@@ -1,0 +1,63 @@
+<?php
+
+namespace App\Providers;
+
+use App\Support\TenantContext;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->scoped(TenantContext::class);
+    }
+
+    public function boot(): void
+    {
+        // Fail loudly in development/tests when code assigns non-fillable or reads unselected attributes.
+        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
+        Model::preventAccessingMissingAttributes(! $this->app->isProduction());
+
+        Password::defaults(fn () => Password::min(8)->letters()->mixedCase()->numbers());
+
+        ResetPassword::createUrlUsing(fn ($user, string $token) => rtrim(config('smartpos.frontend_url'), '/')
+            .'/reset-password?token='.$token.'&email='.urlencode($user->getEmailForPasswordReset()));
+
+        VerifyEmail::createUrlUsing(fn ($user) => URL::temporarySignedRoute(
+            'api.v1.auth.verify-email',
+            now()->addMinutes(60),
+            ['id' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
+        ));
+
+        // Generic permission gate for endpoints not tied to a single model (reports, audit logs…).
+        Gate::define('tenant-permission', fn ($user, string $permission) => app(TenantContext::class)->hasTenant()
+            && app(TenantContext::class)->can($permission));
+
+        $this->configureRateLimiting();
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+            ->by($request->user()?->id ?: $request->ip()));
+
+        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+
+        RateLimiter::for('login', fn (Request $request) => [
+            Limit::perMinute(5)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute(20)->by($request->ip()),
+        ]);
+
+        RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(60)
+            ->by($request->user()?->id ?: $request->ip()));
+    }
+}
