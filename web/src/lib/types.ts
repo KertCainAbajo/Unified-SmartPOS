@@ -51,6 +51,7 @@ export interface Tenant {
   phone: string | null;
   email: string | null;
   staff_email_domain: string | null;
+  recruitment_allow_self_approval: boolean;
   currency: string;
   timezone: string;
   vat_registered: boolean;

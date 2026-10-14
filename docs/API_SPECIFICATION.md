@@ -122,6 +122,15 @@ Staff error codes: `DUPLICATE_IDENTIFIER`, `EMAIL_REQUIRED`, `INVALID_ROLE`, `IN
 `INVALID_STAFF_STATE`, `PERSONAL_ACCOUNT`, `PERSONAL_ACCOUNT_PROFILE`; `ACCOUNT_INACTIVE` (401) on any request by a
 disabled user.
 
+### Recruitment (see [RECRUITMENT.md](RECRUITMENT.md))
+
+Public `/careers/...` endpoints for applicants (reference + secret token, no account) and staff endpoints under
+`/tenants/{t}/vacancies` and `/tenants/{t}/applications/...`. Permissions: `recruitment.view`, `recruitment.vacancies`,
+`recruitment.hr`, `recruitment.manager_interview`, `recruitment.final_approval` (owner-only to grant); provisioning
+the hire's account uses `staff.create`. Error codes: `INVALID_TRANSITION`, `INVALID_APPLICATION_STATE`,
+`INVALID_INTERVIEWER`, `INTERVIEW_ALREADY_SCHEDULED`, `INVALID_DECISION`, `REASON_REQUIRED`, `ONBOARDING_INCOMPLETE`,
+`VACANCY_CLOSED`, `DOCUMENTS_REQUIRED`, `APPLICATION_NOT_FOUND` (404).
+
 ### Catalog
 
 | Method | Path | Permission |

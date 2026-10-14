@@ -7,6 +7,8 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { SelectBusinessPage } from './pages/auth/SelectBusinessPage';
 import { ChangePasswordPage } from './pages/auth/ChangePasswordPage';
+import { ApplicationStatusPage } from './pages/careers/ApplicationStatusPage';
+import { CareersIndexPage, CareersPage } from './pages/careers/CareersPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 function RequireAuth() {
@@ -31,6 +33,10 @@ function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: k
 }
 
 export const router = createBrowserRouter([
+  // Public careers pages: no sign-in needed (applicants have no SmartPOS account).
+  { path: '/careers', element: <CareersIndexPage /> },
+  { path: '/careers/:code', element: <CareersPage /> },
+  { path: '/applications/status', element: <ApplicationStatusPage /> },
   {
     element: <GuestOnly />,
     children: [
@@ -63,6 +69,7 @@ export const router = createBrowserRouter([
           { path: 'expenses', lazy: page(() => import('./pages/operations/ExpensesPage'), 'ExpensesPage') },
           { path: 'reports', lazy: page(() => import('./pages/reports/ReportsPage'), 'ReportsPage') },
           { path: 'audit', lazy: page(() => import('./pages/reports/AuditLogPage'), 'AuditLogPage') },
+          { path: 'recruitment', lazy: page(() => import('./pages/recruitment/RecruitmentPage'), 'RecruitmentPage') },
           { path: 'team', lazy: page(() => import('./pages/admin/TeamPage'), 'TeamPage') },
           { path: 'settings', lazy: page(() => import('./pages/admin/SettingsPage'), 'SettingsPage') },
           { path: '*', element: <NotFoundPage /> },

@@ -20,6 +20,7 @@ import {
   Users,
   Wallet,
   X,
+  UserPlus,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router';
@@ -66,6 +67,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { to: 'expenses', label: 'Expenses', icon: <Wallet />, any: ['expenses.view'] },
       { to: 'reports', label: 'Reports', icon: <BarChart3 />, any: ['reports.view', 'reports.financial'] },
       { to: 'audit', label: 'Audit log', icon: <ClipboardList />, any: ['audit_logs.view'] },
+      { to: 'recruitment', label: 'Recruitment', icon: <UserPlus />, any: ['recruitment.view'] },
       { to: 'team', label: 'Team', icon: <Users />, any: ['staff.view'] },
       { to: 'settings', label: 'Settings', icon: <Settings />, any: ['tenant.manage', 'branches.manage', 'registers.manage'] },
     ],

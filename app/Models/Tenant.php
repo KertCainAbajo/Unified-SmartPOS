@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'name', 'legal_name', 'tin', 'address', 'phone', 'email', 'staff_email_domain', 'timezone',
     'vat_registered', 'vat_rate', 'prices_include_vat', 'allow_negative_stock',
-    'refund_approval_threshold', 'refund_window_days',
+    'refund_approval_threshold', 'refund_window_days', 'recruitment_allow_self_approval',
 ])]
 class Tenant extends Model
 {
@@ -26,6 +26,7 @@ class Tenant extends Model
         'refund_window_days' => 30,
         'status' => 'active',
         'staff_email_domain' => null,
+        'recruitment_allow_self_approval' => false,
     ];
 
     protected function casts(): array
@@ -37,6 +38,7 @@ class Tenant extends Model
             'allow_negative_stock' => 'boolean',
             'refund_approval_threshold' => 'decimal:2',
             'refund_window_days' => 'integer',
+            'recruitment_allow_self_approval' => 'boolean',
         ];
     }
 
@@ -59,6 +61,17 @@ class Tenant extends Model
     public function staff(): HasMany
     {
         return $this->memberships();
+    }
+
+    public function vacancies(): HasMany
+    {
+        return $this->hasMany(Vacancy::class);
+    }
+
+    /** Route-binding name for job applications (scoped bindings use the parameter name). */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(JobApplication::class);
     }
 
     public function branches(): HasMany

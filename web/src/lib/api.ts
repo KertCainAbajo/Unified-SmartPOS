@@ -65,7 +65,9 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     'X-Requested-With': 'XMLHttpRequest',
     ...options.headers,
   };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  // FormData (file uploads) sets its own multipart boundary header.
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   const xsrf = readCookie('XSRF-TOKEN');
   if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
 
@@ -73,7 +75,7 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     method,
     credentials: 'include',
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
   });
 }
 
@@ -101,6 +103,21 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
   }
 
   return data as T;
+}
+
+/** Download a protected file (session cookie) and save it with the given name. */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const response = await fetch(`${BASE}${path}`, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(response.status, data?.message ?? `Download failed (${response.status})`, data?.code);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Human-friendly message for any thrown value. */

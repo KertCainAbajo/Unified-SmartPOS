@@ -1,3 +1,4 @@
+import { Briefcase } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth, type LoginCredentials } from '../../auth/AuthProvider';
@@ -94,6 +95,23 @@ export function LoginPage() {
           Sign in
         </Button>
       </form>
+      <div className="mt-6 rounded-lg border border-teal-100 bg-teal-50/50 p-4 text-center">
+        <p className="flex items-center justify-center gap-2 text-sm font-medium text-slate-800">
+          <Briefcase className="size-4 text-teal-700" /> Looking for a job?
+        </p>
+        <p className="mt-1 text-xs text-slate-500">{device ? `See open positions at ${device.name} and apply online.` : 'See open positions and apply online.'}</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Link
+            to={device ? `/careers/${encodeURIComponent(device.code)}` : '/careers'}
+            className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-medium text-teal-800 ring-1 ring-teal-200 hover:bg-teal-50"
+          >
+            Apply for a job
+          </Link>
+          <Link to="/applications/status" className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-teal-800">
+            Check my application
+          </Link>
+        </div>
+      </div>
       {import.meta.env.DEV && (
         <p className="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
           Local demo (password <code>DemoPass123</code>): email <code>owner@demo.smartpos.test</code>, <code>manager@demo.smartpos.test</code>,{' '}

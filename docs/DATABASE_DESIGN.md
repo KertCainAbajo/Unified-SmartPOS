@@ -90,6 +90,14 @@ Pivot `membership_id` + `branch_id` (composite PK). Ignored when `all_branches =
 Platform Super Admin is `users.is_platform_admin`, not a tenant role, so that it can never be granted
 implicitly through a tenant.
 
+### Recruitment *(added; see [RECRUITMENT.md](RECRUITMENT.md))*
+`vacancies` (branch, role on hire, required document types, status), `job_applications` (applicant details,
+status, return status, applicant-facing message, internal rejection reason, approval, offer, onboarding, hired
+membership; status token stored as SHA-256), `interviews` (one row per stage round: interviewer, schedule, status,
+reschedule count, criteria, score, confidential feedback, decision, reason), `application_documents` (private disk),
+`onboarding_tasks`, `application_events` (append-only history). `tenants.recruitment_allow_self_approval` is the
+hiring policy flag.
+
 ## 2. Products
 
 ### categories

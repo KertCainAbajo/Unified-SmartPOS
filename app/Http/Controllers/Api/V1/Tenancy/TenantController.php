@@ -68,6 +68,8 @@ class TenantController extends Controller
             'allow_negative_stock' => ['sometimes', 'boolean'],
             'refund_approval_threshold' => ['sometimes', 'numeric', 'decimal:0,2', 'min:0'],
             'refund_window_days' => ['sometimes', 'integer', 'min:0', 'max:3650'],
+            // Hiring policy: may whoever recommended an applicant (manager interview) also give final approval?
+            'recruitment_allow_self_approval' => ['sometimes', 'boolean'],
         ]);
 
         $original = $tenant->getOriginal();

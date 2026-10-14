@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last updated: 2026-10-14. Test runs: backend **144/144 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing.
+Last updated: 2026-10-14. Test runs: backend **162/162 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing. End-to-end HTTP flow check (whole business day across all modules and roles, against a separate test database): **106/106**.
 
 Legend: ✅ implemented and covered by automated tests · 🟡 implemented, partially verified · ⛔ not implemented
 
@@ -50,6 +50,17 @@ Each bug was reproduced by a failing test before it was fixed.
 - 🟡 Web app: Team page with auto-fill, printable credential slip, staff detail (account, personal information, roles & access, reset password); staff username sign-in and forced password change. **Activation-code and "forgot password" screens are not built yet**
 - ✅ Staff sign in with username **or employee ID** + password (business remembered per device); owners, managers and HR sign in with email only (`StaffSignInMethodTest`)
 - ⛔ Not implemented: MFA, bulk employee import, per-business password policy
+
+## Recruitment and hiring (2026-10-15) — see [RECRUITMENT.md](RECRUITMENT.md)
+
+- ✅ Vacancies; public careers page and online application with documents; applicant status page (reference + token)
+- ✅ Enforced stages SUBMITTED → HR_SCREENING → HR_INTERVIEW → MANAGER_INTERVIEW → OWNER_FINAL_INTERVIEW → APPROVED → OFFER_SENT → OFFER_ACCEPTED → ONBOARDING → HIRED, plus INCOMPLETE / REJECTED / WITHDRAWN / OFFER_DECLINED
+- ✅ Interview scheduling, rescheduling (incl. applicant requests), cancellation, no-show, assigned-interviewer-only results with criteria, score, feedback and reasons; append-only history + audit
+- ✅ Final approval by owner or delegate; self-approval blocked unless the business policy allows it
+- ✅ Offer, onboarding checklist, document verification; SmartPOS account only after all of them (via staff-account rules)
+- ✅ 17 tests (`tests/Feature/Recruitment`) covering every transition, permission and bypass attempt
+- 🟡 Web pages verified by typecheck/build, not by browser tests; applicant emails go to the log mailer in development
+- ⛔ Not implemented: calendar invites, interview reminders, configurable stages per business
 
 ## Web app (React, `web/`)
 

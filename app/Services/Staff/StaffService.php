@@ -19,6 +19,7 @@ use App\Support\Permissions;
 use App\Support\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -74,8 +75,9 @@ class StaffService
      * Create a company-managed account (no personal email needed) in the `invited` state.
      *
      * @param  array{name: string, username?: string|null, email?: string|null, employee_code?: string|null,
-     *               role_ids: list<int>, all_branches?: bool, branch_ids?: list<int>, delivery: string}  $data
-     * @return array{membership: TenantMembership, activation_code: string|null, expires_at: string}
+     *               role_ids: list<int>, all_branches?: bool, branch_ids?: list<int>, delivery: string,
+     *               require_password_change?: bool, profile?: array<string, mixed>}  $data
+     * @return array{membership: TenantMembership, activation_code: string|null, temporary_password?: string|null, expires_at: string|null}
      */
     public function create(array $data): array
     {
@@ -199,7 +201,7 @@ class StaffService
 
     /* ======================================================================= Changes */
 
-    /** @param  array{name?: string, email?: string|null, username?: string, employee_code?: string|null}  $data */
+    /** @param  array{name?: string, email?: string|null, username?: string, employee_code?: string|null, profile?: array<string, mixed>}  $data */
     public function updateProfile(TenantMembership $target, array $data): TenantMembership
     {
         $this->authorize(Permissions::STAFF_UPDATE, $target, 'update_profile');
@@ -653,9 +655,9 @@ class StaffService
      * only contain permissions their creator holds). Administrative roles are owner-only.
      *
      * @param  list<int>  $roleIds
-     * @return Collection<int, Role>
+     * @return EloquentCollection<int, Role>
      */
-    private function resolveRoles(array $roleIds, string $action, ?TenantMembership $target = null): Collection
+    private function resolveRoles(array $roleIds, string $action, ?TenantMembership $target = null): EloquentCollection
     {
         $roles = Role::query()->availableTo($this->context->tenantId())->whereIn('id', $roleIds)->with('permissions')->get();
 

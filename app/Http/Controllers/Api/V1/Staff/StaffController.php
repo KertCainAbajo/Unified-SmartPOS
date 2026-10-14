@@ -282,7 +282,8 @@ class StaffController extends Controller
     }
 
     /** @param  array{membership: TenantMembership, activation_code: string|null, expires_at: string|null}  $result */
-    private function withCode(array $result, int $status = 200): JsonResponse
+    /** Response carrying one-time sign-in details (also used when recruitment provisions a hire). */
+    public static function withCode(array $result, int $status = 200): JsonResponse
     {
         return response()->json([
             'data' => new StaffResource($result['membership']->load(self::RELATIONS)),

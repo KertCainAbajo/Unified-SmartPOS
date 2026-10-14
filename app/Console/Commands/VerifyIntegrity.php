@@ -3,14 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Support\Money;
-use Illuminate\Console\Attributes\AsCommand;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Read-only consistency checks over the ledger and financial tables. Safe to run in production.
  */
-#[AsCommand(name: 'smartpos:verify-integrity')]
 class VerifyIntegrity extends Command
 {
     protected $signature = 'smartpos:verify-integrity {--tenant= : Limit checks to one tenant ID}';

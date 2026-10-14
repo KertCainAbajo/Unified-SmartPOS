@@ -19,6 +19,9 @@ use App\Http\Controllers\Api\V1\Pos\RegisterSessionController;
 use App\Http\Controllers\Api\V1\Pos\SaleController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
+use App\Http\Controllers\Api\V1\Recruitment\ApplicationController;
+use App\Http\Controllers\Api\V1\Recruitment\PublicCareerController;
+use App\Http\Controllers\Api\V1\Recruitment\VacancyController;
 use App\Http\Controllers\Api\V1\Reports\AuditLogController;
 use App\Http\Controllers\Api\V1\Reports\ReportController;
 use App\Http\Controllers\Api\V1\Staff\StaffActivationController;
@@ -44,6 +47,17 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::prefix('staff')->name('staff.')->middleware('throttle:staff-codes')->group(function () {
         Route::post('activate', [StaffActivationController::class, 'activate'])->name('activate');
         Route::post('forgot-password', [StaffActivationController::class, 'forgotPassword'])->name('forgot-password');
+    });
+
+    // ---- Public careers (applicants have no account: reference + secret token) ---------------
+    Route::prefix('careers')->name('careers.')->middleware('throttle:public-applications')->group(function () {
+        Route::get('{business}/vacancies', [PublicCareerController::class, 'vacancies'])->middleware('throttle:60,1')->withoutMiddleware('throttle:public-applications')->name('vacancies');
+        Route::post('{business}/vacancies/{vacancy}/apply', [PublicCareerController::class, 'apply'])->whereNumber('vacancy')->name('apply');
+        Route::post('applications/status', [PublicCareerController::class, 'status'])->name('status');
+        Route::post('applications/documents', [PublicCareerController::class, 'upload'])->name('documents');
+        Route::post('applications/withdraw', [PublicCareerController::class, 'withdraw'])->name('withdraw');
+        Route::post('applications/offer-response', [PublicCareerController::class, 'offerResponse'])->name('offer-response');
+        Route::post('applications/reschedule-request', [PublicCareerController::class, 'rescheduleRequest'])->name('reschedule-request');
     });
 
     // ---- Authenticated ---------------------------------------------------------------------
@@ -97,6 +111,36 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::post('staff/{staff}/recovery', [StaffController::class, 'recovery'])->name('staff.recovery');
                 Route::get('staff/{staff}/pending-work', [StaffController::class, 'pendingWork'])->name('staff.pending-work');
 
+                // Recruitment (hiring workflow; see RecruitmentService for the stage rules)
+                Route::get('vacancies', [VacancyController::class, 'index'])->name('vacancies.index');
+                Route::post('vacancies', [VacancyController::class, 'store'])->name('vacancies.store');
+                Route::patch('vacancies/{vacancy}', [VacancyController::class, 'update'])->name('vacancies.update');
+                Route::prefix('applications')->name('applications.')->controller(ApplicationController::class)->group(function () {
+                    Route::get('/', 'index')->name('index');
+                    Route::get('{application}', 'show')->name('show');
+                    Route::get('{application}/interviewers', 'interviewers')->name('interviewers');
+                    Route::post('{application}/start-screening', 'startScreening')->name('start-screening');
+                    Route::post('{application}/screen', 'screen')->name('screen');
+                    Route::post('{application}/clarification', 'clarification')->name('clarification');
+                    Route::post('{application}/resume', 'resume')->name('resume');
+                    Route::post('{application}/interviews', 'schedule')->name('interviews.schedule');
+                    Route::post('{application}/interviews/{interview}/reschedule', 'reschedule')->name('interviews.reschedule');
+                    Route::post('{application}/interviews/{interview}/cancel', 'cancelInterview')->name('interviews.cancel');
+                    Route::post('{application}/interviews/{interview}/no-show', 'noShow')->name('interviews.no-show');
+                    Route::post('{application}/interviews/{interview}/result', 'result')->name('interviews.result');
+                    Route::post('{application}/another-interview', 'anotherInterview')->name('another-interview');
+                    Route::post('{application}/reject', 'reject')->name('reject');
+                    Route::post('{application}/withdraw', 'withdraw')->name('withdraw');
+                    Route::post('{application}/offer', 'offer')->name('offer');
+                    Route::post('{application}/offer-response', 'offerResponse')->name('offer-response');
+                    Route::post('{application}/onboarding', 'startOnboarding')->name('onboarding');
+                    Route::patch('{application}/onboarding-tasks/{onboardingTask}', 'updateTask')->name('onboarding-tasks.update');
+                    Route::post('{application}/documents', 'uploadDocument')->name('documents.store');
+                    Route::get('{application}/documents/{document}', 'downloadDocument')->name('documents.download');
+                    Route::post('{application}/documents/{document}/verify', 'verifyDocument')->name('documents.verify');
+                    Route::post('{application}/provision', 'provision')->name('provision');
+                });
+
                 Route::get('permissions', [RoleController::class, 'permissions'])->name('permissions.index');
                 Route::apiResource('roles', RoleController::class)->except('show');
 
@@ -140,7 +184,6 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
                 Route::get('sales', [SaleController::class, 'index'])->name('sales.index');
                 Route::post('sales', [SaleController::class, 'store'])->middleware('throttle:checkout')->name('sales.checkout');
-                Route::post('sales/quote', [SaleController::class, 'quote'])->name('sales.quote');
                 Route::post('sales/quote', [SaleController::class, 'quote'])->name('sales.quote');
                 Route::get('sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
                 Route::get('sales/{sale}/receipt', [SaleController::class, 'receipt'])->name('sales.receipt');

@@ -63,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(20)->by($request->ip()),
         ]);
 
+        // Public careers pages: applications, status checks and applicant actions.
+        RateLimiter::for('public-applications', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+
         RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(60)
             ->by($request->user()?->id ?: $request->ip()));
     }

@@ -29,6 +29,7 @@ class TenantResource extends JsonResource
             'allow_negative_stock' => $this->allow_negative_stock,
             'refund_approval_threshold' => $this->refund_approval_threshold,
             'refund_window_days' => $this->refund_window_days,
+            'recruitment_allow_self_approval' => $this->recruitment_allow_self_approval,
             'status' => $this->status,
             'owner_user_id' => $this->owner_user_id,
             'created_at' => $this->created_at,

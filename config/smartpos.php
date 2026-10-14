@@ -11,6 +11,15 @@ return [
     'sc_pwd_discount_rate' => '20',
 
     // Lifetime of staff activation / recovery codes.
+    // Default onboarding checklist created when a hire starts onboarding (required items gate account creation).
+    'onboarding_tasks' => [
+        ['key' => 'contract_signed', 'label' => 'Employment contract signed', 'required' => true],
+        ['key' => 'government_ids', 'label' => 'SSS, PhilHealth, Pag-IBIG and TIN numbers recorded', 'required' => true],
+        ['key' => 'documents_verified', 'label' => 'Required documents verified', 'required' => true],
+        ['key' => 'orientation', 'label' => 'Orientation and policies briefing completed', 'required' => true],
+        ['key' => 'uniform_issued', 'label' => 'Uniform / ID issued', 'required' => false],
+    ],
+
     'staff_code_ttl_hours' => (int) env('SMARTPOS_STAFF_CODE_TTL_HOURS', 72),
 
     // Maximum page size accepted by paginated endpoints.

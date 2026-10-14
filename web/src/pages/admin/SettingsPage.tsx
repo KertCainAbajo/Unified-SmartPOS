@@ -55,6 +55,7 @@ function BusinessSettings() {
         <Checkbox label="VAT-registered" checked={form.vat_registered} onChange={(v) => setForm((f) => ({ ...f, vat_registered: v }))} />
         <Checkbox label="Prices include VAT" checked={form.prices_include_vat} onChange={(v) => setForm((f) => ({ ...f, prices_include_vat: v }))} />
         <Checkbox label="Allow selling below zero stock (not recommended)" checked={form.allow_negative_stock} onChange={(v) => setForm((f) => ({ ...f, allow_negative_stock: v }))} />
+        <Checkbox label="Hiring: a delegate who recommended an applicant may also give the final approval (not recommended)" checked={form.recruitment_allow_self_approval} onChange={(v) => setForm((f) => ({ ...f, recruitment_allow_self_approval: v }))} />
       </div>
       <div className="mt-6 flex justify-end">
         <Button
@@ -63,6 +64,7 @@ function BusinessSettings() {
             save.mutate({
               name: form.name, legal_name: form.legal_name || null, staff_email_domain: form.staff_email_domain || null, tin: form.tin || null, address: form.address || null, phone: form.phone || null, email: form.email || null,
               vat_rate: form.vat_rate, vat_registered: form.vat_registered, prices_include_vat: form.prices_include_vat, allow_negative_stock: form.allow_negative_stock,
+              recruitment_allow_self_approval: form.recruitment_allow_self_approval,
               refund_approval_threshold: form.refund_approval_threshold, refund_window_days: form.refund_window_days,
             })
           }

@@ -28,7 +28,7 @@ export function TeamPage() {
   );
 }
 
-interface Credentials {
+export interface Credentials {
   name: string;
   signInWith: 'username' | 'email';
   username: string | null;
@@ -40,14 +40,14 @@ interface Credentials {
   expiresAt: string | null;
 }
 
-interface IssuedResponse {
+export interface IssuedResponse {
   data: StaffMember;
   activation_code: string | null;
   temporary_password: string | null;
   code_expires_at: string | null;
 }
 
-const toCredentials = (r: IssuedResponse): Credentials => ({
+export const toCredentials = (r: IssuedResponse): Credentials => ({
   name: r.data.name ?? '',
   signInWith: r.data.sign_in_with,
   username: r.data.username,
@@ -158,7 +158,7 @@ function ProfileFields({ value, onChange, errors }: { value: StaffProfile; onCha
 const profilePayload = (p: StaffProfile) => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === '' ? null : v]));
 
 /** Printable slip with the new sign-in details. The password is shown only here, only once. */
-function CredentialSlip({ credentials }: { credentials: Credentials }) {
+export function CredentialSlip({ credentials }: { credentials: Credentials }) {
   const { tenant } = useTenant();
   const [copied, setCopied] = useState<string | null>(null);
   // Copies the exact value; selecting it by hand easily picks up a stray space.

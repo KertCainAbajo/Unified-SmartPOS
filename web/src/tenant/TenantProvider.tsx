@@ -5,6 +5,8 @@ import { setDeviceBusiness } from '../lib/device';
 import type { Branch, Tenant, TenantContextData } from '../lib/types';
 
 interface TenantValue {
+  /** This member's id in the business (e.g. to recognise interviews assigned to me). */
+  membershipId: number;
   tenantId: number;
   tenant: Tenant;
   permissions: Set<string>;
@@ -77,6 +79,7 @@ export function TenantProvider({ data, tenantId, children }: { data: TenantConte
     return {
       tenantId,
       tenant: data.tenant,
+      membershipId: data.membership_id,
       permissions,
       roles: data.roles,
       branches: data.branches,

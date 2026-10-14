@@ -94,6 +94,20 @@ final class Permissions
 
     public const AUDIT_VIEW = 'audit_logs.view';
 
+    /** See applications of accessible branches (managers: from their interview stage on, or when assigned). */
+    public const RECRUITMENT_VIEW = 'recruitment.view';
+
+    public const RECRUITMENT_VACANCIES = 'recruitment.vacancies';
+
+    /** HR: screening, HR interviews, scheduling, clarifications, offers and onboarding. */
+    public const RECRUITMENT_HR = 'recruitment.hr';
+
+    /** Conduct the second (branch manager) interview for own branches. */
+    public const RECRUITMENT_MANAGER_INTERVIEW = 'recruitment.manager_interview';
+
+    /** Conduct the final interview and approve hiring. The owner always may; others only as an owner-granted delegate. */
+    public const RECRUITMENT_FINAL_APPROVAL = 'recruitment.final_approval';
+
     /**
      * Administrative permissions. Roles containing any of them can only be granted by the business owner,
      * and members holding them can only be modified by the owner (prevents lateral escalation between admins).
@@ -108,6 +122,7 @@ final class Permissions
         self::STAFF_ASSIGN_ROLES,
         self::STAFF_ASSIGN_BRANCHES,
         self::STAFF_CREDENTIALS,
+        self::RECRUITMENT_FINAL_APPROVAL,
     ];
 
     /** @return array<string, array{name: string, group: string}> */
@@ -156,6 +171,11 @@ final class Permissions
             self::REPORTS_VIEW => ['name' => 'View sales and inventory reports', 'group' => 'reports'],
             self::REPORTS_FINANCIAL => ['name' => 'View cost, expense and profit reports', 'group' => 'reports'],
             self::AUDIT_VIEW => ['name' => 'View the full audit log', 'group' => 'reports'],
+            self::RECRUITMENT_VIEW => ['name' => 'View job applications', 'group' => 'recruitment'],
+            self::RECRUITMENT_VACANCIES => ['name' => 'Manage vacancies', 'group' => 'recruitment'],
+            self::RECRUITMENT_HR => ['name' => 'Screen applicants, HR interviews, offers and onboarding', 'group' => 'recruitment'],
+            self::RECRUITMENT_MANAGER_INTERVIEW => ['name' => 'Conduct branch manager interviews', 'group' => 'recruitment'],
+            self::RECRUITMENT_FINAL_APPROVAL => ['name' => 'Final interview and hiring approval', 'group' => 'recruitment'],
         ];
     }
 
@@ -200,8 +220,8 @@ final class Permissions
             ],
             self::ROLE_ACCESS_MANAGER => [
                 'name' => 'User & Access Manager',
-                'description' => 'Manages staff accounts and access; no sales, stock or financial data.',
-                'permissions' => $staffAdmin,
+                'description' => 'HR: manages recruitment, staff accounts and access; no sales, stock or financial data.',
+                'permissions' => [...$staffAdmin, self::RECRUITMENT_VIEW, self::RECRUITMENT_VACANCIES, self::RECRUITMENT_HR],
             ],
             self::ROLE_MANAGER => [
                 'name' => 'Branch Manager',
@@ -212,6 +232,10 @@ final class Permissions
                     self::TENANT_MANAGE,
                     self::BRANCHES_MANAGE,
                     self::ROLES_MANAGE,
+                    // Recruitment: second interview only; screening, offers and final approval belong to HR and the owner.
+                    self::RECRUITMENT_VACANCIES,
+                    self::RECRUITMENT_HR,
+                    self::RECRUITMENT_FINAL_APPROVAL,
                 ])),
             ],
             self::ROLE_CASHIER => [
