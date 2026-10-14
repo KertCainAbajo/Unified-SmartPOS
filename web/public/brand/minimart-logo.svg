@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1104 932" role="img" aria-labelledby="t">
+  <title id="t">Aling Nena Mini Mart</title>
+  <style>
+    .g { fill: none; stroke: #1c6440; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+    .gt { fill: none; stroke: #1c6440; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+    .ray { stroke: #f2c443; stroke-width: 15; stroke-linecap: round; }
+    .y { fill: #f5c347; }
+    .gf { fill: #1c6440; }
+    .skin { fill: #fdf7e6; }
+    .word { font-family: Poppins, 'Segoe UI', Arial, sans-serif; fill: #1f2a1e; text-anchor: middle; }
+  </style>
+
+  <!-- Sun rays -->
+  <g class="ray">
+    <line x1="175" y1="157" x2="228" y2="188" />
+    <line x1="250" y1="117" x2="290" y2="146" />
+    <line x1="306" y1="93" x2="329" y2="116" />
+    <line x1="374" y1="45" x2="400" y2="90" />
+    <line x1="465" y1="31" x2="476" y2="70" />
+    <line x1="548" y1="10" x2="548" y2="64" />
+    <line x1="627" y1="31" x2="617" y2="70" />
+    <line x1="721" y1="45" x2="695" y2="90" />
+    <line x1="788" y1="93" x2="765" y2="116" />
+    <line x1="845" y1="117" x2="805" y2="146" />
+    <line x1="921" y1="157" x2="868" y2="188" />
+  </g>
+
+  <!-- Arch: entablature with double outline, three concentric arcs, capitals, pillars, ground -->
+  <path class="g" d="M120 236 H246 Q552 -46 858 236 H976" />
+  <path class="g" d="M120 236 V284 H290 M976 236 V284 H814" />
+  <path class="g" d="M140 262 H264 Q552 6 840 262 H956" />
+  <path class="g" d="M290 284 Q552 36 814 284" />
+  <rect class="g" x="160" y="318" width="112" height="22" rx="4" />
+  <rect class="g" x="832" y="318" width="112" height="22" rx="4" />
+  <rect class="g" x="178" y="340" width="76" height="262" />
+  <rect class="g" x="850" y="340" width="76" height="262" />
+  <line class="g" x1="132" y1="604" x2="972" y2="604" />
+
+  <!-- Father: green shirt, yellow trousers, shopping bag -->
+  <g>
+    <circle class="skin" cx="356" cy="326" r="34" />
+    <path class="gf" d="M322 322 Q320 286 356 286 Q392 286 390 322 Q378 306 356 306 Q334 306 322 322 Z" />
+    <circle class="gt" cx="356" cy="326" r="34" />
+    <path class="gf" d="M304 382 Q356 360 410 382 L404 486 H312 Z" />
+    <path class="g" d="M306 388 L292 512" />
+    <rect class="y" x="314" y="484" width="84" height="40" rx="6" />
+    <path class="y" d="M318 520 H356 L352 598 H326 Z M360 520 H396 L392 598 H364 Z" />
+    <path class="gt" d="M314 486 H398 L396 598 H364 L358 530 L352 598 H320 Z" />
+    <path class="gt" d="M326 598 V604 M364 598 V604" />
+    <rect class="y" x="266" y="518" width="60" height="78" rx="6" />
+    <path class="gt" d="M278 520 Q296 494 314 520" />
+    <path class="gt" d="M266 540 H326" />
+  </g>
+
+  <!-- Mother: hair, yellow dress -->
+  <g>
+    <circle class="skin" cx="452" cy="348" r="32" />
+    <path class="gf" d="M416 380 Q408 310 452 308 Q496 310 488 380 L476 380 Q480 350 472 336 Q452 344 432 334 Q424 350 428 380 Z" />
+    <circle class="gt" cx="452" cy="348" r="32" />
+    <path class="y" d="M422 390 Q452 378 482 390 L506 540 H398 Z" />
+    <path class="gt" d="M422 390 Q452 378 482 390 L506 540 H398 Z" />
+    <path class="gt" d="M436 540 V600 M468 540 V600" />
+    <path class="gt" d="M482 410 L510 488" />
+  </g>
+
+  <!-- Child: pigtails, yellow dress, holding mother's hand -->
+  <g>
+    <circle class="skin" cx="540" cy="434" r="25" />
+    <path class="gf" d="M515 432 Q514 405 540 405 Q566 405 565 432 Q552 420 540 420 Q526 420 515 432 Z" />
+    <circle class="gf" cx="512" cy="446" r="9" />
+    <circle class="gf" cx="568" cy="446" r="9" />
+    <circle class="g" cx="540" cy="434" r="25" />
+    <path class="y" d="M518 470 Q540 462 562 470 L578 556 H502 Z" />
+    <path class="gt" d="M518 470 Q540 462 562 470 L578 556 H502 Z" />
+    <path class="gt" d="M524 556 V600 M556 556 V600" />
+    <path class="gt" d="M518 486 L508 490" />
+  </g>
+
+  <!-- Grandmother shopkeeper behind the counter -->
+  <g>
+    <circle class="gt" cx="686" cy="300" r="15" />
+    <circle class="skin" cx="686" cy="372" r="56" />
+    <path class="gt" d="M630 372 Q630 316 686 316 Q742 316 742 372" />
+    <path class="gt" d="M640 350 Q686 326 732 350" />
+    <circle class="g" cx="686" cy="372" r="56" />
+    <circle class="gt" cx="664" cy="374" r="12" />
+    <circle class="gt" cx="708" cy="374" r="12" />
+    <path class="gt" d="M676 374 H696" />
+    <path class="gt" d="M670 402 Q686 414 702 402" />
+    <path class="gt" d="M618 494 Q622 438 668 430 L704 430 Q750 438 754 494" />
+    <path class="y" d="M656 448 H716 V494 H656 Z" />
+    <path class="gt" d="M656 432 V494 M716 432 V494" />
+  </g>
+
+  <!-- Counter and jar -->
+  <rect class="g" x="602" y="494" width="226" height="24" rx="3" />
+  <rect class="gt" x="778" y="438" width="44" height="54" rx="6" />
+  <rect class="y" x="783" y="460" width="34" height="28" rx="3" />
+  <path class="gt" d="M776 452 H824" />
+
+  <!-- Wordmark -->
+  <text class="word" x="552" y="742" font-size="156" font-weight="700" letter-spacing="6">ALING NENA</text>
+  <text class="word" x="552" y="862" font-size="98" font-weight="600" letter-spacing="8">MINI MART</text>
+</svg>

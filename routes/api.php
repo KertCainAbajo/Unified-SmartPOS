@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\Auth\ProfileController;
+use App\Http\Controllers\Api\V1\Auth\SignInOptionsController;
 use App\Http\Controllers\Api\V1\Catalog\CategoryController;
 use App\Http\Controllers\Api\V1\Catalog\ProductController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryController;
@@ -36,6 +37,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('register', [AuthController::class, 'register'])->middleware('throttle:auth')->name('auth.register');
         Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login')->name('auth.login');
+        // Branch dropdown on the staff sign-in page (names only).
+        Route::get('businesses', [SignInOptionsController::class, 'index'])->middleware('throttle:60,1')->name('auth.businesses');
+        Route::get('businesses/{business}', [SignInOptionsController::class, 'show'])->middleware('throttle:60,1')->name('auth.business');
         Route::post('forgot-password', [PasswordResetController::class, 'sendLink'])->middleware('throttle:auth')->name('auth.forgot-password');
         Route::post('reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:auth')->name('auth.reset-password');
         Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])

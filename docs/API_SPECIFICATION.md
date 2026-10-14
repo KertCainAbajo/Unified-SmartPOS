@@ -52,7 +52,9 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | POST | `/auth/register` | public | Owner + business + main branch + register, in one transaction |
-| POST | `/auth/login` | public | `email` **or** `business_code` + `username` (company-managed staff); token (with `device_name`) or session |
+| POST | `/auth/login` | public | `email` **or** `business_code` + `username` (username or employee ID) and optional `branch_id` (must be a branch the staff member is assigned to, else 422 on `branch_id`); token (with `device_name`) or session |
+| GET | `/auth/businesses` | public | every active store with its active branch names (staff sign-in dropdown on a new device); 404 when `SMARTPOS_PUBLIC_STORE_LIST=false` |
+| GET | `/auth/businesses/{code}` | public | store name and active branch names for the staff sign-in branch dropdown; 404 if unknown or suspended |
 | POST | `/auth/logout` | user | Revokes current token / ends session |
 | POST | `/auth/logout-all` | user | Revokes all tokens |
 | POST | `/auth/forgot-password` | public | Always the same response |
@@ -71,7 +73,7 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 
 | Method | Path | Auth |
 |---|---|---|
-| GET | `/platform/tenants` | `is_platform_admin` — name/status/counts only, no transactions |
+| GET | `/platform/tenants` | `is_platform_admin` — name, code, status, owner name/email, counts and a `summary` by status; no transactions. Filters `q` (name or code), `status` |
 | PATCH | `/platform/tenants/{tenant}/status` | `is_platform_admin` — suspend/reactivate with reason (audited) |
 
 ### Business, branches, members, roles

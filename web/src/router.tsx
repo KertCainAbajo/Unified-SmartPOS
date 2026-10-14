@@ -49,6 +49,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <SelectBusinessPage /> },
       { path: '/change-password', element: <ChangePasswordPage /> },
+      { path: '/platform', lazy: page(() => import('./pages/platform/PlatformPage'), 'PlatformPage') },
       {
         path: '/t/:tenantId',
         element: <TenantLayout />,

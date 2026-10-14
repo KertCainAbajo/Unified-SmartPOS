@@ -17,25 +17,40 @@ use Illuminate\Http\Request;
  */
 class PlatformTenantController extends Controller
 {
-    /** List businesses with non-sensitive metadata. */
+    /**
+     * List businesses with non-sensitive metadata (who owns it, size, status). `summary` counts every business by
+     * status. Filters: `q` (name or business code), `status`.
+     */
     public function index(Request $request): JsonResponse
     {
         $tenants = Tenant::query()
+            ->with('owner:id,name,email')
             ->withCount(['branches', 'memberships'])
-            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%'.$request->string('q').'%'))
+            ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'like', '%'.$request->string('q').'%')
+                ->orWhere('slug', 'like', '%'.$request->string('q').'%')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderBy('id')
             ->paginate($this->perPage($request));
 
-        return response()->json($tenants->through(fn (Tenant $t) => [
+        $page = $tenants->through(fn (Tenant $t) => [
             'id' => $t->id,
             'name' => $t->name,
             'slug' => $t->slug,
             'status' => $t->status,
+            'owner' => $t->owner ? ['name' => $t->owner->name, 'email' => $t->owner->email] : null,
             'branches_count' => $t->branches_count,
             'members_count' => $t->memberships_count,
             'created_at' => $t->created_at,
-        ]));
+        ])->toArray();
+
+        $byStatus = Tenant::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+
+        return response()->json([...$page, 'summary' => [
+            'total' => (int) $byStatus->sum(),
+            'active' => (int) ($byStatus['active'] ?? 0),
+            'suspended' => (int) ($byStatus['suspended'] ?? 0),
+        ]]);
     }
 
     /** Suspend or reactivate a business. */

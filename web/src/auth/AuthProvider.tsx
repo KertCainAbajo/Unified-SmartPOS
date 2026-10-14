@@ -12,7 +12,7 @@ interface RegisterInput {
 }
 
 /** Owners sign in with email; company-managed staff with business code + username. */
-export type LoginCredentials = { email: string; password: string } | { business_code: string; username: string; password: string };
+export type LoginCredentials = { email: string; password: string } | { business_code: string; username: string; password: string; branch_id?: number };
 
 interface AuthValue {
   user: User | null;

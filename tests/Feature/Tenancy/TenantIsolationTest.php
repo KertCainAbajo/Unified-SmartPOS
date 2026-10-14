@@ -62,8 +62,11 @@ class TenantIsolationTest extends TestCase
         $this->getJson($this->tenantUrl($tenant, 'branches'))->assertNotFound();
 
         // Platform directory only exposes non-sensitive metadata.
-        $row = $this->getJson('/api/v1/platform/tenants')->assertOk()->json('data.0');
-        $this->assertSame(['id', 'name', 'slug', 'status', 'branches_count', 'members_count', 'created_at'], array_keys($row));
+        $list = $this->getJson('/api/v1/platform/tenants')->assertOk()
+            ->assertJsonPath('summary.total', 1)->assertJsonPath('summary.active', 1)->assertJsonPath('summary.suspended', 0);
+        $row = $list->json('data.0');
+        $this->assertSame(['id', 'name', 'slug', 'status', 'owner', 'branches_count', 'members_count', 'created_at'], array_keys($row));
+        $this->assertSame(['name', 'email'], array_keys($row['owner']));
     }
 
     public function test_platform_routes_require_platform_admin(): void

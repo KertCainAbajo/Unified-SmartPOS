@@ -20,6 +20,10 @@ return [
         ['key' => 'uniform_issued', 'label' => 'Uniform / ID issued', 'required' => false],
     ],
 
+    // Staff sign-in shows a dropdown of every active store and branch. Turn off when this system hosts other
+    // companies' stores and their names should not be listed publicly (staff then type a business code).
+    'public_store_list' => (bool) env('SMARTPOS_PUBLIC_STORE_LIST', true),
+
     'staff_code_ttl_hours' => (int) env('SMARTPOS_STAFF_CODE_TTL_HOURS', 72),
 
     // Maximum page size accepted by paginated endpoints.

@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\TenantResource;
 use App\Http\Resources\UserResource;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Tenancy\TenantOnboardingService;
@@ -101,10 +102,19 @@ class AuthController extends Controller
         }
 
         // Checked only after the password is verified, so roles are never revealed to someone guessing usernames.
-        if ($field === 'username' && $tenant->memberships()->where('user_id', $user->id)->first()?->requiresEmailSignIn()) {
+        $membership = $field === 'username' ? $tenant->memberships()->where('user_id', $user->id)->first() : null;
+        if ($membership?->requiresEmailSignIn()) {
             $this->audit->log('auth.login_failed', $user, metadata: ['reason' => 'email_sign_in_required'], tenantId: $tenant->id, userId: $user->id);
 
             throw ValidationException::withMessages([$field => 'Managers and administrators sign in with their email address.']);
+        }
+
+        // Staff choose their branch on the sign-in page; it must be one they are assigned to (checked after the
+        // password, so assignments are never revealed to someone guessing).
+        if ($membership && isset($data['branch_id']) && ! $this->assignedTo($membership, (int) $data['branch_id'])) {
+            $this->audit->log('auth.login_failed', $user, metadata: ['reason' => 'branch_not_assigned', 'branch_id' => (int) $data['branch_id']], tenantId: $tenant->id, userId: $user->id);
+
+            throw ValidationException::withMessages(['branch_id' => 'You are not assigned to this branch. Choose your branch or ask your manager.']);
         }
 
         if ($user->must_change_password && $user->temporary_password_expires_at?->isPast()) {
@@ -165,6 +175,13 @@ class AuthController extends Controller
         $this->audit->log('auth.logout_all', $user, metadata: ['tokens_revoked' => $count], userId: $user->id);
 
         return response()->json(['message' => 'All tokens revoked.', 'tokens_revoked' => $count]);
+    }
+
+    private function assignedTo(TenantMembership $membership, int $branchId): bool
+    {
+        $branch = $membership->tenant->branches()->whereKey($branchId)->where('is_active', true)->exists();
+
+        return $branch && ($membership->all_branches || in_array($branchId, $membership->branchIds(), true));
     }
 
     /** Company-managed account of this business by username, or else by employee ID (case-insensitive). */

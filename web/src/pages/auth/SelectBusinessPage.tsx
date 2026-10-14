@@ -21,6 +21,7 @@ export function SelectBusinessPage() {
   // Pending invitations grant no access until accepted, so only active memberships are listed here.
   const list = (memberships.data?.data ?? []).filter((m) => m.status === 'active');
   if (list.length === 1) return <Navigate to={`/t/${list[0].tenant_id}`} replace />;
+  if (list.length === 0 && user?.is_platform_admin) return <Navigate to="/platform" replace />;
 
   return (
     <AuthLayout title={`Welcome, ${user?.name ?? ''}`} subtitle="Choose a business to continue.">

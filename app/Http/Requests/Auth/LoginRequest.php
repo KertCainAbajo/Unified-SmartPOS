@@ -20,6 +20,8 @@ class LoginRequest extends FormRequest
             'password' => ['required', 'string'],
             // Present for mobile/API clients that need a bearer token. Omit for SPA cookie login.
             'device_name' => ['nullable', 'string', 'max:100'],
+            // Staff: the branch they are signing in at. Must be one they are assigned to.
+            'branch_id' => ['nullable', 'integer'],
         ];
     }
 
