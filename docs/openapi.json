@@ -10367,6 +10367,10 @@
                                             "manual",
                                             "email"
                                         ]
+                                    },
+                                    "require_password_change": {
+                                        "type": "boolean",
+                                        "description": "Generated password only: make it temporary (expires, must be changed at first sign-in). Default permanent."
                                     }
                                 },
                                 "required": [
@@ -11140,6 +11144,9 @@
                                             "manual",
                                             "email"
                                         ]
+                                    },
+                                    "require_password_change": {
+                                        "type": "boolean"
                                     }
                                 }
                             }
@@ -11372,6 +11379,9 @@
                                             "manual",
                                             "email"
                                         ]
+                                    },
+                                    "require_password_change": {
+                                        "type": "boolean"
                                     }
                                 },
                                 "required": [
@@ -11470,6 +11480,9 @@
                                             "manual",
                                             "email"
                                         ]
+                                    },
+                                    "require_password_change": {
+                                        "type": "boolean"
                                     }
                                 },
                                 "required": [

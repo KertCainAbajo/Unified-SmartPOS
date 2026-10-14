@@ -12,7 +12,8 @@ import { NoAccess } from '../NotFoundPage';
 /**
  * Staff accounts. The server enforces every rule (owner-only admin roles, branch scope, no self-edits);
  * buttons simply follow the caller's permissions. Passwords are never displayed after they are issued:
- * a temporary password is shown once on the credential slip and the employee replaces it at first sign-in.
+ * a generated password (e.g. AlingNena-4827) is shown once on the credential slip; it is permanent unless the
+ * administrator asks the employee to change it at first sign-in.
  */
 export function TeamPage() {
   const { can } = useTenant();
@@ -34,6 +35,7 @@ interface Credentials {
   email: string | null;
   employeeCode: string | null;
   temporaryPassword: string | null;
+  mustChange: boolean;
   activationCode: string | null;
   expiresAt: string | null;
 }
@@ -52,6 +54,7 @@ const toCredentials = (r: IssuedResponse): Credentials => ({
   email: r.data.email,
   employeeCode: r.data.employee_code,
   temporaryPassword: r.temporary_password,
+  mustChange: !!r.data.must_change_password,
   activationCode: r.activation_code,
   expiresAt: r.code_expires_at,
 });
@@ -154,7 +157,7 @@ function ProfileFields({ value, onChange, errors }: { value: StaffProfile; onCha
 /** Empty strings become null so cleared fields are cleared on the server. */
 const profilePayload = (p: StaffProfile) => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === '' ? null : v]));
 
-/** Printable slip with the new sign-in details. The temporary password is shown only here, only once. */
+/** Printable slip with the new sign-in details. The password is shown only here, only once. */
 function CredentialSlip({ credentials }: { credentials: Credentials }) {
   const { tenant } = useTenant();
   const [copied, setCopied] = useState<string | null>(null);
@@ -199,12 +202,13 @@ function CredentialSlip({ credentials }: { credentials: Credentials }) {
             {row('Email', credentials.email)}
           </>
         )}
-        {row('Temporary password', credentials.temporaryPassword, true, true)}
+        {row(credentials.mustChange ? 'Temporary password' : 'Password', credentials.temporaryPassword, true, true)}
         {row('Activation code', credentials.activationCode, true, true)}
         {credentials.expiresAt && <p className="mt-3 text-xs text-slate-600">Use before {formatDateTime(credentials.expiresAt)}. {credentials.temporaryPassword ? 'You will be asked to choose your own password at first sign-in.' : 'Enter it on the activation page to choose your password.'}</p>}
+        {credentials.temporaryPassword && !credentials.mustChange && <p className="mt-3 text-xs text-slate-600">This is your password. Keep this slip private and do not share your password with co-workers.</p>}
       </div>
       <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-        This is the only time the {credentials.temporaryPassword ? 'temporary password' : 'code'} is shown. It is not stored in readable form and cannot be viewed later — use <strong>Reset password</strong> to issue a new one.
+        This is the only time the {credentials.temporaryPassword ? 'password' : 'code'} is shown. Print or copy it now — it is not stored in readable form and cannot be viewed later. If it is lost, use <strong>Reset password</strong> to issue a new one.
       </p>
     </div>
   );
@@ -230,7 +234,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
  */
 function deliveryOptions(emailSignIn: boolean, hasEmail: boolean) {
   return [
-    { value: 'temporary_password', label: 'Generate a temporary password', description: 'Printed on a slip now. The employee chooses their own password at first sign-in.', disabled: false },
+    { value: 'temporary_password', label: 'Generate a password', description: 'A simple password based on the business name, e.g. AlingNena-4827, printed on a slip now.', disabled: false },
     ...(emailSignIn ? [] : [{ value: 'manual', label: 'Generate a one-time activation code', description: 'The employee enters the code to set their password.', disabled: false }]),
     { value: 'email', label: 'Email an activation link', description: hasEmail ? 'Sent to the email above.' : 'Enter an email above to use this.', disabled: !hasEmail },
   ];
@@ -239,6 +243,7 @@ function deliveryOptions(emailSignIn: boolean, hasEmail: boolean) {
 function CreateStaff({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { branch, path } = useTenant();
   const [form, setForm] = useState({ name: '', username: '', email: '', employee_code: '', delivery: 'temporary_password' });
+  const [requireChange, setRequireChange] = useState(false);
   const [profile, setProfile] = useState<StaffProfile>(emptyProfile);
   const [showProfile, setShowProfile] = useState(false);
   const [roleIds, setRoleIds] = useState<number[]>([]);
@@ -294,6 +299,7 @@ function CreateStaff({ open, onClose }: { open: boolean; onClose: () => void }) 
       email: form.email || null,
       employee_code: form.employee_code || null,
       delivery: form.delivery,
+      ...(form.delivery === 'temporary_password' ? { require_password_change: requireChange } : {}),
       role_ids: roleIds,
       all_branches: all,
       branch_ids: all ? [] : branchIds,
@@ -308,6 +314,7 @@ function CreateStaff({ open, onClose }: { open: boolean; onClose: () => void }) 
   const close = () => {
     setIssued(null);
     setForm({ name: '', username: '', email: '', employee_code: '', delivery: 'temporary_password' });
+    setRequireChange(false);
     setProfile(emptyProfile);
     setShowProfile(false);
     setRoleIds([]);
@@ -372,6 +379,9 @@ function CreateStaff({ open, onClose }: { open: boolean; onClose: () => void }) 
                 </label>
               ))}
             </div>
+            {form.delivery === 'temporary_password' && (
+              <Checkbox label="Ask the employee to change it at first sign-in (more secure)" checked={requireChange} onChange={setRequireChange} />
+            )}
             {err('delivery') && <p className="text-xs text-red-600">{err('delivery')}</p>}
           </Step>
 
@@ -403,6 +413,7 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   const [roleIds, setRoleIds] = useState<number[]>([]);
   const [all, setAll] = useState(false);
   const [branchIds, setBranchIds] = useState<number[]>([]);
+  const [resetRequireChange, setResetRequireChange] = useState(false);
 
   useEffect(() => {
     if (!member) return;
@@ -413,7 +424,7 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   }, [member]);
 
   const action = (a: string) => `/staff/${id}/${a}`;
-  const credentials = useTenantMutation<{ action: string; delivery: string }, IssuedResponse>('POST', (b) => action(b.action), { success: 'New sign-in details issued.', onSuccess: (r) => setIssued(toCredentials(r)) });
+  const credentials = useTenantMutation<{ action: string; delivery: string; require_password_change: boolean }, IssuedResponse>('POST', (b) => action(b.action), { success: 'New sign-in details issued.', onSuccess: (r) => setIssued(toCredentials(r)) });
   const status = useTenantMutation<{ action: string; reason?: string; delivery?: string }, IssuedResponse>('POST', (b) => action(b.action), { success: 'Account updated.', onSuccess: (r) => (r.temporary_password || r.activation_code ? setIssued(toCredentials(r)) : setReason('')) });
   const saveProfile = useTenantMutation<{ profile: Record<string, unknown> }>('PATCH', `/staff/${id}`, { success: 'Personal information saved.', toastErrors: false });
   const roles = useTenantMutation<{ role_ids: number[] }>('POST', action('change-role'), { success: 'Roles updated.' });
@@ -467,20 +478,25 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
               <span>
                 <span className="font-medium text-slate-900">Password: ••••••••</span>
                 <span className="block text-xs text-slate-500">
-                  {member.must_change_password ? 'Temporary password issued — the employee has not chosen their own yet.' : 'Chosen by the employee. Nobody else can see it.'}
+                  {member.must_change_password
+                    ? 'Temporary password issued — the employee has not chosen their own yet.'
+                    : 'Hidden for security. If it is forgotten, reset it to print a new one.'}
                 </span>
               </span>
             </div>
             {can('staff.credentials') && managed && manageable && ['active', 'invited'].includes(member.status) && (
               <Button size="sm" variant="secondary" loading={credentials.isPending} onClick={() => {
                 if (member.status === 'invited' || confirm(`Reset ${member.name}'s password? Their current password stops working and they are signed out everywhere.`)) {
-                  credentials.mutate({ action: member.status === 'invited' ? 'resend-invitation' : 'recovery', delivery: 'temporary_password' });
+                  credentials.mutate({ action: member.status === 'invited' ? 'resend-invitation' : 'recovery', delivery: 'temporary_password', require_password_change: resetRequireChange });
                 }
               }}>
                 Reset password
               </Button>
             )}
           </div>
+          {can('staff.credentials') && managed && manageable && ['active', 'invited'].includes(member.status) && (
+            <Checkbox label="When resetting, ask the employee to change it at next sign-in" checked={resetRequireChange} onChange={setResetRequireChange} />
+          )}
           {!managed && <p className="text-xs text-slate-500">Personal accounts reset their own password with "Forgot password" on the sign-in page.</p>}
 
           {manageable && (can('staff.status') || can('staff.offboard')) && (

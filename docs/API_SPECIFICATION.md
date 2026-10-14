@@ -96,7 +96,7 @@ audited as `staff.unauthorized_attempt`.
 |---|---|---|
 | GET | `/tenants/{t}/staff` | `staff.view` — filters `status`, `q`, `branch_id`; restricted admins see shared-branch staff only |
 | GET | `/tenants/{t}/staff/{id}` | `staff.view` (or own record) |
-| POST | `/tenants/{t}/staff` | `staff.create` — company-managed account; `delivery` = `temporary_password` (returns `temporary_password` once), `manual` (returns `activation_code` once) or `email`; optional `profile` |
+| POST | `/tenants/{t}/staff` | `staff.create` — company-managed account; `delivery` = `temporary_password` (returns a generated company-based password once; permanent unless `require_password_change=true`), `manual` (returns `activation_code` once) or `email`; optional `profile` |
 | GET | `/tenants/{t}/staff/username-suggestion?role_id=&branch_id=` | `staff.create` — `{username, employee_code, email}` (`email` null without a `staff_email_domain`) |
 | POST | `/tenants/{t}/staff/invite-existing` | `staff.create` — always 202; person must accept |
 | PATCH | `/tenants/{t}/staff/{id}` | `staff.update` — name/username/email/employee code (personal accounts: employee code only) and `profile` |

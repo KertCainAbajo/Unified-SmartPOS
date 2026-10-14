@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last updated: 2026-10-14. Test runs: backend **142/142 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing.
+Last updated: 2026-10-14. Test runs: backend **144/144 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing.
 
 Legend: ✅ implemented and covered by automated tests · 🟡 implemented, partially verified · ⛔ not implemented
 
@@ -46,7 +46,7 @@ Each bug was reproduced by a failing test before it was fixed.
 - ✅ Existing personal accounts invited without enumeration; active only after acceptance
 - ✅ Staff audit trail endpoint limited to account events; failed sign-ins audited without secrets
 - ✅ 22 new tests + rewritten role tests (`tests/Feature/Staff`, `RoleManagementTest`); mutation-checked (removing the branch-scope or owner-only rule makes tests fail)
-- ✅ Generated temporary passwords (shown once, forced change at first sign-in, 72 h expiry), password reset by administrators, auto-filled username / employee ID / company email, staff personal-information profiles (`StaffCredentialsTest`)
+- ✅ Generated company-based passwords (`AlingNena-4827`, shown once, permanent by default; optional forced change at first sign-in with 72 h expiry), password reset by administrators, auto-filled username / employee ID / company email, staff personal-information profiles (`StaffCredentialsTest`)
 - 🟡 Web app: Team page with auto-fill, printable credential slip, staff detail (account, personal information, roles & access, reset password); staff username sign-in and forced password change. **Activation-code and "forgot password" screens are not built yet**
 - ✅ Staff sign in with username **or employee ID** + password (business remembered per device); owners, managers and HR sign in with email only (`StaffSignInMethodTest`)
 - ⛔ Not implemented: MFA, bulk employee import, per-business password policy

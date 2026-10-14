@@ -93,6 +93,8 @@ class StaffController extends Controller
             'branch_ids' => ['sometimes', 'array'],
             'branch_ids.*' => ['integer', 'distinct'],
             'delivery' => ['required', Rule::in(StaffService::DELIVERIES)],
+            // Generated password only: make it temporary (expires, must be changed at first sign-in). Default permanent.
+            'require_password_change' => ['sometimes', 'boolean'],
             ...self::profileRules(),
         ], [
             'username.regex' => 'Use 3-50 lowercase letters, digits, dots, dashes or underscores.',
@@ -180,9 +182,9 @@ class StaffController extends Controller
      */
     public function reactivate(Request $request, Tenant $tenant, TenantMembership $staff): JsonResponse
     {
-        $data = $request->validate(['delivery' => ['sometimes', Rule::in(StaffService::DELIVERIES)]]);
+        $data = $request->validate(['delivery' => ['sometimes', Rule::in(StaffService::DELIVERIES)], 'require_password_change' => ['sometimes', 'boolean']]);
 
-        return $this->withCode($this->staff->reactivate($staff, $data['delivery'] ?? StaffService::DELIVERY_TEMPORARY_PASSWORD));
+        return $this->withCode($this->staff->reactivate($staff, $data['delivery'] ?? StaffService::DELIVERY_TEMPORARY_PASSWORD, (bool) ($data['require_password_change'] ?? false)));
     }
 
     /**
@@ -203,9 +205,9 @@ class StaffController extends Controller
     /** Issue a new activation code (previous codes are revoked). Requires `staff.credentials`. */
     public function resendInvitation(Request $request, Tenant $tenant, TenantMembership $staff): JsonResponse
     {
-        $data = $request->validate(['delivery' => ['required', Rule::in(StaffService::DELIVERIES)]]);
+        $data = $request->validate(['delivery' => ['required', Rule::in(StaffService::DELIVERIES)], 'require_password_change' => ['sometimes', 'boolean']]);
 
-        return $this->withCode($this->staff->resendInvitation($staff, $data['delivery']));
+        return $this->withCode($this->staff->resendInvitation($staff, $data['delivery'], (bool) ($data['require_password_change'] ?? false)));
     }
 
     /**
@@ -214,9 +216,9 @@ class StaffController extends Controller
      */
     public function recovery(Request $request, Tenant $tenant, TenantMembership $staff): JsonResponse
     {
-        $data = $request->validate(['delivery' => ['required', Rule::in(StaffService::DELIVERIES)]]);
+        $data = $request->validate(['delivery' => ['required', Rule::in(StaffService::DELIVERIES)], 'require_password_change' => ['sometimes', 'boolean']]);
 
-        return $this->withCode($this->staff->issueRecovery($staff, $data['delivery']));
+        return $this->withCode($this->staff->issueRecovery($staff, $data['delivery'], (bool) ($data['require_password_change'] ?? false)));
     }
 
     /** Pending work owned by a member (useful before offboarding). Requires `staff.offboard`. */

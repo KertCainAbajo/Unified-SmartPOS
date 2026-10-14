@@ -5,6 +5,7 @@ namespace Tests\Feature\Staff;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Staff\CompanyPassword;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -12,9 +13,44 @@ class StaffCredentialsTest extends TestCase
 {
     use StaffTestHelpers;
 
+    /** Generated password that must be changed at first sign-in (the optional stricter mode). */
     private function createWithTemporaryPassword($tenant, $actor, $branch, array $extra = [])
     {
-        return $this->createStaff($tenant, $actor, 'cashier', [$branch], ['delivery' => 'temporary_password', ...$extra]);
+        return $this->createStaff($tenant, $actor, 'cashier', [$branch], ['delivery' => 'temporary_password', 'require_password_change' => true, ...$extra]);
+    }
+
+    public function test_generated_password_is_simple_company_based_and_permanent_by_default(): void
+    {
+        [$tenant, $owner, $branch] = $this->createTenant();
+        $tenant->forceFill(['name' => 'Aling Nena Mini Mart'])->save();
+
+        $response = $this->createStaff($tenant, $owner, 'cashier', [$branch], ['delivery' => 'temporary_password'])->assertCreated()
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.must_change_password', false)
+            ->assertJsonPath('code_expires_at', null);
+        $password = $response->json('temporary_password');
+        $this->assertMatchesRegularExpression('/^AlingNena-\d{4}$/', $password);
+
+        // Still only a hash is stored, and nothing is shown later.
+        $this->assertStringNotContainsString($password, json_encode(DB::table('users')->get()));
+        $this->assertStringNotContainsString($password, $this->getJson($this->tenantUrl($tenant, "staff/{$response->json('data.id')}"))->getContent());
+
+        // Works straight away and keeps working (no forced change, no expiry).
+        $this->travel(30)->days();
+        $token = $this->staffLogin($tenant, $response->json('data.username'), $password)->assertOk()
+            ->assertJsonPath('must_change_password', false)->json('token');
+        $this->app['auth']->forgetGuards();
+        $this->withToken($token)->getJson($this->tenantUrl($tenant, 'context'))->assertOk();
+    }
+
+    public function test_company_password_prefix(): void
+    {
+        $this->assertSame('AlingNena', CompanyPassword::prefix('Aling Nena Mini Mart'));
+        $this->assertSame('SariSari', CompanyPassword::prefix('SARI-SARI'));
+        $this->assertSame('Jollyfoods', CompanyPassword::prefix('Jollyfoods International Inc.'));
+        $this->assertSame('Staff', CompanyPassword::prefix('7-11'));
+        $this->assertSame('Staff', CompanyPassword::prefix('X'));
+        $this->assertNotSame(CompanyPassword::generate('Aling Nena'), CompanyPassword::generate('Aling Nena').'x');
     }
 
     public function test_suggestions_follow_role_branch_and_company_email_domain(): void
@@ -45,7 +81,6 @@ class StaffCredentialsTest extends TestCase
             ->assertJsonPath('data.employee_code', 'EMP-0001')
             ->assertJsonPath('activation_code', null);
         $temporary = $response->json('temporary_password');
-        $this->assertMatchesRegularExpression('/^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$/', $temporary);
 
         // Only a bcrypt hash exists; the plain value appears nowhere in the database.
         $user = User::query()->findOrFail($response->json('data.user_id'));
@@ -112,7 +147,7 @@ class StaffCredentialsTest extends TestCase
         $oldToken = $this->staffLogin($tenant, $username, $password)->json('token');
 
         $this->app['auth']->forgetGuards();
-        $new = $this->actingAsUser($uam)->postJson($this->tenantUrl($tenant, "staff/{$membership->id}/recovery"), ['delivery' => 'temporary_password'])
+        $new = $this->actingAsUser($uam)->postJson($this->tenantUrl($tenant, "staff/{$membership->id}/recovery"), ['delivery' => 'temporary_password', 'require_password_change' => true])
             ->assertOk()->assertJsonPath('data.must_change_password', true)->json('temporary_password');
 
         $this->staffLogin($tenant, $username, $password)->assertUnprocessable();

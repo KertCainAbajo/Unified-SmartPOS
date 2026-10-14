@@ -134,7 +134,7 @@ class StaffService
                 ], tenantId: $tenantId);
 
                 if ($temporary) {
-                    return ['membership' => $membership, 'temporary' => $this->issueTemporaryPassword($membership, 'onboarding')];
+                    return ['membership' => $membership, 'temporary' => $this->issueGeneratedPassword($membership, 'onboarding', (bool) ($data['require_password_change'] ?? false))];
                 }
 
                 ['invitation' => $invitation, 'code' => $code] = $this->codes->issue($membership, StaffInvitation::PURPOSE_ACTIVATION, $delivery, $this->actorId());
@@ -310,7 +310,7 @@ class StaffService
      *
      * @return array{membership: TenantMembership, activation_code: string|null, expires_at: string|null}
      */
-    public function reactivate(TenantMembership $target, string $delivery = StaffInvitation::CHANNEL_MANUAL): array
+    public function reactivate(TenantMembership $target, string $delivery = StaffInvitation::CHANNEL_MANUAL, bool $requireChange = false): array
     {
         $this->authorize(Permissions::STAFF_STATUS, $target, 'reactivate');
         $this->assertStatus($target, [MembershipStatus::Suspended, MembershipStatus::Offboarded], 'reactivate');
@@ -336,7 +336,7 @@ class StaffService
             throw new BusinessRuleException('This account has no email address; use manual delivery.', 'EMAIL_REQUIRED');
         }
 
-        $result = DB::transaction(function () use ($target, $user, $delivery) {
+        $result = DB::transaction(function () use ($target, $user, $delivery, $requireChange) {
             $target->forceFill([
                 'status' => MembershipStatus::Invited->value,
                 'offboarded_at' => null,
@@ -351,7 +351,7 @@ class StaffService
                 $user->forceFill(['status' => UserStatus::Pending->value, 'password' => Str::random(64)])->save();
                 $this->audit->log('staff.rehired', $target, ['status' => 'offboarded'], ['status' => 'invited'], ['user_id' => $user->id, 'channel' => $delivery]);
                 if ($delivery === self::DELIVERY_TEMPORARY_PASSWORD) {
-                    return ['invitation' => null, 'code' => null, 'temporary' => $this->issueTemporaryPassword($target, 'rehire')];
+                    return ['invitation' => null, 'code' => null, 'temporary' => $this->issueGeneratedPassword($target, 'rehire', $requireChange)];
                 }
                 ['invitation' => $invitation, 'code' => $code] = $this->codes->issue($target, StaffInvitation::PURPOSE_ACTIVATION, $delivery, $this->actorId());
 
@@ -422,7 +422,7 @@ class StaffService
     /* ======================================================================= Credentials */
 
     /** @return array{membership: TenantMembership, activation_code: string|null, expires_at: string} */
-    public function resendInvitation(TenantMembership $target, string $delivery): array
+    public function resendInvitation(TenantMembership $target, string $delivery, bool $requireChange = false): array
     {
         $this->authorize(Permissions::STAFF_CREDENTIALS, $target, 'resend_invitation');
         $this->assertStatus($target, [MembershipStatus::Invited], 'resend_invitation');
@@ -430,7 +430,7 @@ class StaffService
         $this->assertDeliverable($target, $delivery);
 
         if ($delivery === self::DELIVERY_TEMPORARY_PASSWORD) {
-            return $this->temporaryResult($target, DB::transaction(fn () => $this->issueTemporaryPassword($target, 'onboarding')));
+            return $this->temporaryResult($target, DB::transaction(fn () => $this->issueGeneratedPassword($target, 'onboarding', $requireChange)));
         }
 
         $result = DB::transaction(function () use ($target, $delivery) {
@@ -451,7 +451,7 @@ class StaffService
      *
      * @return array{membership: TenantMembership, activation_code: string|null, expires_at: string}
      */
-    public function issueRecovery(TenantMembership $target, string $delivery): array
+    public function issueRecovery(TenantMembership $target, string $delivery, bool $requireChange = false): array
     {
         $this->authorize(Permissions::STAFF_CREDENTIALS, $target, 'recovery');
         $this->assertStatus($target, [MembershipStatus::Active], 'recovery');
@@ -461,9 +461,9 @@ class StaffService
         if ($delivery === self::DELIVERY_TEMPORARY_PASSWORD) {
             // Takes effect immediately: the old password stops working and every session ends, so a misuse is
             // noticed at once by the employee; the employee and owner are also notified and it is audited.
-            $temporary = DB::transaction(fn () => $this->issueTemporaryPassword($target, 'recovery'));
+            $temporary = DB::transaction(fn () => $this->issueGeneratedPassword($target, 'recovery', $requireChange));
             $this->notifications->notifyUser($target->tenant_id, $target->user_id, 'password_recovered', 'Your password was reset',
-                'An administrator ('.($this->context->membership()->user->name ?? 'unknown').') issued you a temporary password. If you did not ask for this, tell the business owner.');
+                'An administrator ('.($this->context->membership()->user->name ?? 'unknown').') issued you a new password. If you did not ask for this, tell the business owner.');
             $this->notifyOwnerOfRecovery($target);
 
             return $this->temporaryResult($target, $temporary);
@@ -520,22 +520,23 @@ class StaffService
     }
 
     /**
-     * Set a new random temporary password (only its hash is stored), activate the login, sign the user out
-     * everywhere and require a password change at next sign-in. Caller must hold a transaction.
+     * Set a new generated password based on the business name (only its hash is stored), activate the login and
+     * sign the user out everywhere. Permanent by default (the business chose this for simplicity); with
+     * $requireChange it is temporary: it expires and must be replaced at next sign-in. Caller must hold a transaction.
      *
-     * @return array{password: string, expires_at: string}
+     * @return array{password: string, expires_at: string|null}
      */
-    private function issueTemporaryPassword(TenantMembership $membership, string $purpose): array
+    private function issueGeneratedPassword(TenantMembership $membership, string $purpose, bool $requireChange = false): array
     {
         $user = $membership->user()->firstOrFail();
-        $password = TemporaryPassword::generate();
-        $expiresAt = now()->addHours((int) config('smartpos.staff_code_ttl_hours', 72));
+        $password = CompanyPassword::generate($membership->tenant()->firstOrFail()->name);
+        $expiresAt = $requireChange ? now()->addHours((int) config('smartpos.staff_code_ttl_hours', 72)) : null;
 
         $this->revoker->revokeAll($user);
         $user->forceFill([
             'password' => $password,
             'status' => UserStatus::Active->value,
-            'must_change_password' => true,
+            'must_change_password' => $requireChange,
             'temporary_password_expires_at' => $expiresAt,
         ])->save();
 
@@ -546,13 +547,14 @@ class StaffService
         $this->audit->log('staff.temporary_password_issued', $membership, null, null, [
             'purpose' => $purpose,
             'user_id' => $user->id,
-            'expires_at' => $expiresAt->toIso8601String(),
+            'must_change' => $requireChange,
+            'expires_at' => $expiresAt?->toIso8601String(),
         ]);
 
-        return ['password' => $password, 'expires_at' => $expiresAt->toIso8601String()];
+        return ['password' => $password, 'expires_at' => $expiresAt?->toIso8601String()];
     }
 
-    /** @return array{membership: TenantMembership, activation_code: null, temporary_password: string, expires_at: string} */
+    /** @return array{membership: TenantMembership, activation_code: null, temporary_password: string, expires_at: string|null} */
     private function temporaryResult(TenantMembership $membership, array $temporary): array
     {
         return [
