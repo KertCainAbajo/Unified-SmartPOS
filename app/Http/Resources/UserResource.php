@@ -17,6 +17,8 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'email_verified' => $this->email_verified_at !== null,
+            'username' => $this->username,
+            'must_change_password' => $this->when($request->user()?->is($this->resource), (bool) $this->must_change_password),
             'is_platform_admin' => $this->when($request->user()?->is($this->resource), $this->is_platform_admin),
             'created_at' => $this->created_at,
         ];

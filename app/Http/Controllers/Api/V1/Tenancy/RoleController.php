@@ -23,7 +23,7 @@ class RoleController extends Controller
 {
     public function __construct(private readonly AuditLogger $audit) {}
 
-    /** System roles and this business's custom roles, with their permissions. Requires `members.view`. */
+    /** System roles and this business's custom roles, with their permissions. Requires `staff.view`. */
     public function index(Tenant $tenant): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Role::class);
@@ -33,7 +33,7 @@ class RoleController extends Controller
         );
     }
 
-    /** The permission catalogue. Requires `members.view`. */
+    /** The permission catalogue. Requires `staff.view`. */
     public function permissions(): JsonResponse
     {
         $this->authorize('viewAny', Role::class);

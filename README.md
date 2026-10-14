@@ -3,7 +3,7 @@
 Multi-tenant point-of-sale backend for Philippine businesses: one Laravel REST API and one MySQL database,
 shared by a future React web app and a React Native (Expo) mobile app.
 
-This repository currently contains **only the backend** (no web or mobile UI).
+This repository contains the backend API and the **React web app** in [`web/`](web/README.md). The Expo mobile app is not built yet.
 
 | Document | Purpose |
 |---|---|
@@ -12,6 +12,7 @@ This repository currently contains **only the backend** (no web or mobile UI).
 | [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) | Every table, relationships, invariants |
 | [docs/API_SPECIFICATION.md](docs/API_SPECIFICATION.md) | Endpoints, permissions, workflows, report formulas |
 | [docs/openapi.json](docs/openapi.json) | OpenAPI 3.1 contract (generated) |
+| [docs/STAFF_ACCOUNTS.md](docs/STAFF_ACCOUNTS.md) | Company-managed staff accounts: lifecycle, roles, rules, onboarding, offboarding |
 | [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | What is done, verified, blocked, and out of scope |
 
 ## Prerequisites
@@ -45,6 +46,10 @@ Then set `DB_DATABASE=smartpos`, `DB_USERNAME=smartpos` and `DB_PASSWORD=…` in
 
 ### Migrate and seed
 
+Upgrading an existing database (e.g. after pulling the staff-accounts change): back it up, then run
+`php artisan migrate` and `php artisan db:seed --class=RolesAndPermissionsSeeder` (adds the new roles and
+replaces `members.*` permissions with `staff.*`).
+
 ```bash
 php artisan migrate                 # schema
 php artisan db:seed                 # roles & permissions; demo data only when APP_ENV=local
@@ -66,14 +71,32 @@ Password for all demo accounts: **`DemoPass123`**. These credentials are public 
 | inventory@demo.smartpos.test | Inventory Staff (Main, Makati) |
 | admin@demo.smartpos.test | Platform Super Admin (no business access) |
 
+Company-managed demo staff sign in with **business code** `aling-nena-mini-mart` + username or employee ID
+(password `DemoPass123`). The web app asks for the business code only the first time on a device. Owners,
+managers and HR always sign in with email.
+
+| Username / Employee ID | Role |
+|---|---|
+| cashier.main01 / EMP-102 | Cashier (Main) |
+| accountant.all01 / EMP-103 | Accountant (all branches) |
+| hr@demo.smartpos.test (email only) | User & Access Manager (all branches) |
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login -H 'Accept: application/json' -H 'Content-Type: application/json' \
+  -d '{"business_code":"aling-nena-mini-mart","username":"cashier.main01","password":"DemoPass123","device_name":"curl"}'
+```
+
 The demo business "Aling Nena Mini Mart" has 2 branches, 6 categories, 14 products (incl. VAT-exempt rice sold by kg),
 opening stock, 2 suppliers, a draft purchase order, 5 sales (cash, GCash, card, Senior Citizen) and 3 expenses.
 
 ## Run locally
 
 ```bash
-php artisan serve        # http://127.0.0.1:8000
+php artisan serve        # API on http://127.0.0.1:8000
+cd web && npm install && npm run dev   # web app on http://localhost:5173
 ```
+
+Open http://localhost:5173 and sign in with a demo account. See [web/README.md](web/README.md).
 
 ## Try the API
 

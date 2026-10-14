@@ -132,25 +132,46 @@ class StockTransferService
         });
     }
 
-    public function cancel(StockTransfer $transfer): StockTransfer
+    /**
+     * Cancel a draft, or an in-transit transfer that will not arrive: the dispatched stock is returned to the
+     * source branch at the cost it left with.
+     */
+    public function cancel(StockTransfer $transfer, ?int $userId = null): StockTransfer
     {
-        return DB::transaction(function () use ($transfer) {
-            $transfer = $this->lockInStatus($transfer, StockTransferStatus::Draft);
+        return DB::transaction(function () use ($transfer, $userId) {
+            $transfer = $this->lockInStatus($transfer, [StockTransferStatus::Draft, StockTransferStatus::InTransit]);
+            $old = $transfer->status->value;
+
+            if ($transfer->status === StockTransferStatus::InTransit) {
+                $items = $transfer->items()->get();
+                $rows = $this->ledger->lockRows($transfer->tenant_id, $transfer->from_branch_id, $items->pluck('product_id')->all());
+                foreach ($items as $item) {
+                    $this->ledger->post($rows[$item->product_id], StockMovementType::TransferReturn, (string) $item->quantity, [
+                        'unit_cost' => (string) $item->unit_cost,
+                        'reference' => $transfer,
+                        'reason' => "Transfer {$transfer->reference} cancelled; stock returned",
+                        'user_id' => $userId,
+                    ]);
+                }
+            }
+
             $transfer->forceFill(['status' => StockTransferStatus::Cancelled])->save();
-            $this->audit->log('stock_transfer.cancelled', $transfer, ['status' => 'draft'], ['status' => 'cancelled'],
-                branchId: $transfer->from_branch_id);
+            $this->audit->log('stock_transfer.cancelled', $transfer, ['status' => $old], ['status' => 'cancelled'],
+                ['stock_returned' => $old === StockTransferStatus::InTransit->value], branchId: $transfer->from_branch_id);
 
             return $transfer;
         });
     }
 
-    private function lockInStatus(StockTransfer $transfer, StockTransferStatus $expected): StockTransfer
+    /** @param  StockTransferStatus|list<StockTransferStatus>  $expected */
+    private function lockInStatus(StockTransfer $transfer, StockTransferStatus|array $expected): StockTransfer
     {
         $locked = StockTransfer::query()->lockForUpdate()->findOrFail($transfer->id);
+        $allowed = is_array($expected) ? $expected : [$expected];
 
-        if ($locked->status !== $expected) {
+        if (! in_array($locked->status, $allowed, true)) {
             throw new BusinessRuleException(
-                "Transfer is {$locked->status->value}; expected {$expected->value}.",
+                "Transfer is {$locked->status->value}; expected ".implode(' or ', array_map(fn ($s) => $s->value, $allowed)).'.',
                 'INVALID_TRANSFER_STATE',
             );
         }

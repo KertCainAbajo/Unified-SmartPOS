@@ -10,6 +10,9 @@ return [
     // Senior Citizen (RA 9994) and PWD (RA 10754) discount rate, in percent.
     'sc_pwd_discount_rate' => '20',
 
+    // Lifetime of staff activation / recovery codes.
+    'staff_code_ttl_hours' => (int) env('SMARTPOS_STAFF_CODE_TTL_HOURS', 72),
+
     // Maximum page size accepted by paginated endpoints.
     'max_per_page' => 100,
 ];

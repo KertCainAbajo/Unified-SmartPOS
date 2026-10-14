@@ -26,6 +26,7 @@ use App\Support\Permissions;
 use App\Support\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -54,7 +55,7 @@ class CheckoutService
     {
         $requestHash = hash('sha256', json_encode($data, JSON_PRESERVE_ZERO_FRACTION));
 
-        if ($existing = $this->findReplay($tenant, $idempotencyKey, $requestHash)) {
+        if ($existing = $this->findReplay($tenant, $cashier, $idempotencyKey, $requestHash)) {
             return ['sale' => $existing, 'replayed' => true];
         }
 
@@ -62,7 +63,7 @@ class CheckoutService
             $sale = DB::transaction(fn () => $this->createSale($tenant, $cashier, $data, $idempotencyKey, $requestHash));
         } catch (UniqueConstraintViolationException $e) {
             // A concurrent request with the same key committed first.
-            if ($existing = $this->findReplay($tenant, $idempotencyKey, $requestHash)) {
+            if ($existing = $this->findReplay($tenant, $cashier, $idempotencyKey, $requestHash)) {
                 return ['sale' => $existing, 'replayed' => true];
             }
             throw $e;
@@ -71,11 +72,12 @@ class CheckoutService
         return ['sale' => $sale, 'replayed' => false];
     }
 
-    private function findReplay(Tenant $tenant, string $key, string $hash): ?Sale
+    private function findReplay(Tenant $tenant, User $cashier, string $key, string $hash): ?Sale
     {
         $sale = Sale::query()->where('tenant_id', $tenant->id)->where('idempotency_key', $key)->first();
 
-        if ($sale && ! hash_equals($sale->request_hash, $hash)) {
+        // Only the cashier who made the sale may replay it; anyone else reusing the key gets a conflict.
+        if ($sale && ($sale->cashier_id !== $cashier->id || ! hash_equals($sale->request_hash, $hash))) {
             throw new BusinessRuleException(
                 'This idempotency key was already used for a different checkout request.',
                 'IDEMPOTENCY_KEY_REUSED',
@@ -109,42 +111,7 @@ class CheckoutService
         }
 
         // 2. Products and discounts (authoritative prices from the database).
-        $saleDiscount = SaleDiscountType::from($data['discount']['type'] ?? 'none');
-        $products = Product::query()
-            ->where('tenant_id', $tenant->id)
-            ->whereIn('id', array_column($data['items'], 'product_id'))
-            ->get()->keyBy('id');
-
-        $lines = [];
-        foreach ($data['items'] as $i => $item) {
-            $product = $products[$item['product_id']];
-            if (! $product->isActive()) {
-                throw new BusinessRuleException("{$product->name} is archived and cannot be sold.", 'PRODUCT_INACTIVE',
-                    ["items.{$i}.product_id" => ['Product is archived.']]);
-            }
-            $quantity = Money::normalize((string) $item['quantity'], 3);
-            $this->quantities->assertQuantityPrecision($product, $quantity, "items.{$i}.quantity");
-
-            $discountType = LineDiscountType::from($item['discount']['type'] ?? 'none');
-            if ($discountType !== LineDiscountType::None) {
-                if (! $this->context->can(Permissions::SALES_DISCOUNT)) {
-                    throw new AuthorizationException('You are not allowed to apply manual discounts.');
-                }
-                if ($saleDiscount !== SaleDiscountType::None) {
-                    throw new BusinessRuleException('Manual discounts cannot be combined with Senior Citizen/PWD discounts.',
-                        'DISCOUNT_NOT_COMBINABLE', ["items.{$i}.discount" => ['Not combinable with SC/PWD discount.']]);
-                }
-            }
-
-            $lines[] = [
-                'product' => $product,
-                'quantity' => $quantity,
-                'discount_type' => $discountType,
-                'discount_value' => (string) ($item['discount']['value'] ?? '0'),
-            ];
-        }
-
-        $calculation = SaleCalculator::forTenant($tenant)->calculate($lines, $saleDiscount);
+        ['products' => $products, 'calculation' => $calculation, 'sale_discount' => $saleDiscount] = $this->price($tenant, $data);
         $totals = $calculation['totals'];
 
         // 3. Payments.
@@ -235,6 +202,108 @@ class CheckoutService
         ]);
 
         return $sale;
+    }
+
+    /**
+     * Price a cart without saving anything, so the POS can show the amount due before taking payment.
+     * Uses exactly the same rules as checkout. Stock availability is reported per line but not enforced.
+     *
+     * @param  array<string, mixed>  $data  validated cart (register_id, items, discount)
+     * @return array{totals: array<string, string>, lines: list<array<string, mixed>>}
+     */
+    public function quote(Tenant $tenant, array $data): array
+    {
+        ['calculation' => $calculation] = $this->price($tenant, $data);
+
+        $register = Register::query()->where('tenant_id', $tenant->id)->findOrFail($data['register_id']);
+        $stock = DB::table('inventory')
+            ->where('branch_id', $register->branch_id)
+            ->whereIn('product_id', array_map(fn ($l) => $l['product']->id, $calculation['lines']))
+            ->pluck('quantity', 'product_id');
+
+        // Sum requested quantities per product (the same product may appear on several lines).
+        $requested = [];
+        foreach ($calculation['lines'] as $line) {
+            $id = $line['product']->id;
+            $requested[$id] = Money::add($requested[$id] ?? '0', $line['quantity']);
+        }
+
+        return [
+            'totals' => $calculation['totals'],
+            'lines' => array_map(function (array $line) use ($stock, $requested, $tenant) {
+                /** @var Product $product */
+                $product = $line['product'];
+                $available = $product->track_inventory ? Money::fromDatabase($stock[$product->id] ?? '0', 3) : null;
+
+                return [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'name' => $product->name,
+                    'unit' => $product->unit,
+                    'tax_type' => $product->tax_type,
+                    'quantity' => $line['quantity'],
+                    'unit_price' => $line['unit_price'],
+                    'gross_amount' => $line['gross_amount'],
+                    'discount_amount' => $line['discount_amount'],
+                    'vat_exemption_amount' => $line['vat_exemption_amount'],
+                    'vat_amount' => $line['vat_amount'],
+                    'line_total' => $line['line_total'],
+                    'available_stock' => $available,
+                    'in_stock' => $available === null
+                        || (bool) $tenant->allow_negative_stock
+                        || Money::cmp($available, $requested[$product->id]) >= 0,
+                ];
+            }, $calculation['lines']),
+        ];
+    }
+
+    /**
+     * Load products and compute line and sale totals with server prices.
+     *
+     * @return array{products: Collection<int, Product>, calculation: array, sale_discount: SaleDiscountType}
+     */
+    private function price(Tenant $tenant, array $data): array
+    {
+        $saleDiscount = SaleDiscountType::from($data['discount']['type'] ?? 'none');
+        $products = Product::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('id', array_column($data['items'], 'product_id'))
+            ->get()->keyBy('id');
+
+        $lines = [];
+        foreach ($data['items'] as $i => $item) {
+            $product = $products[$item['product_id']];
+            if (! $product->isActive()) {
+                throw new BusinessRuleException("{$product->name} is archived and cannot be sold.", 'PRODUCT_INACTIVE',
+                    ["items.{$i}.product_id" => ['Product is archived.']]);
+            }
+            $quantity = Money::normalize((string) $item['quantity'], 3);
+            $this->quantities->assertQuantityPrecision($product, $quantity, "items.{$i}.quantity");
+
+            $discountType = LineDiscountType::from($item['discount']['type'] ?? 'none');
+            if ($discountType !== LineDiscountType::None) {
+                if (! $this->context->can(Permissions::SALES_DISCOUNT)) {
+                    throw new AuthorizationException('You are not allowed to apply manual discounts.');
+                }
+                if ($saleDiscount !== SaleDiscountType::None) {
+                    throw new BusinessRuleException('Manual discounts cannot be combined with Senior Citizen/PWD discounts.',
+                        'DISCOUNT_NOT_COMBINABLE', ["items.{$i}.discount" => ['Not combinable with SC/PWD discount.']]);
+                }
+            }
+
+            $lines[] = [
+                'product' => $product,
+                'quantity' => $quantity,
+                'discount_type' => $discountType,
+                'discount_value' => (string) ($item['discount']['value'] ?? '0'),
+            ];
+        }
+
+        return [
+            'products' => $products,
+            'calculation' => SaleCalculator::forTenant($tenant)->calculate($lines, $saleDiscount),
+            'sale_discount' => $saleDiscount,
+        ];
     }
 
     /**

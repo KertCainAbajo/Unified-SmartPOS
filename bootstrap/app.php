@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Middleware\EnsureEmailIsVerifiedWhenRequired;
+use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsurePlatformAdmin;
+use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -25,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => ResolveTenant::class,
             'platform.admin' => EnsurePlatformAdmin::class,
             'verified.when_required' => EnsureEmailIsVerifiedWhenRequired::class,
+            'active' => EnsureUserIsActive::class,
+            'password.changed' => EnsurePasswordIsChanged::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

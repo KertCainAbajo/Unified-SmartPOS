@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\CheckoutRequest;
+use App\Http\Requests\Pos\QuoteRequest;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
 use App\Models\Tenant;
@@ -73,6 +74,17 @@ class SaleController extends Controller
                 'receipt' => $receipts->build($sale),
             ], $replayed ? 200 : 201)
             ->header('Idempotent-Replayed', $replayed ? 'true' : 'false');
+    }
+
+    /**
+     * Price a cart (no sale is created).
+     *
+     * Returns the server-computed totals, VAT breakdown and per-line stock availability so the POS can
+     * show the amount due before payment. Same permissions and discount rules as checkout.
+     */
+    public function quote(QuoteRequest $request, Tenant $tenant, CheckoutService $checkout): JsonResponse
+    {
+        return response()->json(['data' => $checkout->quote($tenant, $request->validated())]);
     }
 
     public function show(Tenant $tenant, Sale $sale): SaleResource

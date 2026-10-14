@@ -177,11 +177,12 @@ class RefundService
             : PaymentStatus::PartiallyRefunded;
         $sale->save();
 
-        if ($refund->register_session_id && $refund->refund_method === PaymentMethod::Cash) {
-            $session = RegisterSession::query()->lockForUpdate()->findOrFail($refund->register_session_id);
-            if ($session->isOpen()) {
-                $session->cash_refunds = Money::round(Money::add((string) $session->cash_refunds, (string) $refund->total));
-                $session->save();
+        if ($refund->refund_method === PaymentMethod::Cash) {
+            $drawer = $this->cashDrawer($refund, $sale, $approverId ?? $refund->requested_by);
+            if ($drawer) {
+                $drawer->cash_refunds = Money::round(Money::add((string) $drawer->cash_refunds, (string) $refund->total));
+                $drawer->save();
+                $refund->register_session_id = $drawer->id;
             }
         }
 
@@ -288,6 +289,28 @@ class RefundService
         }
 
         return $session;
+    }
+
+    /**
+     * The drawer the cash is paid from: the shift chosen at request time if it is still open, otherwise the
+     * open shift of the person completing the refund at the sale's branch (e.g. a manager approving later).
+     */
+    private function cashDrawer(Refund $refund, Sale $sale, int $actorId): ?RegisterSession
+    {
+        if ($refund->register_session_id) {
+            $linked = RegisterSession::query()->lockForUpdate()->find($refund->register_session_id);
+            if ($linked?->isOpen()) {
+                return $linked;
+            }
+        }
+
+        return RegisterSession::query()
+            ->where('tenant_id', $sale->tenant_id)
+            ->where('branch_id', $sale->branch_id)
+            ->where('opened_by', $actorId)
+            ->where('status', 'open')
+            ->lockForUpdate()
+            ->first();
     }
 
     private function lockPending(Refund $refund): Refund

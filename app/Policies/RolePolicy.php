@@ -10,7 +10,7 @@ class RolePolicy extends TenantScopedPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->allows(Permissions::MEMBERS_VIEW);
+        return $this->allows(Permissions::STAFF_VIEW);
     }
 
     public function create(User $user): bool

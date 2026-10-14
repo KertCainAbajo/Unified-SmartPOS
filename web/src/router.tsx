@@ -1,0 +1,74 @@
+import type { ComponentType } from 'react';
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router';
+import { useAuth } from './auth/AuthProvider';
+import { Spinner } from './components/ui';
+import { TenantLayout } from './components/TenantLayout';
+import { LoginPage } from './pages/auth/LoginPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
+import { SelectBusinessPage } from './pages/auth/SelectBusinessPage';
+import { ChangePasswordPage } from './pages/auth/ChangePasswordPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+
+function RequireAuth() {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <Spinner />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // A temporary password from a manager must be replaced before anything else (the API enforces this too).
+  if (user.must_change_password && location.pathname !== '/change-password') return <Navigate to="/change-password" replace />;
+  return <Outlet />;
+}
+
+function GuestOnly() {
+  const { user, loading } = useAuth();
+  if (loading) return <Spinner />;
+  return user ? <Navigate to="/" replace /> : <Outlet />;
+}
+
+/** Load a page module on first visit so each screen ships as its own chunk. */
+function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M) {
+  return async () => ({ Component: (await load())[name] as ComponentType });
+}
+
+export const router = createBrowserRouter([
+  {
+    element: <GuestOnly />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+    ],
+  },
+  {
+    element: <RequireAuth />,
+    children: [
+      { path: '/', element: <SelectBusinessPage /> },
+      { path: '/change-password', element: <ChangePasswordPage /> },
+      {
+        path: '/t/:tenantId',
+        element: <TenantLayout />,
+        hydrateFallbackElement: <Spinner />,
+        children: [
+          { index: true, lazy: page(() => import('./pages/DashboardPage'), 'DashboardPage') },
+          { path: 'pos', lazy: page(() => import('./pages/pos/PosPage'), 'PosPage') },
+          { path: 'sales', lazy: page(() => import('./pages/sales/SalesPage'), 'SalesPage') },
+          { path: 'sales/:saleId', lazy: page(() => import('./pages/sales/SaleDetailPage'), 'SaleDetailPage') },
+          { path: 'refunds', lazy: page(() => import('./pages/sales/RefundsPage'), 'RefundsPage') },
+          { path: 'shifts', lazy: page(() => import('./pages/pos/ShiftsPage'), 'ShiftsPage') },
+          { path: 'products', lazy: page(() => import('./pages/catalog/ProductsPage'), 'ProductsPage') },
+          { path: 'categories', lazy: page(() => import('./pages/catalog/CategoriesPage'), 'CategoriesPage') },
+          { path: 'inventory', lazy: page(() => import('./pages/inventory/InventoryPage'), 'InventoryPage') },
+          { path: 'transfers', lazy: page(() => import('./pages/inventory/TransfersPage'), 'TransfersPage') },
+          { path: 'purchasing', lazy: page(() => import('./pages/purchasing/PurchasingPage'), 'PurchasingPage') },
+          { path: 'customers', lazy: page(() => import('./pages/operations/CustomersPage'), 'CustomersPage') },
+          { path: 'expenses', lazy: page(() => import('./pages/operations/ExpensesPage'), 'ExpensesPage') },
+          { path: 'reports', lazy: page(() => import('./pages/reports/ReportsPage'), 'ReportsPage') },
+          { path: 'audit', lazy: page(() => import('./pages/reports/AuditLogPage'), 'AuditLogPage') },
+          { path: 'team', lazy: page(() => import('./pages/admin/TeamPage'), 'TeamPage') },
+          { path: 'settings', lazy: page(() => import('./pages/admin/SettingsPage'), 'SettingsPage') },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
+  },
+  { path: '*', element: <NotFoundPage /> },
+]);

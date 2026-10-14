@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\TenantResource;
 use App\Http\Resources\UserResource;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Tenancy\TenantOnboardingService;
@@ -60,6 +62,9 @@ class AuthController extends Controller
     /**
      * Log in.
      *
+     * Identify with `email`, or (company-managed staff) `business_code` + `username`, where `username` may also be
+     * the employee ID. Owners, managers and HR (User & Access Manager, or any role with administrative permissions)
+     * must use their email; a correct username password for them is refused with a hint.
      * With `device_name`: returns a personal access token for `Authorization: Bearer`.
      * Without it (SPA on a stateful domain, after GET /sanctum/csrf-cookie): starts a session.
      *
@@ -68,17 +73,52 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $user = User::query()->where('email', $data['email'])->first();
+        $field = isset($data['username']) ? 'username' : 'email';
+        $tenant = isset($data['username']) ? Tenant::query()->where('slug', $data['business_code'])->first() : null;
+
+        $user = match ($field) {
+            'email' => User::query()->where('email', $data['email'])->first(),
+            'username' => $tenant ? $this->findStaff($tenant, $data['username']) : null,
+        };
 
         // Hash even when the user does not exist so response timing does not reveal accounts.
-        $valid = Hash::check($data['password'], $user?->password ?? '$2y$12$'.str_repeat('a', 53));
+        $hash = $user?->password ?? '$2y$12$'.str_repeat('a', 53);
+        $valid = Hash::check($data['password'], $hash);
+        // Temporary passwords never contain spaces, so a space picked up when copying one from the slip is ignored.
+        // The extra check depends only on the input, so timing still reveals nothing about the account.
+        $trimmed = trim($data['password']);
+        if (! $valid && $trimmed !== $data['password']) {
+            $valid = Hash::check($trimmed, $hash) && (bool) $user?->must_change_password;
+        }
 
         if (! $user || ! $valid) {
-            throw ValidationException::withMessages(['email' => __('auth.failed')]);
+            $this->audit->log('auth.login_failed', null, metadata: [
+                'identifier' => $request->identifier(),
+                'reason' => 'invalid_credentials',
+            ], tenantId: $tenant?->id);
+
+            throw ValidationException::withMessages([$field => __('auth.failed')]);
+        }
+
+        // Checked only after the password is verified, so roles are never revealed to someone guessing usernames.
+        if ($field === 'username' && $tenant->memberships()->where('user_id', $user->id)->first()?->requiresEmailSignIn()) {
+            $this->audit->log('auth.login_failed', $user, metadata: ['reason' => 'email_sign_in_required'], tenantId: $tenant->id, userId: $user->id);
+
+            throw ValidationException::withMessages([$field => 'Managers and administrators sign in with their email address.']);
+        }
+
+        if ($user->must_change_password && $user->temporary_password_expires_at?->isPast()) {
+            $this->audit->log('auth.login_failed', $user, metadata: ['reason' => 'temporary_password_expired'], tenantId: $tenant?->id, userId: $user->id);
+
+            throw ValidationException::withMessages([$field => 'This temporary password has expired. Ask your manager to reset your password.']);
         }
 
         if (! $user->isActive()) {
-            throw ValidationException::withMessages(['email' => 'This account has been disabled.']);
+            $this->audit->log('auth.login_failed', $user, metadata: ['reason' => "account_{$user->status}"], tenantId: $tenant?->id, userId: $user->id);
+
+            throw ValidationException::withMessages([$field => $user->status === UserStatus::Pending->value
+                ? 'This account has not been activated yet. Use the activation code from your manager.'
+                : 'This account has been disabled.']);
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
@@ -86,6 +126,8 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($user),
+            // Clients route straight to "choose your password" when an administrator-issued temporary password was used.
+            'must_change_password' => (bool) $user->must_change_password,
             ...$this->establishSession($request, $user, $data['device_name'] ?? null),
         ]);
     }
@@ -123,6 +165,16 @@ class AuthController extends Controller
         $this->audit->log('auth.logout_all', $user, metadata: ['tokens_revoked' => $count], userId: $user->id);
 
         return response()->json(['message' => 'All tokens revoked.', 'tokens_revoked' => $count]);
+    }
+
+    /** Company-managed account of this business by username, or else by employee ID (case-insensitive). */
+    private function findStaff(Tenant $tenant, string $identifier): ?User
+    {
+        $managed = User::query()->where('managed_by_tenant_id', $tenant->id);
+
+        return (clone $managed)->where('username', $identifier)->first()
+            ?? $managed->whereHas('memberships', fn ($m) => $m->where('tenant_id', $tenant->id)
+                ->whereRaw('LOWER(employee_code) = ?', [mb_strtolower($identifier)]))->first();
     }
 
     /** @return array<string, mixed> */

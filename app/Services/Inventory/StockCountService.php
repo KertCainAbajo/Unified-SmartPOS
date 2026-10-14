@@ -14,8 +14,9 @@ use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Physical counts. The client submits counted quantities; on completion the server compares them
- * with the locked system balance and books the variance. Clients never set balances directly.
+ * Physical counts. The client submits counted quantities; the server snapshots the system balance at that
+ * moment, and on completion books the variance (counted − snapshot) as a movement. Movements that happened
+ * after the count (e.g. sales) are therefore kept. Clients never set balances directly.
  */
 class StockCountService
 {
@@ -51,9 +52,13 @@ class StockCountService
                 'created_by' => $userId,
             ]);
 
+            // Snapshot the system balance at the moment of counting. Sales or receipts that happen
+            // between counting and completion are then preserved instead of being overwritten.
+            $rows = $this->ledger->lockRows($branch->tenant_id, $branch->id, array_column($items, 'product_id'));
             foreach ($items as $item) {
                 $count->items()->create([
                     'product_id' => $item['product_id'],
+                    'expected_quantity' => Money::normalize((string) $rows[$item['product_id']]->quantity, 3),
                     'counted_quantity' => Money::normalize((string) $item['counted_quantity'], 3),
                 ]);
             }
@@ -74,7 +79,8 @@ class StockCountService
 
             foreach ($items as $item) {
                 $row = $rows[$item->product_id];
-                $expected = Money::normalize((string) $row->quantity, 3);
+                // Variance is measured against the balance when the count was taken.
+                $expected = Money::normalize((string) ($item->expected_quantity ?? $row->quantity), 3);
                 $variance = Money::round(Money::sub((string) $item->counted_quantity, $expected), 3);
 
                 $item->expected_quantity = $expected;

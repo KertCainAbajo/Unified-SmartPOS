@@ -29,7 +29,8 @@ class PurchaseOrderService
                 'supplier_id' => $data['supplier_id'],
                 'reference' => $this->numberer->next($branch->tenant_id, 'purchase_order'),
                 'status' => PurchaseOrderStatus::Draft,
-                'order_date' => $data['order_date'] ?? now()->toDateString(),
+                // Default to today in the business's timezone, not the server's (UTC).
+                'order_date' => $data['order_date'] ?? now($branch->tenant->timezone)->toDateString(),
                 'expected_date' => $data['expected_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $userId,
@@ -76,6 +77,29 @@ class PurchaseOrderService
             $old = $order->status->value;
             $order->forceFill(['status' => PurchaseOrderStatus::Cancelled, 'cancelled_at' => now()])->save();
             $this->audit->log('purchase_order.cancelled', $order, ['status' => $old], ['status' => 'cancelled'], ['reason' => $reason]);
+
+            return $order;
+        });
+    }
+
+    /**
+     * Close a partially received PO short (the supplier will not deliver the rest). Goods already received
+     * stay in stock; outstanding quantities can no longer be received.
+     */
+    public function close(PurchaseOrder $order, string $reason): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $reason) {
+            $order = $this->lockInStatus($order, [PurchaseOrderStatus::PartiallyReceived]);
+            $outstanding = $order->items()->get()->map(fn ($i) => [
+                'purchase_order_item_id' => $i->id,
+                'outstanding' => Money::round(Money::sub((string) $i->quantity_ordered, (string) $i->quantity_received), 3),
+            ])->filter(fn ($l) => Money::isPositive($l['outstanding']))->values()->all();
+
+            $order->forceFill(['status' => PurchaseOrderStatus::Closed, 'cancelled_at' => now()])->save();
+            $this->audit->log('purchase_order.closed', $order, ['status' => 'partially_received'], ['status' => 'closed'], [
+                'reason' => $reason,
+                'not_delivered' => $outstanding,
+            ]);
 
             return $order;
         });

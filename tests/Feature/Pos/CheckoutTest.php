@@ -322,6 +322,39 @@ class CheckoutTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('items.0.product_id');
     }
 
+    public function test_quote_returns_server_totals_and_stock_without_saving(): void
+    {
+        [$tenant, , $branch] = $this->createTenant();
+        $cashier = $this->addMember($tenant, 'cashier', [$branch]);
+        $product = $this->createProduct($tenant, ['price' => '112.00']);
+        $this->setStock($product, $branch, '1');
+        $register = $this->mainRegister($branch);
+
+        $response = $this->actingAsUser($cashier)->postJson($this->tenantUrl($tenant, 'sales/quote'), [
+            'register_id' => $register->id,
+            'items' => [['product_id' => $product->id, 'quantity' => 2]],
+        ])->assertOk()
+            ->assertJsonPath('data.totals.total', '224.00')
+            ->assertJsonPath('data.totals.vat_amount', '24.00')
+            ->assertJsonPath('data.lines.0.available_stock', '1.000')
+            ->assertJsonPath('data.lines.0.in_stock', false);
+
+        $this->assertSame('112.00', $response->json('data.lines.0.unit_price'));
+        $this->assertSame(0, Sale::query()->count());
+
+        // Same discount rules as checkout.
+        $this->postJson($this->tenantUrl($tenant, 'sales/quote'), [
+            'register_id' => $register->id,
+            'items' => [['product_id' => $product->id, 'quantity' => 1, 'discount' => ['type' => 'percent', 'value' => 10]]],
+        ])->assertForbidden();
+
+        $this->postJson($this->tenantUrl($tenant, 'sales/quote'), [
+            'register_id' => $register->id,
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+            'discount' => ['type' => 'pwd', 'id_number' => 'PWD-1', 'holder_name' => 'Juan'],
+        ])->assertOk()->assertJsonPath('data.totals.total', '80.00');
+    }
+
     public function test_cashier_sees_only_own_sales(): void
     {
         [$tenant, $owner, $branch] = $this->createTenant();

@@ -16,6 +16,10 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::query()->updateOrCreate(['key' => $key], $definition);
         }
 
+        // Remove permissions that are no longer in the catalogue (e.g. members.* replaced by staff.*);
+        // role_permissions rows cascade, so no role keeps a permission the code no longer checks.
+        Permission::query()->whereNotIn('key', array_keys(Permissions::catalogue()))->delete();
+
         $permissionIds = Permission::query()->pluck('id', 'key');
 
         foreach (Permissions::systemRoles() as $key => $definition) {

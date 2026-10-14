@@ -160,7 +160,7 @@
         "/v1/auth/login": {
             "post": {
                 "operationId": "v1.auth.login",
-                "description": "With `device_name`: returns a personal access token for `Authorization: Bearer`.\nWithout it (SPA on a stateful domain, after GET /sanctum/csrf-cookie): starts a session.",
+                "description": "Identify with `email`, or (company-managed staff) `business_code` + `username`, where `username` may also be\nthe employee ID. Owners, managers and HR (User & Access Manager, or any role with administrative permissions)\nmust use their email; a correct username password for them is refused with a hint.\nWith `device_name`: returns a personal access token for `Authorization: Bearer`.\nWithout it (SPA on a stateful domain, after GET /sanctum/csrf-cookie): starts a session.",
                 "summary": "Log in",
                 "tags": [
                     "Authentication",
@@ -191,10 +191,20 @@
                                                 },
                                                 {}
                                             ]
+                                        },
+                                        "must_change_password": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "boolean",
+                                                    "description": "Clients route straight to \"choose your password\" when an administrator-issued temporary password was used."
+                                                },
+                                                {}
+                                            ]
                                         }
                                     },
                                     "required": [
-                                        "user"
+                                        "user",
+                                        "must_change_password"
                                     ],
                                     "additionalProperties": {}
                                 }
@@ -1030,6 +1040,15 @@
                                         ],
                                         "format": "email",
                                         "maxLength": 255
+                                    },
+                                    "staff_email_domain": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "description": "Domain used to suggest company emails for staff, e.g. alingnena.com (you must own its mailboxes).",
+                                        "pattern": "^(?!-)[a-z0-9-]+(\\.[a-z0-9-]+)+$",
+                                        "maxLength": 100
                                     },
                                     "timezone": {
                                         "type": "string"
@@ -3026,432 +3045,6 @@
                 }
             }
         },
-        "/v1/tenants/{tenant}/members": {
-            "get": {
-                "operationId": "v1.tenants.members.index",
-                "summary": "Team members. Requires `members.view`",
-                "tags": [
-                    "Members",
-                    "Member"
-                ],
-                "parameters": [
-                    {
-                        "name": "tenant",
-                        "in": "path",
-                        "required": true,
-                        "description": "The tenant ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "status",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated set of `MembershipResource`",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "allOf": [
-                                                    {
-                                                        "$ref": "#/components/schemas/MembershipResource"
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "required": [
-                                                            "user",
-                                                            "roles",
-                                                            "branches"
-                                                        ]
-                                                    }
-                                                ]
-                                            }
-                                        },
-                                        "links": {
-                                            "type": "object",
-                                            "properties": {
-                                                "first": {
-                                                    "type": "string"
-                                                },
-                                                "last": {
-                                                    "type": "string"
-                                                },
-                                                "prev": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "next": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "required": [
-                                                "first",
-                                                "last",
-                                                "prev",
-                                                "next"
-                                            ]
-                                        },
-                                        "meta": {
-                                            "type": "object",
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer"
-                                                },
-                                                "from": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "last_page": {
-                                                    "type": "string"
-                                                },
-                                                "links": {
-                                                    "type": "object",
-                                                    "additionalProperties": {}
-                                                },
-                                                "path": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "per_page": {
-                                                    "type": "integer"
-                                                },
-                                                "to": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "total": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "required": [
-                                                "current_page",
-                                                "from",
-                                                "last_page",
-                                                "links",
-                                                "path",
-                                                "per_page",
-                                                "to",
-                                                "total"
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "data",
-                                        "links",
-                                        "meta"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "$ref": "#/components/responses/AuthorizationException"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            },
-            "post": {
-                "operationId": "v1.tenants.members.store",
-                "description": "Requires `members.manage`. Existing users are linked; new users receive a password-setup email.\nThe caller can only grant roles whose permissions they hold themselves, and only branches they can access.",
-                "summary": "Add a member",
-                "tags": [
-                    "Members",
-                    "Member"
-                ],
-                "parameters": [
-                    {
-                        "name": "tenant",
-                        "in": "path",
-                        "required": true,
-                        "description": "The tenant ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email",
-                                        "maxLength": 255
-                                    },
-                                    "name": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 255
-                                    },
-                                    "role_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1,
-                                        "uniqueItems": true
-                                    },
-                                    "all_branches": {
-                                        "type": "boolean"
-                                    },
-                                    "branch_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "uniqueItems": true
-                                    }
-                                },
-                                "required": [
-                                    "email",
-                                    "role_ids"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "`MembershipResource`",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "allOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/MembershipResource"
-                                                },
-                                                {
-                                                    "type": "object",
-                                                    "required": [
-                                                        "user",
-                                                        "roles",
-                                                        "branches"
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "$ref": "#/components/responses/AuthorizationException"
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            }
-        },
-        "/v1/tenants/{tenant}/members/{membership}": {
-            "get": {
-                "operationId": "v1.tenants.members.show",
-                "tags": [
-                    "Members",
-                    "Member"
-                ],
-                "parameters": [
-                    {
-                        "name": "tenant",
-                        "in": "path",
-                        "required": true,
-                        "description": "The tenant ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "membership",
-                        "in": "path",
-                        "required": true,
-                        "description": "The membership ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "`MembershipResource`",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "allOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/MembershipResource"
-                                                },
-                                                {
-                                                    "type": "object",
-                                                    "required": [
-                                                        "user",
-                                                        "roles",
-                                                        "branches"
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "$ref": "#/components/responses/AuthorizationException"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "v1.tenants.members.update",
-                "description": "Requires `members.manage`. Members cannot change their own membership, and nobody can change the owner's.",
-                "summary": "Change a member's roles, branches or status",
-                "tags": [
-                    "Members",
-                    "Member"
-                ],
-                "parameters": [
-                    {
-                        "name": "tenant",
-                        "in": "path",
-                        "required": true,
-                        "description": "The tenant ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "membership",
-                        "in": "path",
-                        "required": true,
-                        "description": "The membership ID",
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "role_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1,
-                                        "uniqueItems": true
-                                    },
-                                    "all_branches": {
-                                        "type": "boolean"
-                                    },
-                                    "branch_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "uniqueItems": true
-                                    },
-                                    "status": {
-                                        "type": "string",
-                                        "enum": [
-                                            "active",
-                                            "suspended"
-                                        ]
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "`MembershipResource`",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/components/schemas/MembershipResource"
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "$ref": "#/components/responses/AuthorizationException"
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            }
-        },
         "/v1/tenants/{tenant}/notifications": {
             "get": {
                 "operationId": "v1.tenants.notifications.index",
@@ -4582,6 +4175,111 @@
                 }
             }
         },
+        "/v1/me/memberships/{membership}/accept": {
+            "post": {
+                "operationId": "v1.me.memberships.accept",
+                "summary": "Accept an invitation to join a business (existing personal accounts)",
+                "tags": [
+                    "Profile"
+                ],
+                "parameters": [
+                    {
+                        "name": "membership",
+                        "in": "path",
+                        "required": true,
+                        "description": "The membership ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`MembershipResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/MembershipResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "tenant",
+                                                        "roles",
+                                                        "branches"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/me/memberships/{membership}/decline": {
+            "post": {
+                "operationId": "v1.me.memberships.decline",
+                "summary": "Decline an invitation. The membership is closed and grants nothing",
+                "tags": [
+                    "Profile"
+                ],
+                "parameters": [
+                    {
+                        "name": "membership",
+                        "in": "path",
+                        "required": true,
+                        "description": "The membership ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Invitation declined."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/tenants/{tenant}/purchase-orders": {
             "get": {
                 "operationId": "v1.tenants.purchase-orders.index",
@@ -5547,6 +5245,247 @@
                                         "maxLength": 255
                                     }
                                 }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "reference": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "$ref": "#/components/schemas/PurchaseOrderStatus"
+                                                },
+                                                "branch_id": {
+                                                    "type": "integer"
+                                                },
+                                                "supplier": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "supplier_id": {
+                                                    "type": "integer"
+                                                },
+                                                "order_date": {
+                                                    "type": "string"
+                                                },
+                                                "expected_date": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "total": {
+                                                    "type": "string"
+                                                },
+                                                "notes": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "items": {
+                                                    "type": [
+                                                        "array",
+                                                        "null"
+                                                    ],
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "product_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "product": {
+                                                                "type": [
+                                                                    "object",
+                                                                    "null"
+                                                                ],
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "sku": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "unit": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "sku",
+                                                                    "name",
+                                                                    "unit"
+                                                                ]
+                                                            },
+                                                            "quantity_ordered": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity_received": {
+                                                                "type": "string"
+                                                            },
+                                                            "unit_cost": {
+                                                                "type": "string"
+                                                            },
+                                                            "line_total": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "product_id",
+                                                            "product",
+                                                            "quantity_ordered",
+                                                            "quantity_received",
+                                                            "unit_cost",
+                                                            "line_total"
+                                                        ]
+                                                    }
+                                                },
+                                                "receipts": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "created_by": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "ordered_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "format": "date-time"
+                                                },
+                                                "created_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "reference",
+                                                "status",
+                                                "branch_id",
+                                                "supplier",
+                                                "supplier_id",
+                                                "order_date",
+                                                "expected_date",
+                                                "total",
+                                                "notes",
+                                                "items",
+                                                "receipts",
+                                                "created_by",
+                                                "ordered_at",
+                                                "created_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/purchase-orders/{purchaseOrder}/close": {
+            "post": {
+                "operationId": "v1.tenants.purchase-orders.close",
+                "summary": "Close a partially received PO short when the rest will not arrive. Received stock is kept; the\nundelivered quantities are recorded in the audit log. Requires `purchasing.manage`",
+                "tags": [
+                    "Purchasing",
+                    "PurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "purchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The purchase order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "reason"
+                                ]
                             }
                         }
                     }
@@ -8897,7 +8836,7 @@
         "/v1/tenants/{tenant}/permissions": {
             "get": {
                 "operationId": "v1.tenants.permissions.index",
-                "summary": "The permission catalogue. Requires `members.view`",
+                "summary": "The permission catalogue. Requires `staff.view`",
                 "tags": [
                     "Roles and permissions",
                     "Role"
@@ -8946,7 +8885,7 @@
         "/v1/tenants/{tenant}/roles": {
             "get": {
                 "operationId": "v1.tenants.roles.index",
-                "summary": "System roles and this business's custom roles, with their permissions. Requires `members.view`",
+                "summary": "System roles and this business's custom roles, with their permissions. Requires `staff.view`",
                 "tags": [
                     "Roles and permissions",
                     "Role"
@@ -9398,6 +9337,84 @@
                             "application/json": {
                                 "schema": {
                                     "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/sales/quote": {
+            "post": {
+                "operationId": "v1.tenants.sales.quote",
+                "description": "Returns the server-computed totals, VAT breakdown and per-line stock availability so the POS can\nshow the amount due before payment. Same permissions and discount rules as checkout.",
+                "summary": "Price a cart (no sale is created)",
+                "tags": [
+                    "Sales and checkout",
+                    "Sale"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "totals": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "lines": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "totals",
+                                                "lines"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -9960,6 +9977,1642 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/LengthAwarePaginator"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/staff/activate": {
+            "post": {
+                "operationId": "v1.staff.activate",
+                "description": "Codes are single-use, expire, and are locked after 5 wrong attempts. The error message is the same for\nevery failure so it reveals nothing about the account.",
+                "summary": "Activate a staff account, or redeem a recovery code, and choose a password",
+                "tags": [
+                    "Staff accounts",
+                    "StaffActivation"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "business_code": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "maxLength": 50
+                                    },
+                                    "code": {
+                                        "type": "string",
+                                        "maxLength": 100
+                                    },
+                                    "password": {
+                                        "type": "string"
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "business_code",
+                                    "username",
+                                    "code",
+                                    "password",
+                                    "password_confirmation"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Your password is set. You can now sign in with your business code and username."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/staff/forgot-password": {
+            "post": {
+                "operationId": "v1.staff.forgot-password",
+                "summary": "Ask for help signing in (company-managed accounts). Accounts with an email receive a reset link; otherwise\nthe business's staff administrators are notified. The response is always the same",
+                "tags": [
+                    "Staff accounts",
+                    "StaffActivation"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "business_code": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "maxLength": 50
+                                    }
+                                },
+                                "required": [
+                                    "business_code",
+                                    "username"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "If the account exists, a reset link was emailed or your administrator was notified. Ask your manager for a recovery code."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/tenants/{tenant}/staff": {
+            "get": {
+                "operationId": "v1.tenants.staff.index",
+                "summary": "Staff visible to the caller. Filters: `status`, `q` (name, username, email, employee code), `branch_id`. Requires `staff.view`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "invited",
+                                "active",
+                                "suspended",
+                                "offboarded"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "allOf": [
+                                                    {
+                                                        "$ref": "#/components/schemas/StaffResource"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "branches",
+                                                            "roles"
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": "string"
+                                                },
+                                                "last": {
+                                                    "type": "string"
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last_page": {
+                                                    "type": "string"
+                                                },
+                                                "links": {
+                                                    "type": "object",
+                                                    "additionalProperties": {}
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "total": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.tenants.staff.store",
+                "description": "`delivery=manual` returns a one-time `activation_code` **once** for in-person hand-over;\n`delivery=email` emails an activation link to the company email. Requires `staff.create`.",
+                "summary": "Create a company-managed staff account (pending activation)",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "pattern": "^[a-z0-9][a-z0-9._-]{2,49}$"
+                                    },
+                                    "email": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "employee_code": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 40
+                                    },
+                                    "role_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    },
+                                    "all_branches": {
+                                        "type": "boolean"
+                                    },
+                                    "branch_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "uniqueItems": true
+                                    },
+                                    "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                            "temporary_password",
+                                            "manual",
+                                            "email"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "role_ids",
+                                    "delivery"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StaffResource"
+                                        },
+                                        "activation_code": {
+                                            "type": "string",
+                                            "description": "Shown once. Neither is stored in readable form or retrievable later; issue a new one if it is lost."
+                                        },
+                                        "temporary_password": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "code_expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "activation_code",
+                                        "temporary_password",
+                                        "code_expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/username-suggestion": {
+            "get": {
+                "operationId": "v1.tenants.staff.username-suggestion",
+                "summary": "Suggest identifiers for a new staff member from the role, branch and business: username (e.g. `cashier.main01`),\nnext employee ID (`EMP-0004`) and, when the business has a staff email domain, a company email.\nRequires `staff.create`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "role_id",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "username": {
+                                            "type": "string"
+                                        },
+                                        "employee_code": {
+                                            "type": "string"
+                                        },
+                                        "email": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "username",
+                                        "employee_code",
+                                        "email"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/invite-existing": {
+            "post": {
+                "operationId": "v1.tenants.staff.invite-existing",
+                "summary": "Invite an existing personal account by email. Always answers 202 with the same message, whether or\nnot the email belongs to an account. The person must accept in `/me/memberships`. Requires `staff.create`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "role_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    },
+                                    "all_branches": {
+                                        "type": "boolean"
+                                    },
+                                    "branch_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "uniqueItems": true
+                                    }
+                                },
+                                "required": [
+                                    "email",
+                                    "role_ids"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "If an account with this email exists, it has been invited. The person must accept the invitation before gaining access."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/audit-log": {
+            "get": {
+                "operationId": "v1.tenants.staff.audit-log",
+                "summary": "Account-administration audit trail (staff.* and sign-in events for members the caller can see).\nRequires `staff.audit`. The full audit log requires `audit_logs.view`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "membership_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LengthAwarePaginator"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}": {
+            "get": {
+                "operationId": "v1.tenants.staff.show",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "v1.tenants.staff.update",
+                "summary": "Update profile details. Company-managed: name, username, email, employee code. Personal: employee code only. Requires `staff.update`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9._-]{2,49}$"
+                                    },
+                                    "email": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "employee_code": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 40
+                                    },
+                                    "role_ids": {
+                                        "type": "string",
+                                        "description": "Role, branch and status changes have dedicated, separately-permissioned endpoints."
+                                    },
+                                    "branch_ids": {
+                                        "type": "string"
+                                    },
+                                    "all_branches": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/change-role": {
+            "post": {
+                "operationId": "v1.tenants.staff.change-role",
+                "summary": "Replace the member's roles. Requires `staff.assign_roles`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "role_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                },
+                                "required": [
+                                    "role_ids"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/transfer-branches": {
+            "post": {
+                "operationId": "v1.tenants.staff.transfer-branches",
+                "summary": "Replace the member's branch access (transfer, add or remove branches). Requires `staff.assign_branches`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "all_branches": {
+                                        "type": "boolean"
+                                    },
+                                    "branch_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "uniqueItems": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/suspend": {
+            "post": {
+                "operationId": "v1.tenants.staff.suspend",
+                "summary": "Suspend access immediately (tokens and sessions revoked). Requires `staff.status`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "reason"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`StaffResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/reactivate": {
+            "post": {
+                "operationId": "v1.tenants.staff.reactivate",
+                "summary": "Reactivate a suspended member, or rehire an offboarded one (returns to `invited` with a new activation\ncode). Requires `staff.status` (and `staff.credentials` for rehire)",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                            "temporary_password",
+                                            "manual",
+                                            "email"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StaffResource"
+                                        },
+                                        "activation_code": {
+                                            "type": "string",
+                                            "description": "Shown once. Neither is stored in readable form or retrievable later; issue a new one if it is lost."
+                                        },
+                                        "temporary_password": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "code_expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "activation_code",
+                                        "temporary_password",
+                                        "code_expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/offboard": {
+            "post": {
+                "operationId": "v1.tenants.staff.offboard",
+                "summary": "Offboard: remove all access immediately and keep every historical record. Returns pending work to hand\nover (open shifts, pending refunds, drafts). Requires `staff.offboard`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "reason"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/StaffResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "branches",
+                                                        "roles"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "pending_work": {
+                                            "type": "object",
+                                            "properties": {
+                                                "open_shifts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "pending_refunds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "draft_transfers": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "draft_stock_counts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "open_purchase_orders": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "how_to_reassign": {
+                                                    "type": "string",
+                                                    "const": "A manager with shifts.view_all can close open shifts; approvers can process pending refunds; drafts can be completed or cancelled by any authorized member of the branch."
+                                                }
+                                            },
+                                            "required": [
+                                                "open_shifts",
+                                                "pending_refunds",
+                                                "draft_transfers",
+                                                "draft_stock_counts",
+                                                "open_purchase_orders",
+                                                "how_to_reassign"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "pending_work"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/resend-invitation": {
+            "post": {
+                "operationId": "v1.tenants.staff.resend-invitation",
+                "summary": "Issue a new activation code (previous codes are revoked). Requires `staff.credentials`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                            "temporary_password",
+                                            "manual",
+                                            "email"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "delivery"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StaffResource"
+                                        },
+                                        "activation_code": {
+                                            "type": "string",
+                                            "description": "Shown once. Neither is stored in readable form or retrievable later; issue a new one if it is lost."
+                                        },
+                                        "temporary_password": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "code_expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "activation_code",
+                                        "temporary_password",
+                                        "code_expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/recovery": {
+            "post": {
+                "operationId": "v1.tenants.staff.recovery",
+                "summary": "Administrator-assisted password recovery for company-managed accounts (verify identity in person first).\nThe employee's current password keeps working until the code is redeemed. Requires `staff.credentials`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                            "temporary_password",
+                                            "manual",
+                                            "email"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "delivery"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StaffResource"
+                                        },
+                                        "activation_code": {
+                                            "type": "string",
+                                            "description": "Shown once. Neither is stored in readable form or retrievable later; issue a new one if it is lost."
+                                        },
+                                        "temporary_password": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "code_expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "activation_code",
+                                        "temporary_password",
+                                        "code_expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/tenants/{tenant}/staff/{staff}/pending-work": {
+            "get": {
+                "operationId": "v1.tenants.staff.pending-work",
+                "summary": "Pending work owned by a member (useful before offboarding). Requires `staff.offboard`",
+                "tags": [
+                    "Staff accounts",
+                    "Staff"
+                ],
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tenant ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "staff",
+                        "in": "path",
+                        "required": true,
+                        "description": "The staff ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "open_shifts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "pending_refunds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "draft_transfers": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "draft_stock_counts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "open_purchase_orders": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "how_to_reassign": {
+                                                    "type": "string",
+                                                    "const": "A manager with shifts.view_all can close open shifts; approvers can process pending refunds; drafts can be completed or cancelled by any authorized member of the branch."
+                                                }
+                                            },
+                                            "required": [
+                                                "open_shifts",
+                                                "pending_refunds",
+                                                "draft_transfers",
+                                                "draft_stock_counts",
+                                                "open_purchase_orders",
+                                                "how_to_reassign"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -10882,7 +12535,7 @@
         "/v1/tenants/{tenant}/stock-transfers/{stockTransfer}/cancel": {
             "post": {
                 "operationId": "v1.tenants.stock-transfers.cancel",
-                "summary": "Cancel a draft transfer",
+                "summary": "Cancel a draft, or an in-transit transfer (dispatched stock returns to the source branch)",
                 "tags": [
                     "Stock transfers",
                     "StockTransfer"
@@ -11498,12 +13151,6 @@
                                         "type",
                                         "value"
                                     ]
-                                },
-                                "price": {
-                                    "type": "string"
-                                },
-                                "unit_price": {
-                                    "type": "string"
                                 }
                             },
                             "required": [
@@ -11567,13 +13214,6 @@
                             ]
                         },
                         "maxItems": 10
-                    },
-                    "total": {
-                        "type": "string",
-                        "description": "Explicitly rejected: clients may not dictate these."
-                    },
-                    "subtotal": {
-                        "type": "string"
                     }
                 },
                 "required": [
@@ -11708,10 +13348,29 @@
             },
             "LoginRequest": {
                 "type": "object",
+                "description": "Sign in with an email, or (company-managed staff) business code + username or employee ID.\nOwners, managers and HR always use email.",
                 "properties": {
                     "email": {
-                        "type": "string",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
                         "format": "email"
+                    },
+                    "business_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Username or employee ID.",
+                        "maxLength": 50
                     },
                     "password": {
                         "type": "string"
@@ -11726,7 +13385,6 @@
                     }
                 },
                 "required": [
-                    "email",
                     "password"
                 ],
                 "title": "LoginRequest"
@@ -12080,14 +13738,94 @@
             },
             "PurchaseOrderStatus": {
                 "type": "string",
+                "description": "| |\n|---|\n| `draft` <br/>  |\n| `ordered` <br/>  |\n| `partially_received` <br/>  |\n| `received` <br/>  |\n| `cancelled` <br/>  |\n| `closed` <br/> Partially received and closed short: the remaining quantity will not be delivered. |",
                 "enum": [
                     "draft",
                     "ordered",
                     "partially_received",
                     "received",
-                    "cancelled"
+                    "cancelled",
+                    "closed"
                 ],
                 "title": "PurchaseOrderStatus"
+            },
+            "QuoteRequest": {
+                "type": "object",
+                "description": "Cart pricing preview: same rules as checkout, without idempotency key or payments.",
+                "properties": {
+                    "register_id": {
+                        "type": "integer"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "product_id": {
+                                    "type": "integer"
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "maximum": 99999
+                                },
+                                "discount": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "$ref": "#/components/schemas/LineDiscountType"
+                                        },
+                                        "value": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        }
+                                    },
+                                    "required": [
+                                        "type",
+                                        "value"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "product_id",
+                                "quantity"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    },
+                    "discount": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "$ref": "#/components/schemas/SaleDiscountType"
+                            },
+                            "id_number": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 50
+                            },
+                            "holder_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 255
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "id_number",
+                            "holder_name"
+                        ]
+                    }
+                },
+                "required": [
+                    "register_id",
+                    "items"
+                ],
+                "title": "QuoteRequest"
             },
             "RefundStatus": {
                 "type": "string",
@@ -12318,6 +14056,10 @@
                     "is_system": {
                         "type": "boolean"
                     },
+                    "requires_email_sign_in": {
+                        "type": "boolean",
+                        "description": "Staff holding this role sign in with email instead of username / employee ID."
+                    },
                     "permissions": {
                         "type": "array",
                         "items": {}
@@ -12328,7 +14070,8 @@
                     "key",
                     "name",
                     "description",
-                    "is_system"
+                    "is_system",
+                    "requires_email_sign_in"
                 ],
                 "title": "RoleResource"
             },
@@ -12651,6 +14394,255 @@
                 ],
                 "title": "SaleStatus"
             },
+            "StaffResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "account_type": {
+                        "type": "string",
+                        "enum": [
+                            "company_managed",
+                            "personal"
+                        ]
+                    },
+                    "name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sign_in_with": {
+                        "type": "string",
+                        "description": "How this person signs in: `username` (username or employee ID + password) or `email`.",
+                        "enum": [
+                            "username",
+                            "email"
+                        ]
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "employee_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "user_status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "all_branches": {
+                        "type": "boolean"
+                    },
+                    "branches": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/BranchResource"
+                        }
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RoleResource"
+                        }
+                    },
+                    "pending_code": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "purpose": {
+                                "type": "string"
+                            },
+                            "channel": {
+                                "type": "string"
+                            },
+                            "expires_at": {
+                                "anyOf": [
+                                    {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "expired": {
+                                "type": [
+                                    "boolean",
+                                    "string"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "purpose",
+                            "channel",
+                            "expires_at",
+                            "expired"
+                        ]
+                    },
+                    "joined_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "suspended_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "offboarded_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "last_login_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "must_change_password": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "profile": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "Personal data: only staff administrators (staff.update) and the employee themselves.",
+                        "properties": {
+                            "job_title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "hire_date": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date"
+                            },
+                            "phone": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "address": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "birth_date": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date"
+                            },
+                            "emergency_contact_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "emergency_contact_phone": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "notes": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "job_title",
+                            "hire_date",
+                            "phone",
+                            "address",
+                            "birth_date",
+                            "emergency_contact_name",
+                            "emergency_contact_phone",
+                            "notes"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "user_id",
+                    "account_type",
+                    "name",
+                    "username",
+                    "sign_in_with",
+                    "email",
+                    "employee_code",
+                    "status",
+                    "user_status",
+                    "status_reason",
+                    "all_branches",
+                    "pending_code",
+                    "joined_at",
+                    "suspended_at",
+                    "offboarded_at",
+                    "last_login_at",
+                    "must_change_password",
+                    "created_at"
+                ],
+                "title": "StaffResource"
+            },
             "StockCountResource": {
                 "type": "object",
                 "properties": {
@@ -12895,6 +14887,7 @@
                     "purchase_receipt",
                     "transfer_out",
                     "transfer_in",
+                    "transfer_return",
                     "stock_count"
                 ],
                 "title": "StockMovementType"
@@ -13093,6 +15086,12 @@
                             "null"
                         ]
                     },
+                    "staff_email_domain": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "currency": {
                         "type": "string"
                     },
@@ -13140,6 +15139,7 @@
                     "address",
                     "phone",
                     "email",
+                    "staff_email_domain",
                     "currency",
                     "timezone",
                     "vat_registered",
@@ -13164,7 +15164,10 @@
                         "type": "string"
                     },
                     "email": {
-                        "type": "string"
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "phone": {
                         "type": [
@@ -13173,6 +15176,15 @@
                         ]
                     },
                     "email_verified": {
+                        "type": "boolean"
+                    },
+                    "username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "must_change_password": {
                         "type": "boolean"
                     },
                     "is_platform_admin": {
@@ -13192,6 +15204,7 @@
                     "email",
                     "phone",
                     "email_verified",
+                    "username",
                     "created_at"
                 ],
                 "title": "UserResource"

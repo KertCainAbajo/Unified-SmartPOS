@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Permissions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,5 +38,15 @@ class Role extends Model
         // A missing system role is a deployment error (seeder not run), not a client 404.
         return static::query()->whereNull('tenant_id')->where('key', $key)->first()
             ?? throw new \RuntimeException("System role [{$key}] is not seeded. Run RolesAndPermissionsSeeder.");
+    }
+
+    /** Holders of this role must sign in with email (see Permissions::EMAIL_SIGN_IN_ROLES). */
+    public function requiresEmailSignIn(): bool
+    {
+        if (($this->tenant_id === null && in_array($this->key, Permissions::EMAIL_SIGN_IN_ROLES, true))) {
+            return true;
+        }
+
+        return $this->permissions->pluck('key')->intersect(Permissions::PRIVILEGED)->isNotEmpty();
     }
 }

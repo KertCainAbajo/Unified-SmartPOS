@@ -20,6 +20,7 @@ class TenantResource extends JsonResource
             'address' => $this->address,
             'phone' => $this->phone,
             'email' => $this->email,
+            'staff_email_domain' => $this->staff_email_domain,
             'currency' => $this->currency,
             'timezone' => $this->timezone,
             'vat_registered' => $this->vat_registered,

@@ -4,52 +4,29 @@ namespace Tests\Feature\Tenancy;
 
 use App\Models\Permission;
 use App\Models\Role;
-use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Support\Facades\Notification;
+use App\Support\Permissions;
 use Tests\TestCase;
 
 class RoleManagementTest extends TestCase
 {
-    public function test_owner_can_add_member_and_new_user_receives_password_setup_link(): void
+    public function test_branch_manager_cannot_change_another_users_roles_without_permission(): void
     {
-        Notification::fake();
-        [$tenant, $owner, $branch] = $this->createTenant();
-
-        $response = $this->actingAsUser($owner)->postJson($this->tenantUrl($tenant, 'members'), [
-            'email' => 'New.Cashier@example.com',
-            'name' => 'New Cashier',
-            'role_ids' => [Role::system('cashier')->id],
-            'branch_ids' => [$branch->id],
-        ]);
-
-        $response->assertCreated()
-            ->assertJsonPath('data.user.email', 'new.cashier@example.com')
-            ->assertJsonPath('data.roles.0.key', 'cashier')
-            ->assertJsonPath('data.branches.0.id', $branch->id);
-
-        Notification::assertSentTo(User::query()->where('email', 'new.cashier@example.com')->first(), ResetPassword::class);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'member.added', 'tenant_id' => $tenant->id]);
-    }
-
-    public function test_user_cannot_change_another_users_roles_without_permission(): void
-    {
-        [$tenant, $owner, $branch] = $this->createTenant();
+        [$tenant, , $branch] = $this->createTenant();
         $manager = $this->addMember($tenant, 'branch_manager', [$branch]);
         $cashier = $this->addMember($tenant, 'cashier', [$branch]);
         $cashierMembership = $tenant->memberships()->where('user_id', $cashier->id)->first();
 
-        // Branch managers lack members.manage.
+        // Branch managers do not hold staff.assign_roles unless the owner grants it.
         $this->actingAsUser($manager)
-            ->patchJson($this->tenantUrl($tenant, 'members/'.$cashierMembership->id), ['role_ids' => [Role::system('branch_manager')->id]])
+            ->postJson($this->tenantUrl($tenant, "staff/{$cashierMembership->id}/change-role"), ['role_ids' => [Role::system('branch_manager')->id]])
             ->assertForbidden();
 
-        // Cashiers obviously too.
         $this->actingAsUser($cashier)
-            ->patchJson($this->tenantUrl($tenant, 'members/'.$cashierMembership->id), ['role_ids' => [Role::system('business_owner')->id]])
+            ->postJson($this->tenantUrl($tenant, "staff/{$cashierMembership->id}/change-role"), ['role_ids' => [Role::system('business_owner')->id]])
             ->assertForbidden();
 
         $this->assertSame(['cashier'], $cashierMembership->roles()->pluck('key')->all());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'staff.unauthorized_attempt', 'user_id' => $manager->id]);
     }
 
     public function test_nobody_can_modify_their_own_or_the_owners_membership(): void
@@ -58,17 +35,17 @@ class RoleManagementTest extends TestCase
         $ownerMembership = $tenant->memberships()->where('user_id', $owner->id)->first();
 
         $this->actingAsUser($owner)
-            ->patchJson($this->tenantUrl($tenant, 'members/'.$ownerMembership->id), ['status' => 'suspended'])
+            ->postJson($this->tenantUrl($tenant, "staff/{$ownerMembership->id}/suspend"), ['reason' => 'x'])
             ->assertForbidden();
     }
 
     public function test_custom_role_cannot_grant_permissions_the_creator_lacks(): void
     {
-        [$tenant, $owner] = $this->createTenant();
+        [$tenant] = $this->createTenant();
         // A manager given roles.manage via a custom role still cannot grant tenant.manage.
         $manager = $this->addMember($tenant, 'branch_manager');
         $custom = Role::query()->create(['tenant_id' => $tenant->id, 'key' => 'role_admin', 'name' => 'Role admin']);
-        $custom->permissions()->attach(Permission::query()->whereIn('key', ['roles.manage', 'members.manage'])->pluck('id'));
+        $custom->permissions()->attach(Permission::query()->whereIn('key', ['roles.manage', 'staff.assign_roles'])->pluck('id'));
         $tenant->memberships()->where('user_id', $manager->id)->first()->roles()->attach($custom->id);
 
         $this->actingAsUser($manager)->postJson($this->tenantUrl($tenant, 'roles'), [
@@ -77,8 +54,8 @@ class RoleManagementTest extends TestCase
 
         // And cannot assign the Business Owner role.
         $cashier = $this->addMember($tenant, 'cashier');
-        $this->actingAsUser($manager)->patchJson(
-            $this->tenantUrl($tenant, 'members/'.$tenant->memberships()->where('user_id', $cashier->id)->value('id')),
+        $this->actingAsUser($manager)->postJson(
+            $this->tenantUrl($tenant, 'staff/'.$tenant->memberships()->where('user_id', $cashier->id)->value('id').'/change-role'),
             ['role_ids' => [Role::system('business_owner')->id]],
         )->assertForbidden();
 
@@ -110,5 +87,21 @@ class RoleManagementTest extends TestCase
         $this->assertContains('sales.create', $response->json('permissions'));
         $this->assertNotContains('refunds.approve', $response->json('permissions'));
         $this->assertSame([$main->id], array_column($response->json('branches'), 'id'));
+    }
+
+    public function test_seeded_roles_have_expected_boundaries(): void
+    {
+        $perms = fn (string $key) => Role::system($key)->permissions()->pluck('key')->all();
+
+        $uam = $perms('user_access_manager');
+        $this->assertContains('staff.create', $uam);
+        foreach (['sales.create', 'sales.view_all', 'refunds.create', 'inventory.adjust', 'reports.financial', 'reports.view', 'tenant.manage', 'audit_logs.view'] as $forbidden) {
+            $this->assertNotContains($forbidden, $uam, "UAM must not hold {$forbidden}");
+        }
+
+        $this->assertSame([], array_diff($perms('auditor'), Permissions::readOnly()), 'Auditor must be read-only');
+        $this->assertNotContains('staff.create', $perms('branch_manager'));
+        $this->assertContains('staff.view', $perms('branch_manager'));
+        $this->assertDatabaseMissing('permissions', ['key' => 'members.manage']);
     }
 }

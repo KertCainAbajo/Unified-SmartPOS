@@ -51,6 +51,19 @@ class NotificationService
         return count($rows);
     }
 
+    /** @param  array<string, mixed>  $data */
+    public function notifyUser(int $tenantId, int $userId, string $type, string $title, ?string $body = null, array $data = []): void
+    {
+        AppNotification::query()->create([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => $title,
+            'body' => $body,
+            'data' => $data,
+        ]);
+    }
+
     /** Defer notification creation until the surrounding transaction commits. */
     public function afterCommit(callable $callback): void
     {

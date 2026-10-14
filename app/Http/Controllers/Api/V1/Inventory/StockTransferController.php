@@ -87,11 +87,11 @@ class StockTransferController extends Controller
         return new StockTransferResource($this->transfers->receive($stockTransfer, $request->user()->id)->load('items.product'));
     }
 
-    /** Cancel a draft transfer. */
-    public function cancel(Tenant $tenant, StockTransfer $stockTransfer): StockTransferResource
+    /** Cancel a draft, or an in-transit transfer (dispatched stock returns to the source branch). */
+    public function cancel(Request $request, Tenant $tenant, StockTransfer $stockTransfer): StockTransferResource
     {
         $this->authorize('dispatch', $stockTransfer);
 
-        return new StockTransferResource($this->transfers->cancel($stockTransfer)->load('items.product'));
+        return new StockTransferResource($this->transfers->cancel($stockTransfer, $request->user()->id)->load('items.product'));
     }
 }

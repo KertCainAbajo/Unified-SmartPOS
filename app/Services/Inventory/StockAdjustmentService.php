@@ -41,6 +41,10 @@ class StockAdjustmentService
                     throw new BusinessRuleException('Stock is not tracked for this product.', 'STOCK_NOT_TRACKED',
                         ["items.{$i}.product_id" => ['Stock is not tracked for this product.']]);
                 }
+                if (Money::isZero(Money::normalize((string) $item['quantity_change'], 3))) {
+                    throw new BusinessRuleException('The quantity change cannot be zero.', 'ZERO_QUANTITY',
+                        ["items.{$i}.quantity_change" => ['The quantity change cannot be zero.']]);
+                }
                 $this->assertQuantityPrecision($product, (string) $item['quantity_change'], "items.{$i}.quantity_change");
             }
 

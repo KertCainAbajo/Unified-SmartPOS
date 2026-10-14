@@ -59,6 +59,8 @@ class TenantController extends Controller
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'email' => ['sometimes', 'nullable', 'email:rfc', 'max:255'],
+            // Domain used to suggest company emails for staff, e.g. alingnena.com (you must own its mailboxes).
+            'staff_email_domain' => ['sometimes', 'nullable', 'string', 'max:100', 'regex:/^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)+$/i'],
             'timezone' => ['sometimes', 'required', 'timezone:all'],
             'vat_registered' => ['sometimes', 'boolean'],
             'vat_rate' => ['sometimes', 'numeric', 'decimal:0,2', 'min:0', 'max:100'],

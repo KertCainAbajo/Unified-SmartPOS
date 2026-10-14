@@ -10,6 +10,7 @@ use App\Support\Permissions;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Checkout payload. Only identifiers, quantities, discount requests and tendered amounts are accepted:
@@ -57,13 +58,29 @@ class CheckoutRequest extends FormRequest
             'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)],
             'payments.*.amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:999999999'],
             'payments.*.reference_number' => ['nullable', 'string', 'max:100'],
-
-            // Explicitly rejected: clients may not dictate these.
-            'total' => ['prohibited'],
-            'subtotal' => ['prohibited'],
-            'items.*.price' => ['prohibited'],
-            'items.*.unit_price' => ['prohibited'],
         ];
+    }
+
+    /**
+     * Reject client-supplied prices and totals. Kept out of rules() so API docs and their example
+     * bodies do not present these fields as part of the request.
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator) {
+            foreach (['total', 'subtotal'] as $field) {
+                if ($this->has($field)) {
+                    $validator->errors()->add($field, "The {$field} is calculated by the server and must not be sent.");
+                }
+            }
+            foreach ((array) $this->input('items', []) as $i => $item) {
+                foreach (['price', 'unit_price'] as $field) {
+                    if (is_array($item) && array_key_exists($field, $item)) {
+                        $validator->errors()->add("items.{$i}.{$field}", 'Prices are taken from the product catalog and must not be sent.');
+                    }
+                }
+            }
+        }];
     }
 
     /** The idempotency key may be sent as the `Idempotency-Key` header (preferred) or in the body. */

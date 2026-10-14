@@ -52,7 +52,7 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | POST | `/auth/register` | public | Owner + business + main branch + register, in one transaction |
-| POST | `/auth/login` | public | Token (with `device_name`) or session |
+| POST | `/auth/login` | public | `email` **or** `business_code` + `username` (company-managed staff); token (with `device_name`) or session |
 | POST | `/auth/logout` | user | Revokes current token / ends session |
 | POST | `/auth/logout-all` | user | Revokes all tokens |
 | POST | `/auth/forgot-password` | public | Always the same response |
@@ -63,6 +63,9 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | PUT | `/me/password` | user | Requires `current_password`; revokes other tokens |
 | GET | `/me/memberships` | user | Businesses, roles, branches |
 | POST | `/tenants` | user | Create an additional business owned by the caller |
+| POST | `/me/memberships/{id}/accept` / `decline` | user | Respond to an invitation to an existing personal account |
+| POST | `/staff/activate` | public (rate-limited) | Redeem an activation or recovery code (`business_code`, `username`, `code`, `password`) |
+| POST | `/staff/forgot-password` | public (rate-limited) | Staff sign-in help: emailed link or administrators notified; same response always |
 
 ### Platform administration
 
@@ -80,10 +83,44 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | GET | `/tenants/{t}/context` | member — own permissions and branches |
 | GET | `/tenants/{t}/branches` | member (authorized branches only) |
 | POST/PATCH | `/tenants/{t}/branches[/{b}]` | `branches.manage` |
-| GET | `/tenants/{t}/members[/{m}]` | `members.view` |
-| POST/PATCH | `/tenants/{t}/members[/{m}]` | `members.manage`; cannot edit self or owner; cannot grant permissions/branches the caller lacks |
-| GET | `/tenants/{t}/roles`, `/permissions` | `members.view` |
+| GET | `/tenants/{t}/roles`, `/permissions` | `staff.view` |
 | POST/PATCH/DELETE | `/tenants/{t}/roles[/{r}]` | `roles.manage`; custom roles only |
+
+### Staff accounts (see [STAFF_ACCOUNTS.md](STAFF_ACCOUNTS.md))
+
+Every write also enforces: same business, not self, not the owner, branch scope (administrators without all-branch
+access only manage staff wholly inside their branches), and owner-only administrative roles/targets. Denials are
+audited as `staff.unauthorized_attempt`.
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/tenants/{t}/staff` | `staff.view` — filters `status`, `q`, `branch_id`; restricted admins see shared-branch staff only |
+| GET | `/tenants/{t}/staff/{id}` | `staff.view` (or own record) |
+| POST | `/tenants/{t}/staff` | `staff.create` — company-managed account; `delivery` = `temporary_password` (returns `temporary_password` once), `manual` (returns `activation_code` once) or `email`; optional `profile` |
+| GET | `/tenants/{t}/staff/username-suggestion?role_id=&branch_id=` | `staff.create` — `{username, employee_code, email}` (`email` null without a `staff_email_domain`) |
+| POST | `/tenants/{t}/staff/invite-existing` | `staff.create` — always 202; person must accept |
+| PATCH | `/tenants/{t}/staff/{id}` | `staff.update` — name/username/email/employee code (personal accounts: employee code only) and `profile` |
+| POST | `/tenants/{t}/staff/{id}/change-role` | `staff.assign_roles` |
+| POST | `/tenants/{t}/staff/{id}/transfer-branches` | `staff.assign_branches` |
+| POST | `/tenants/{t}/staff/{id}/suspend` | `staff.status` — revokes tokens and sessions |
+| POST | `/tenants/{t}/staff/{id}/reactivate` | `staff.status` (+ `staff.credentials` to rehire an offboarded member) |
+| POST | `/tenants/{t}/staff/{id}/offboard` | `staff.offboard` — returns `pending_work` |
+| POST | `/tenants/{t}/staff/{id}/resend-invitation` | `staff.credentials` — `delivery` as on create |
+| POST | `/tenants/{t}/staff/{id}/recovery` | `staff.credentials` — company-managed, active members only; `delivery=temporary_password` resets the password |
+| GET | `/tenants/{t}/staff/{id}/pending-work` | `staff.offboard` |
+| GET | `/tenants/{t}/staff/audit-log` | `staff.audit` — `staff.*` and `auth.*` events only |
+
+Responses that issue credentials have the shape `{data, activation_code, temporary_password, code_expires_at}`
+(only one secret is non-null) and `Cache-Control: no-store`. Staff records include `profile` only for `staff.update`
+holders and the employee. `POST /auth/login` returns `must_change_password`; while it is true, tenant and platform
+endpoints answer 403 `PASSWORD_CHANGE_REQUIRED` until `PUT /me/password` succeeds.
+
+Sign-in method: company-managed staff log in with `business_code` + `username` (username or employee ID); owners,
+managers and HR (roles with `requires_email_sign_in`) must use `email`. See STAFF_ACCOUNTS.md §5a.
+
+Staff error codes: `DUPLICATE_IDENTIFIER`, `EMAIL_REQUIRED`, `INVALID_ROLE`, `INVALID_BRANCH`, `BRANCH_REQUIRED`,
+`INVALID_STAFF_STATE`, `PERSONAL_ACCOUNT`, `PERSONAL_ACCOUNT_PROFILE`; `ACCOUNT_INACTIVE` (401) on any request by a
+disabled user.
 
 ### Catalog
 
@@ -106,7 +143,7 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | POST | `/tenants/{t}/inventory/adjustments` | `inventory.adjust` + branch |
 | GET | `/tenants/{t}/stock-movements` | `inventory.view` |
 | GET/POST | `/tenants/{t}/stock-transfers` | view: `inventory.view`; create: `inventory.transfer` + source branch |
-| POST | `/tenants/{t}/stock-transfers/{id}/dispatch` / `cancel` | `inventory.transfer` + source branch |
+| POST | `/tenants/{t}/stock-transfers/{id}/dispatch` / `cancel` | `inventory.transfer` + source branch — cancelling an in-transit transfer returns the stock to the source (`transfer_return`) |
 | POST | `/tenants/{t}/stock-transfers/{id}/receive` | `inventory.transfer` + destination branch |
 | GET/POST | `/tenants/{t}/stock-counts` | view: `inventory.view`; create: `inventory.count` + branch |
 | POST | `/tenants/{t}/stock-counts/{id}/complete` / `cancel` | `inventory.count` + branch |
@@ -120,6 +157,7 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | GET | `/tenants/{t}/purchase-orders[/{po}]` | `purchasing.view` + branch |
 | POST/PATCH | `/tenants/{t}/purchase-orders[/{po}]` | `purchasing.manage` + branch (edit while draft) |
 | POST | `/tenants/{t}/purchase-orders/{po}/order` / `cancel` | `purchasing.manage` + branch |
+| POST | `/tenants/{t}/purchase-orders/{po}/close` | `purchasing.manage` + branch — close a partially received PO short (`reason` required) |
 | GET | `/tenants/{t}/goods-receipts[/{gr}]` | `purchasing.view` + branch |
 | POST | `/tenants/{t}/goods-receipts` | `purchasing.receive` + branch |
 
@@ -134,6 +172,7 @@ Business-rule codes: `INSUFFICIENT_STOCK`, `WHOLE_UNITS_ONLY`, `STOCK_NOT_TRACKE
 | POST | `/tenants/{t}/register-sessions` | `shifts.operate` + branch — open shift with float |
 | GET | `/tenants/{t}/register-sessions/{id}` | owner of shift or `shifts.view_all` — includes X-reading summary |
 | POST | `/tenants/{t}/register-sessions/{id}/close` | same — counted cash → expected/difference, Z-reading summary |
+| POST | `/tenants/{t}/sales/quote` | `sales.create` + register branch — prices a cart (totals, VAT, per-line stock) without saving |
 | POST | `/tenants/{t}/sales` | `sales.create` + register branch + open shift; `Idempotency-Key` header required |
 | GET | `/tenants/{t}/sales[/{id}]` | own (`sales.view`) or all in branches (`sales.view_all`) |
 | GET | `/tenants/{t}/sales/{id}/receipt` | same as view |
@@ -231,4 +270,16 @@ Pending refunds reserve their quantities. Completion restocks items (`restock=tr
 ### Stock transfers
 
 `draft` → `dispatch` (stock leaves source at its average cost) → `in_transit` → `receive` (stock enters
-destination, updating its weighted-average cost) → `received`. Drafts can be cancelled.
+destination, updating its weighted-average cost) → `received`. Drafts can be cancelled; cancelling an in-transit
+transfer returns the stock to the source branch.
+
+### Stock counts
+
+The system balance is snapshotted when the counted quantities are submitted. Completing the count posts
+`counted − snapshot` as a `stock_count` movement, so sales or receipts that happen between counting and completion
+are kept.
+
+### Purchase order statuses
+
+`draft` → `ordered` → `partially_received` → `received`; `draft`/`ordered` → `cancelled`;
+`partially_received` → `closed` (remaining quantity will not be delivered; recorded in the audit log).

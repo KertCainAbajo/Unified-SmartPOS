@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'name', 'legal_name', 'tin', 'address', 'phone', 'email', 'timezone',
+    'name', 'legal_name', 'tin', 'address', 'phone', 'email', 'staff_email_domain', 'timezone',
     'vat_registered', 'vat_rate', 'prices_include_vat', 'allow_negative_stock',
     'refund_approval_threshold', 'refund_window_days',
 ])]
@@ -25,6 +25,7 @@ class Tenant extends Model
         'refund_approval_threshold' => '0.00',
         'refund_window_days' => 30,
         'status' => 'active',
+        'staff_email_domain' => null,
     ];
 
     protected function casts(): array
@@ -52,6 +53,12 @@ class Tenant extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(TenantMembership::class);
+    }
+
+    /** Alias used by scoped route binding of `{staff}` (a membership of this business). */
+    public function staff(): HasMany
+    {
+        return $this->memberships();
     }
 
     public function branches(): HasMany

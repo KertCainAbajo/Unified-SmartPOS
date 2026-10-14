@@ -13,11 +13,26 @@ final class Permissions
 
     public const BRANCHES_MANAGE = 'branches.manage';
 
-    public const MEMBERS_VIEW = 'members.view';
-
-    public const MEMBERS_MANAGE = 'members.manage';
-
     public const ROLES_MANAGE = 'roles.manage';
+
+    // Staff accounts (company-managed employee accounts). See docs/STAFF_ACCOUNTS.md.
+    public const STAFF_VIEW = 'staff.view';
+
+    public const STAFF_CREATE = 'staff.create';
+
+    public const STAFF_UPDATE = 'staff.update';
+
+    public const STAFF_STATUS = 'staff.status';
+
+    public const STAFF_OFFBOARD = 'staff.offboard';
+
+    public const STAFF_ASSIGN_ROLES = 'staff.assign_roles';
+
+    public const STAFF_ASSIGN_BRANCHES = 'staff.assign_branches';
+
+    public const STAFF_CREDENTIALS = 'staff.credentials';
+
+    public const STAFF_AUDIT = 'staff.audit';
 
     public const PRODUCTS_VIEW = 'products.view';
 
@@ -79,15 +94,38 @@ final class Permissions
 
     public const AUDIT_VIEW = 'audit_logs.view';
 
+    /**
+     * Administrative permissions. Roles containing any of them can only be granted by the business owner,
+     * and members holding them can only be modified by the owner (prevents lateral escalation between admins).
+     */
+    public const PRIVILEGED = [
+        self::TENANT_MANAGE,
+        self::BRANCHES_MANAGE,
+        self::ROLES_MANAGE,
+        self::STAFF_CREATE,
+        self::STAFF_STATUS,
+        self::STAFF_OFFBOARD,
+        self::STAFF_ASSIGN_ROLES,
+        self::STAFF_ASSIGN_BRANCHES,
+        self::STAFF_CREDENTIALS,
+    ];
+
     /** @return array<string, array{name: string, group: string}> */
     public static function catalogue(): array
     {
         return [
             self::TENANT_MANAGE => ['name' => 'Manage business settings', 'group' => 'business'],
             self::BRANCHES_MANAGE => ['name' => 'Manage branches', 'group' => 'business'],
-            self::MEMBERS_VIEW => ['name' => 'View team members', 'group' => 'team'],
-            self::MEMBERS_MANAGE => ['name' => 'Add members and assign roles', 'group' => 'team'],
             self::ROLES_MANAGE => ['name' => 'Manage custom roles', 'group' => 'team'],
+            self::STAFF_VIEW => ['name' => 'View staff accounts', 'group' => 'team'],
+            self::STAFF_CREATE => ['name' => 'Create staff accounts', 'group' => 'team'],
+            self::STAFF_UPDATE => ['name' => 'Edit staff profile details', 'group' => 'team'],
+            self::STAFF_STATUS => ['name' => 'Suspend and reactivate staff', 'group' => 'team'],
+            self::STAFF_OFFBOARD => ['name' => 'Offboard staff (revoke all access)', 'group' => 'team'],
+            self::STAFF_ASSIGN_ROLES => ['name' => 'Assign roles to staff', 'group' => 'team'],
+            self::STAFF_ASSIGN_BRANCHES => ['name' => 'Assign staff to branches', 'group' => 'team'],
+            self::STAFF_CREDENTIALS => ['name' => 'Issue activation and recovery codes', 'group' => 'team'],
+            self::STAFF_AUDIT => ['name' => 'View staff account audit trail', 'group' => 'team'],
             self::PRODUCTS_VIEW => ['name' => 'View products', 'group' => 'products'],
             self::PRODUCTS_MANAGE => ['name' => 'Create, edit and archive products', 'group' => 'products'],
             self::PRODUCTS_PRICE => ['name' => 'Change product prices and costs', 'group' => 'products'],
@@ -117,11 +155,13 @@ final class Permissions
             self::EXPENSES_MANAGE => ['name' => 'Record and edit expenses', 'group' => 'finance'],
             self::REPORTS_VIEW => ['name' => 'View sales and inventory reports', 'group' => 'reports'],
             self::REPORTS_FINANCIAL => ['name' => 'View cost, expense and profit reports', 'group' => 'reports'],
-            self::AUDIT_VIEW => ['name' => 'View audit logs', 'group' => 'reports'],
+            self::AUDIT_VIEW => ['name' => 'View the full audit log', 'group' => 'reports'],
         ];
     }
 
     public const ROLE_OWNER = 'business_owner';
+
+    public const ROLE_ACCESS_MANAGER = 'user_access_manager';
 
     public const ROLE_MANAGER = 'branch_manager';
 
@@ -129,10 +169,28 @@ final class Permissions
 
     public const ROLE_INVENTORY = 'inventory_staff';
 
+    public const ROLE_ACCOUNTANT = 'accountant';
+
+    public const ROLE_PURCHASING = 'purchasing_staff';
+
+    public const ROLE_AUDITOR = 'auditor';
+
+    public const ROLE_CUSTOMER_SERVICE = 'customer_service';
+
+    /**
+     * Owners, managers and HR (User & Access Manager) sign in with their email address, never with a username or
+     * employee ID. Any role carrying an administrative permission is treated the same way.
+     */
+    public const EMAIL_SIGN_IN_ROLES = [self::ROLE_OWNER, self::ROLE_ACCESS_MANAGER, self::ROLE_MANAGER];
+
     /** @return array<string, array{name: string, description: string, permissions: list<string>}> */
     public static function systemRoles(): array
     {
         $all = array_keys(self::catalogue());
+        $staffAdmin = [
+            self::STAFF_VIEW, self::STAFF_CREATE, self::STAFF_UPDATE, self::STAFF_STATUS, self::STAFF_OFFBOARD,
+            self::STAFF_ASSIGN_ROLES, self::STAFF_ASSIGN_BRANCHES, self::STAFF_CREDENTIALS, self::STAFF_AUDIT,
+        ];
 
         return [
             self::ROLE_OWNER => [
@@ -140,14 +198,19 @@ final class Permissions
                 'description' => 'Full access to the business.',
                 'permissions' => $all,
             ],
+            self::ROLE_ACCESS_MANAGER => [
+                'name' => 'User & Access Manager',
+                'description' => 'Manages staff accounts and access; no sales, stock or financial data.',
+                'permissions' => $staffAdmin,
+            ],
             self::ROLE_MANAGER => [
                 'name' => 'Branch Manager',
-                'description' => 'Runs day-to-day operations of assigned branches.',
+                'description' => 'Runs day-to-day operations of assigned branches. Staff administration only if granted.',
                 'permissions' => array_values(array_diff($all, [
                     self::TENANT_MANAGE,
                     self::BRANCHES_MANAGE,
-                    self::MEMBERS_MANAGE,
                     self::ROLES_MANAGE,
+                    ...array_diff($staffAdmin, [self::STAFF_VIEW]),
                 ])),
             ],
             self::ROLE_CASHIER => [
@@ -178,6 +241,78 @@ final class Permissions
                     self::PURCHASING_RECEIVE,
                 ],
             ],
+            self::ROLE_ACCOUNTANT => [
+                'name' => 'Accountant / Finance',
+                'description' => 'Financial reports, expenses and review of sales and purchasing.',
+                'permissions' => [
+                    self::REPORTS_VIEW,
+                    self::REPORTS_FINANCIAL,
+                    self::EXPENSES_VIEW,
+                    self::EXPENSES_MANAGE,
+                    self::SALES_VIEW_ALL,
+                    self::PRODUCTS_VIEW,
+                    self::INVENTORY_VIEW,
+                    self::SUPPLIERS_VIEW,
+                    self::PURCHASING_VIEW,
+                    self::CUSTOMERS_VIEW,
+                ],
+            ],
+            self::ROLE_PURCHASING => [
+                'name' => 'Purchasing / Procurement',
+                'description' => 'Suppliers, purchase orders and receiving.',
+                'permissions' => [
+                    self::PRODUCTS_VIEW,
+                    self::INVENTORY_VIEW,
+                    self::SUPPLIERS_VIEW,
+                    self::SUPPLIERS_MANAGE,
+                    self::PURCHASING_VIEW,
+                    self::PURCHASING_MANAGE,
+                    self::PURCHASING_RECEIVE,
+                ],
+            ],
+            self::ROLE_AUDITOR => [
+                'name' => 'Auditor / Read-only',
+                'description' => 'Reviews records without changing anything.',
+                'permissions' => [
+                    self::PRODUCTS_VIEW,
+                    self::INVENTORY_VIEW,
+                    self::SUPPLIERS_VIEW,
+                    self::PURCHASING_VIEW,
+                    self::CUSTOMERS_VIEW,
+                    self::SALES_VIEW_ALL,
+                    self::EXPENSES_VIEW,
+                    self::REPORTS_VIEW,
+                    self::REPORTS_FINANCIAL,
+                    self::AUDIT_VIEW,
+                    self::STAFF_VIEW,
+                ],
+            ],
+            self::ROLE_CUSTOMER_SERVICE => [
+                'name' => 'Customer Service',
+                'description' => 'Customer records, sale look-ups and refund requests.',
+                'permissions' => [
+                    self::CUSTOMERS_VIEW,
+                    self::CUSTOMERS_MANAGE,
+                    self::PRODUCTS_VIEW,
+                    self::INVENTORY_VIEW,
+                    self::SALES_VIEW_ALL,
+                    self::REFUNDS_CREATE,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Read-only permissions: holding only these never allows changing operational data.
+     *
+     * @return list<string>
+     */
+    public static function readOnly(): array
+    {
+        return [
+            self::STAFF_VIEW, self::STAFF_AUDIT, self::PRODUCTS_VIEW, self::INVENTORY_VIEW, self::SUPPLIERS_VIEW,
+            self::PURCHASING_VIEW, self::CUSTOMERS_VIEW, self::SALES_VIEW, self::SALES_VIEW_ALL,
+            self::EXPENSES_VIEW, self::REPORTS_VIEW, self::REPORTS_FINANCIAL, self::AUDIT_VIEW,
         ];
     }
 }

@@ -11,7 +11,9 @@ class EnsureEmailIsVerifiedWhenRequired
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (config('smartpos.require_email_verification') && ! $request->user()?->hasVerifiedEmail()) {
+        // Company-managed accounts without an email are verified through their activation code instead.
+        $user = $request->user();
+        if (config('smartpos.require_email_verification') && $user?->email && ! $user->hasVerifiedEmail()) {
             return response()->json([
                 'message' => 'Your email address is not verified.',
                 'code' => 'EMAIL_NOT_VERIFIED',

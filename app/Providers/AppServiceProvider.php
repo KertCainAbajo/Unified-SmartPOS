@@ -53,7 +53,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
 
         RateLimiter::for('login', fn (Request $request) => [
-            Limit::perMinute(5)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute(5)->by(mb_strtolower((string) ($request->input('email') ?: $request->input('business_code').'/'.$request->input('username'))).'|'.$request->ip()),
+            Limit::perMinute(20)->by($request->ip()),
+        ]);
+
+        // Activation/recovery codes: slow down guessing per account and per IP.
+        RateLimiter::for('staff-codes', fn (Request $request) => [
+            Limit::perMinute(5)->by(mb_strtolower($request->input('business_code').'/'.$request->input('username')).'|'.$request->ip()),
             Limit::perMinute(20)->by($request->ip()),
         ]);
 

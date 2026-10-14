@@ -17,6 +17,8 @@ class RoleResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'is_system' => $this->is_system,
+            // Staff holding this role sign in with email instead of username / employee ID.
+            'requires_email_sign_in' => $this->requiresEmailSignIn(),
             'permissions' => $this->whenLoaded('permissions', fn () => $this->permissions->pluck('key')->values()),
         ];
     }

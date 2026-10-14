@@ -60,8 +60,8 @@ class CategoryController extends Controller
         $this->authorize('update', $category);
 
         $data = $this->validated($request, $tenant, $category);
-        if (($data['parent_id'] ?? null) === $category->id) {
-            throw new BusinessRuleException('A category cannot be its own parent.', 'INVALID_PARENT');
+        if (isset($data['parent_id']) && $this->wouldCreateCycle($category, (int) $data['parent_id'])) {
+            throw new BusinessRuleException('A category cannot be placed under itself or one of its subcategories.', 'INVALID_PARENT');
         }
 
         $original = $category->getOriginal();
@@ -84,6 +84,23 @@ class CategoryController extends Controller
         $category->delete();
 
         return response()->json(null, 204);
+    }
+
+    /** Walk up from the proposed parent; reaching the category itself means a loop. */
+    private function wouldCreateCycle(Category $category, int $parentId): bool
+    {
+        $seen = [];
+        $id = $parentId;
+        while ($id !== null && ! isset($seen[$id])) {
+            if ($id === (int) $category->id) {
+                return true;
+            }
+            $seen[$id] = true;
+            $next = Category::query()->whereKey($id)->value('parent_id');
+            $id = $next === null ? null : (int) $next;
+        }
+
+        return false;
     }
 
     private function validated(Request $request, Tenant $tenant, ?Category $category = null): array

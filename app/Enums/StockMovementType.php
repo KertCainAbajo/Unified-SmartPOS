@@ -12,6 +12,7 @@ enum StockMovementType: string
     case PurchaseReceipt = 'purchase_receipt';
     case TransferOut = 'transfer_out';
     case TransferIn = 'transfer_in';
+    case TransferReturn = 'transfer_return';
     case StockCount = 'stock_count';
 
     /** @return list<string> */

@@ -18,11 +18,16 @@ final class Money
     {
         $value = trim((string) $value);
 
-        if (! preg_match('/^-?\d+(\.\d+)?$/', $value)) {
+        // Accept every form Laravel's `decimal` rule accepts: "+5", ".5", "5.", "-.25".
+        if (! preg_match('/^([+-]?)(\d+\.?\d*|\.\d+)$/', $value, $m)) {
             throw new InvalidArgumentException("Invalid decimal value [{$value}].");
         }
+        $digits = rtrim($m[2], '.');
+        if (str_starts_with($digits, '.')) {
+            $digits = '0'.$digits;
+        }
 
-        return self::round($value, $scale);
+        return self::round(($m[1] === '-' ? '-' : '').$digits, $scale);
     }
 
     /**

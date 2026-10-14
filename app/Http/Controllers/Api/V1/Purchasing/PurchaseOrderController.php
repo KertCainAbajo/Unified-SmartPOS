@@ -83,6 +83,18 @@ class PurchaseOrderController extends Controller
         return response()->json(['data' => $this->present($this->orders->cancel($purchaseOrder, $data['reason'] ?? null))]);
     }
 
+    /**
+     * Close a partially received PO short when the rest will not arrive. Received stock is kept; the
+     * undelivered quantities are recorded in the audit log. Requires `purchasing.manage`.
+     */
+    public function close(Request $request, Tenant $tenant, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        $this->authorize('update', $purchaseOrder);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        return response()->json(['data' => $this->present($this->orders->close($purchaseOrder, $data['reason'])->load(['items.product', 'supplier']))]);
+    }
+
     /** Goods receipts. Filters: `purchase_order_id`, `branch_id`. Requires `purchasing.view`. */
     public function receipts(Request $request, Tenant $tenant): JsonResponse
     {

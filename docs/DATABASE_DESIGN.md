@@ -40,11 +40,13 @@ audit_logs, notifications, document_sequences
 
 ### users
 Global identity (one login across businesses).
-`name`, `email` (unique), `phone`, `password` (bcrypt hash), `email_verified_at`, `is_platform_admin` (bool),
-`status` (`active`/`disabled`), `last_login_at`, `remember_token`.
+`name`, `email` (unique, **nullable**), `username` + `managed_by_tenant_id` (company-managed staff; unique per business),
+`phone`, `password` (bcrypt hash), `email_verified_at`, `is_platform_admin` (bool), `status` (`pending`/`active`/`disabled`),
+`must_change_password` (bool) + `temporary_password_expires_at` (set when an administrator issues a temporary password),
+`last_login_at`, `remember_token`. Users are never deleted (history keeps pointing at them).
 
 ### tenants
-A business. `name`, `slug` (unique), `legal_name`, `tin`, `address`, `phone`, `email`,
+A business. `name`, `slug` (unique; the staff "business code"), `staff_email_domain` (optional, for suggested staff emails), `legal_name`, `tin`, `address`, `phone`, `email`,
 `currency` (`PHP`), `timezone` (`Asia/Manila`), `vat_registered` (bool), `vat_rate` (12.00),
 `prices_include_vat` (bool, default true), `allow_negative_stock` (bool, default false),
 `refund_approval_threshold` (money; refunds above it need `refunds.approve`), `refund_window_days`,
@@ -55,7 +57,8 @@ A business. `name`, `slug` (unique), `legal_name`, `tin`, `address`, `phone`, `e
 
 ### roles
 `tenant_id` (NULL = system role available to all tenants), `key` (unique per tenant scope), `name`,
-`description`, `is_system`. System roles: `business_owner`, `branch_manager`, `cashier`, `inventory_staff`.
+`description`, `is_system`. System roles: `business_owner`, `user_access_manager`, `branch_manager`, `cashier`,
+`inventory_staff`, `accountant`, `purchasing_staff`, `auditor`, `customer_service`.
 
 ### permissions
 `key` (unique, e.g. `refunds.approve`), `name`, `group`, `description`. Seeded catalogue.
@@ -64,7 +67,19 @@ A business. `name`, `slug` (unique), `legal_name`, `tin`, `address`, `phone`, `e
 Pivot `role_id` + `permission_id` (composite PK).
 
 ### tenant_memberships
-`tenant_id`, `user_id` (unique pair), `status` (`active`/`suspended`), `all_branches` (bool), `joined_at`.
+`tenant_id`, `user_id` (unique pair), `employee_code` (unique per business), `status`
+(`invited`/`active`/`suspended`/`offboarded`; only `active` grants access), `status_reason`, `all_branches` (bool),
+`joined_at`, `suspended_at`, `offboarded_at`, `offboarded_by`, `created_by`.
+
+### staff_profiles *(added: employee personal information)*
+`tenant_id`, `membership_id` (unique), `job_title`, `hire_date`, `phone`, `address`, `birth_date`,
+`emergency_contact_name`, `emergency_contact_phone`, `notes`. Per membership, so each business keeps its own record;
+visible only to staff administrators and the employee.
+
+### staff_invitations *(added: company-managed onboarding and recovery)*
+`tenant_id`, `membership_id`, `user_id`, `purpose` (`activation`/`recovery`), `channel` (`email`/`manual`), `code_hash`
+(SHA-256; codes are never stored), `expires_at`, `used_at`, `revoked_at`, `failed_attempts`, `created_by`.
+Single-use, expiring, locked after 5 failures. See [STAFF_ACCOUNTS.md](STAFF_ACCOUNTS.md).
 
 ### membership_roles
 Pivot `membership_id` + `role_id` (composite PK).
@@ -105,7 +120,7 @@ override, nullable). **Only `StockLedger` writes to this table.**
 
 ### stock_movements
 Immutable ledger. `tenant_id`, `branch_id`, `product_id`, `type` (`opening`, `adjustment`, `sale`,
-`sale_void`, `refund`, `purchase_receipt`, `transfer_out`, `transfer_in`, `stock_count`),
+`sale_void`, `refund`, `purchase_receipt`, `transfer_out`, `transfer_in`, `transfer_return`, `stock_count`),
 `quantity_change` (signed), `quantity_before`, `quantity_after`, `unit_cost`, `reason`,
 `reference_type`/`reference_id` (polymorphic link to the sale, transfer, receipt, …), `user_id`, `created_at`.
 Invariant: for each (branch, product), `inventory.quantity` = sum of `quantity_change`.
@@ -113,8 +128,9 @@ Invariant: for each (branch, product), `inventory.quantity` = sum of `quantity_c
 ### stock_counts / stock_count_items *(items table added: one count covers many products)*
 Physical count. Header: `tenant_id`, `branch_id`, `reference`, `status` (`draft` → `completed`/`cancelled`),
 `notes`, `created_by`, `completed_by`, `completed_at`.
-Items: `stock_count_id`, `product_id`, `expected_quantity` (snapshot at completion), `counted_quantity`, `variance`.
-Completing a count posts a `stock_count` movement for each non-zero variance.
+Items: `stock_count_id`, `product_id`, `expected_quantity` (system balance snapshotted when the count is recorded),
+`counted_quantity`, `variance`. Completing a count posts `counted − expected` as a `stock_count` movement, so later sales
+are not overwritten.
 
 ### stock_transfers / stock_transfer_items
 Header: `tenant_id`, `reference`, `from_branch_id`, `to_branch_id`, `status`
@@ -129,7 +145,7 @@ Dispatch deducts from source (`transfer_out`); receive adds to destination (`tra
 
 ### purchase_orders / purchase_order_items
 Header: `tenant_id`, `branch_id` (deliver-to), `supplier_id`, `reference` (unique per tenant), `status`
-(`draft` → `ordered` → `partially_received` → `received`; `draft`/`ordered` → `cancelled`), `order_date`,
+(`draft` → `ordered` → `partially_received` → `received`; `draft`/`ordered` → `cancelled`; `partially_received` → `closed`), `order_date`,
 `expected_date`, `total`, `notes`, `created_by`. Items: `product_id`, `quantity_ordered`,
 `quantity_received`, `unit_cost`, `line_total`.
 

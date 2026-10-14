@@ -21,8 +21,9 @@ use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Reports\AuditLogController;
 use App\Http\Controllers\Api\V1\Reports\ReportController;
+use App\Http\Controllers\Api\V1\Staff\StaffActivationController;
+use App\Http\Controllers\Api\V1\Staff\StaffController;
 use App\Http\Controllers\Api\V1\Tenancy\BranchController;
-use App\Http\Controllers\Api\V1\Tenancy\MemberController;
 use App\Http\Controllers\Api\V1\Tenancy\RoleController;
 use App\Http\Controllers\Api\V1\Tenancy\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -39,8 +40,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('auth.verify-email');
     });
 
+    // ---- Public staff onboarding / recovery (company-managed accounts) ----------------------
+    Route::prefix('staff')->name('staff.')->middleware('throttle:staff-codes')->group(function () {
+        Route::post('activate', [StaffActivationController::class, 'activate'])->name('activate');
+        Route::post('forgot-password', [StaffActivationController::class, 'forgotPassword'])->name('forgot-password');
+    });
+
     // ---- Authenticated ---------------------------------------------------------------------
-    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('auth.logout-all');
         Route::post('auth/email/verification-notification', [EmailVerificationController::class, 'resend'])
@@ -50,18 +57,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::patch('me', [ProfileController::class, 'update'])->name('me.update');
         Route::put('me/password', [ProfileController::class, 'updatePassword'])->name('me.password');
         Route::get('me/memberships', [ProfileController::class, 'memberships'])->name('me.memberships');
+        Route::post('me/memberships/{membership}/accept', [ProfileController::class, 'acceptMembership'])->name('me.memberships.accept');
+        Route::post('me/memberships/{membership}/decline', [ProfileController::class, 'declineMembership'])->name('me.memberships.decline');
 
-        Route::post('tenants', [TenantController::class, 'store'])->middleware('verified.when_required')->name('tenants.store');
+        Route::post('tenants', [TenantController::class, 'store'])->middleware(['password.changed', 'verified.when_required'])->name('tenants.store');
 
         // ---- Platform administration (no access to tenant transactions) ------------------------
-        Route::prefix('platform')->middleware('platform.admin')->name('platform.')->group(function () {
+        Route::prefix('platform')->middleware(['password.changed', 'platform.admin'])->name('platform.')->group(function () {
             Route::get('tenants', [PlatformTenantController::class, 'index'])->name('tenants.index');
             Route::patch('tenants/{tenant}/status', [PlatformTenantController::class, 'updateStatus'])->name('tenants.status');
         });
 
         // ---- Tenant-scoped ---------------------------------------------------------------------
         Route::prefix('tenants/{tenant}')
-            ->middleware(['tenant', 'verified.when_required'])
+            ->middleware(['password.changed', 'tenant', 'verified.when_required'])
             ->scopeBindings()
             ->name('tenants.')
             ->group(function () {
@@ -71,10 +80,22 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
                 Route::apiResource('branches', BranchController::class)->except('destroy');
 
-                Route::get('members', [MemberController::class, 'index'])->name('members.index');
-                Route::post('members', [MemberController::class, 'store'])->name('members.store');
-                Route::get('members/{membership}', [MemberController::class, 'show'])->name('members.show');
-                Route::patch('members/{membership}', [MemberController::class, 'update'])->name('members.update');
+                // Staff accounts (company-managed employees). Static paths before {staff}.
+                Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
+                Route::post('staff', [StaffController::class, 'store'])->name('staff.store');
+                Route::get('staff/username-suggestion', [StaffController::class, 'suggestUsername'])->name('staff.username-suggestion');
+                Route::post('staff/invite-existing', [StaffController::class, 'inviteExisting'])->name('staff.invite-existing');
+                Route::get('staff/audit-log', [StaffController::class, 'auditLog'])->name('staff.audit-log');
+                Route::get('staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
+                Route::patch('staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+                Route::post('staff/{staff}/change-role', [StaffController::class, 'changeRoles'])->name('staff.change-role');
+                Route::post('staff/{staff}/transfer-branches', [StaffController::class, 'transferBranches'])->name('staff.transfer-branches');
+                Route::post('staff/{staff}/suspend', [StaffController::class, 'suspend'])->name('staff.suspend');
+                Route::post('staff/{staff}/reactivate', [StaffController::class, 'reactivate'])->name('staff.reactivate');
+                Route::post('staff/{staff}/offboard', [StaffController::class, 'offboard'])->name('staff.offboard');
+                Route::post('staff/{staff}/resend-invitation', [StaffController::class, 'resendInvitation'])->name('staff.resend-invitation');
+                Route::post('staff/{staff}/recovery', [StaffController::class, 'recovery'])->name('staff.recovery');
+                Route::get('staff/{staff}/pending-work', [StaffController::class, 'pendingWork'])->name('staff.pending-work');
 
                 Route::get('permissions', [RoleController::class, 'permissions'])->name('permissions.index');
                 Route::apiResource('roles', RoleController::class)->except('show');
@@ -119,6 +140,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
                 Route::get('sales', [SaleController::class, 'index'])->name('sales.index');
                 Route::post('sales', [SaleController::class, 'store'])->middleware('throttle:checkout')->name('sales.checkout');
+                Route::post('sales/quote', [SaleController::class, 'quote'])->name('sales.quote');
+                Route::post('sales/quote', [SaleController::class, 'quote'])->name('sales.quote');
                 Route::get('sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
                 Route::get('sales/{sale}/receipt', [SaleController::class, 'receipt'])->name('sales.receipt');
                 Route::post('sales/{sale}/void', [SaleController::class, 'void'])->name('sales.void');
@@ -138,6 +161,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::patch('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
                 Route::post('purchase-orders/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->name('purchase-orders.order');
                 Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+                Route::post('purchase-orders/{purchaseOrder}/close', [PurchaseOrderController::class, 'close'])->name('purchase-orders.close');
                 Route::get('goods-receipts', [PurchaseOrderController::class, 'receipts'])->name('goods-receipts.index');
                 Route::post('goods-receipts', [PurchaseOrderController::class, 'receive'])->name('goods-receipts.store');
                 Route::get('goods-receipts/{goodsReceipt}', [PurchaseOrderController::class, 'showReceipt'])->name('goods-receipts.show');
