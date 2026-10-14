@@ -14060,6 +14060,13 @@
                         "type": "boolean",
                         "description": "Staff holding this role sign in with email instead of username / employee ID."
                     },
+                    "assignable": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "description": "Whether the signed-in user may give this role to staff (administrative roles are owner-only)."
+                    },
                     "permissions": {
                         "type": "array",
                         "items": {}
@@ -14071,7 +14078,8 @@
                     "name",
                     "description",
                     "is_system",
-                    "requires_email_sign_in"
+                    "requires_email_sign_in",
+                    "assignable"
                 ],
                 "title": "RoleResource"
             },

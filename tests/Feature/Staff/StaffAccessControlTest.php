@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Staff;
 
-use App\Models\Permission;
 use App\Models\Role;
 use Tests\TestCase;
 
@@ -38,7 +37,9 @@ class StaffAccessControlTest extends TestCase
 
         // Can create and manage a cashier.
         $cashierId = $this->createStaff($tenant, $uam, 'cashier', [$branch], ['email' => 'cashier1@example.com'])->assertCreated()->json('data.id');
-        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/change-role"), ['role_ids' => [Role::system('branch_manager')->id]])->assertOk();
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/change-role"), ['role_ids' => [Role::system('inventory_staff')->id]])->assertOk();
+        // Branch Manager can add staff, so it is an administrative role: owner-only.
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/change-role"), ['role_ids' => [Role::system('branch_manager')->id]])->assertForbidden();
         $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/suspend"), ['reason' => 'Investigation'])->assertOk();
 
         // Cannot create another User & Access Manager or grant Business Owner.
@@ -67,32 +68,44 @@ class StaffAccessControlTest extends TestCase
         $this->getJson($this->tenantUrl($tenant, 'staff/audit-log'))->assertOk();
     }
 
-    public function test_branch_manager_needs_explicit_grant_and_is_limited_to_own_branches(): void
+    public function test_branch_manager_adds_and_manages_staff_of_own_branches_only(): void
     {
         [$tenant, $owner, $main] = $this->createTenant();
         $makati = $this->createBranch($tenant, 'MKT');
         $manager = $this->addMember($tenant, 'branch_manager', [$main]);
-        $mainCashier = $this->createStaff($tenant, $owner, 'cashier', [$main])->assertCreated()->json('data.id');
         $makatiCashier = $this->createStaff($tenant, $owner, 'cashier', [$makati])->assertCreated()->json('data.id');
+        $otherManager = $this->membershipOf($tenant, $this->addMember($tenant, 'branch_manager', [$main]))->id;
 
-        // Default branch manager: can view staff of own branch only, cannot manage.
-        $list = array_column($this->actingAsUser($manager)->getJson($this->tenantUrl($tenant, 'staff'))->assertOk()->json('data'), 'id');
-        $this->assertContains($mainCashier, $list);
+        // Same process as the owner: temporary password, slip, own-branch staff.
+        $created = $this->createStaff($tenant, $manager, 'cashier', [$main], ['delivery' => 'temporary_password'])->assertCreated();
+        $this->assertNotNull($created->json('temporary_password'));
+        $cashierId = $created->json('data.id');
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/change-role"), ['role_ids' => [Role::system('inventory_staff')->id]])->assertOk();
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/recovery"), ['delivery' => 'temporary_password'])->assertOk();
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/suspend"), ['reason' => 'Late'])->assertOk();
+
+        // Only own branches.
+        $list = array_column($this->getJson($this->tenantUrl($tenant, 'staff'))->assertOk()->json('data'), 'id');
+        $this->assertContains($cashierId, $list);
         $this->assertNotContains($makatiCashier, $list);
-        $this->getJson($this->tenantUrl($tenant, "staff/{$makatiCashier}"))->assertForbidden();
-        $this->createStaff($tenant, $manager, 'cashier', [$main])->assertForbidden();
-
-        // Owner grants branch staff administration via a custom role.
-        $custom = Role::query()->create(['tenant_id' => $tenant->id, 'key' => 'branch_staff_admin', 'name' => 'Branch staff admin']);
-        $custom->permissions()->attach(Permission::query()->whereIn('key', ['staff.view', 'staff.create', 'staff.status', 'staff.assign_branches'])->pluck('id'));
-        $this->membershipOf($tenant, $manager)->roles()->attach($custom->id);
-
-        $this->createStaff($tenant, $manager, 'cashier', [$main])->assertCreated();
         $this->createStaff($tenant, $manager, 'cashier', [$makati])->assertForbidden();
         $this->createStaff($tenant, $manager, 'cashier', [], ['all_branches' => true])->assertForbidden();
-        $this->postJson($this->tenantUrl($tenant, "staff/{$mainCashier}/suspend"), ['reason' => 'Late'])->assertOk();
         $this->postJson($this->tenantUrl($tenant, "staff/{$makatiCashier}/suspend"), ['reason' => 'x'])->assertForbidden();
-        $this->postJson($this->tenantUrl($tenant, "staff/{$mainCashier}/transfer-branches"), ['branch_ids' => [$makati->id]])->assertForbidden();
+        $this->postJson($this->tenantUrl($tenant, "staff/{$cashierId}/transfer-branches"), ['branch_ids' => [$makati->id]])->assertForbidden();
+
+        // No administrative roles, and other managers are owner-only.
+        foreach (['branch_manager', 'user_access_manager', 'business_owner'] as $role) {
+            $this->createStaff($tenant, $manager, $role, [$main], ['email' => "{$role}@example.com"])->assertForbidden();
+        }
+        $this->postJson($this->tenantUrl($tenant, "staff/{$otherManager}/suspend"), ['reason' => 'x'])->assertForbidden();
+        $this->postJson($this->tenantUrl($tenant, 'staff/'.$this->membershipOf($tenant, $owner)->id.'/suspend'), ['reason' => 'x'])->assertForbidden();
+
+        // The role list tells the web app which roles the manager may give.
+        $assignable = collect($this->getJson($this->tenantUrl($tenant, 'roles'))->assertOk()->json('data'))->pluck('assignable', 'key');
+        $this->assertTrue($assignable['cashier']);
+        $this->assertFalse($assignable['branch_manager']);
+        $this->assertFalse($assignable['business_owner']);
+        $this->assertTrue(collect($this->actingAsUser($owner)->getJson($this->tenantUrl($tenant, 'roles'))->json('data'))->every('assignable'));
     }
 
     public function test_cashier_and_auditor_cannot_administer_staff_even_by_direct_api_calls(): void

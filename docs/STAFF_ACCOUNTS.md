@@ -62,7 +62,7 @@ by email.
 |---|---|---|
 | Business Owner (`business_owner`) | Everything in the business | Full |
 | User & Access Manager (`user_access_manager`) | Staff accounts and access only | `staff.*` (no sales/stock/finance) |
-| Branch Manager (`branch_manager`) | Branch operations | View staff only, unless the owner grants more |
+| Branch Manager (`branch_manager`) | Branch operations | Adds and manages staff of **own branches** with non-administrative roles (same process as the owner); cannot change other managers. Owner-only to grant |
 | Cashier (`cashier`) | Selling | None |
 | Inventory Staff (`inventory_staff`) | Stock operations | None |
 | Accountant / Finance (`accountant`) | Reports, expenses, financial review | None |
@@ -93,8 +93,9 @@ An administrator may act on a target membership only if **all** of these hold:
 6. **Who defines roles**: non-owner administrators assign only the business's non-administrative roles. Those
    roles are system roles or custom roles, and custom roles can only contain permissions their creator holds
    (`roles.manage` is itself owner-only), so administrators can never grant permissions beyond what the owner
-   defined. A User & Access Manager can therefore make someone a Cashier or Branch Manager, but cannot grant
-   any administrative permission.
+   defined. A User & Access Manager or Branch Manager can therefore make someone a Cashier, Accountant, etc., but cannot
+   grant any administrative permission — including the Branch Manager role itself, which carries staff
+   administration. `RoleResource.assignable` tells the client which roles the caller may give.
 7. Branch assignments must be within the administrator's own branches; `all_branches` only by all-branch administrators.
 
 Denied attempts are written to the audit log as `staff.unauthorized_attempt`.

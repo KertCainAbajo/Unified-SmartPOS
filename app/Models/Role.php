@@ -40,6 +40,13 @@ class Role extends Model
             ?? throw new \RuntimeException("System role [{$key}] is not seeded. Run RolesAndPermissionsSeeder.");
     }
 
+    /** Business Owner or any role carrying an administrative permission: only the owner can grant it. */
+    public function isAdministrative(): bool
+    {
+        return ($this->tenant_id === null && $this->key === Permissions::ROLE_OWNER)
+            || $this->permissions->pluck('key')->intersect(Permissions::PRIVILEGED)->isNotEmpty();
+    }
+
     /** Holders of this role must sign in with email (see Permissions::EMAIL_SIGN_IN_ROLES). */
     public function requiresEmailSignIn(): bool
     {

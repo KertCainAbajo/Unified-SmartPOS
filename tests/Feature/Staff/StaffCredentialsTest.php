@@ -128,7 +128,7 @@ class StaffCredentialsTest extends TestCase
     public function test_personal_information_is_visible_only_to_staff_admins_and_the_employee(): void
     {
         [$tenant, $owner, $branch] = $this->createTenant();
-        $manager = $this->addMember($tenant, 'branch_manager', [$branch]);
+        $auditor = $this->addMember($tenant, 'auditor');
         $profile = [
             'job_title' => 'Senior Cashier', 'hire_date' => '2026-01-15', 'phone' => '09171234567',
             'address' => '12 Mabini St., Quezon City', 'birth_date' => '1995-04-02',
@@ -141,8 +141,8 @@ class StaffCredentialsTest extends TestCase
             ->assertJsonPath('data.profile.job_title', 'Senior Cashier')
             ->assertJsonPath('data.profile.birth_date', '1995-04-02');
 
-        // Branch manager can see the staff list but not personal data.
-        $this->actingAsUser($manager)->getJson($this->tenantUrl($tenant, "staff/{$id}"))->assertOk()->assertJsonMissingPath('data.profile');
+        // The read-only auditor can see the staff list but not personal data.
+        $this->actingAsUser($auditor)->getJson($this->tenantUrl($tenant, "staff/{$id}"))->assertOk()->assertJsonMissingPath('data.profile');
 
         // Updates are audited by field name only, never by value.
         $this->actingAsUser($owner)->patchJson($this->tenantUrl($tenant, "staff/{$id}"), ['profile' => ['phone' => '09990000000']])

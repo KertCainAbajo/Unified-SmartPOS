@@ -36,6 +36,8 @@ export interface Role {
   is_system: boolean;
   /** Holders sign in with email (owners, managers, HR) instead of username / employee ID. */
   requires_email_sign_in: boolean;
+  /** Whether the signed-in user may give this role (administrative roles are owner-only). */
+  assignable?: boolean | null;
   permissions?: string[];
 }
 

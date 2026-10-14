@@ -205,12 +205,13 @@ final class Permissions
             ],
             self::ROLE_MANAGER => [
                 'name' => 'Branch Manager',
-                'description' => 'Runs day-to-day operations of assigned branches. Staff administration only if granted.',
+                'description' => 'Runs day-to-day operations of assigned branches, including adding and managing their staff.',
+                // Staff administration is limited by the usual rules: own branches only, non-administrative roles only,
+                // and other managers or administrators can only be changed by the owner.
                 'permissions' => array_values(array_diff($all, [
                     self::TENANT_MANAGE,
                     self::BRANCHES_MANAGE,
                     self::ROLES_MANAGE,
-                    ...array_diff($staffAdmin, [self::STAFF_VIEW]),
                 ])),
             ],
             self::ROLE_CASHIER => [

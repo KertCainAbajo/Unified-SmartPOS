@@ -100,8 +100,12 @@ class RoleManagementTest extends TestCase
         }
 
         $this->assertSame([], array_diff($perms('auditor'), Permissions::readOnly()), 'Auditor must be read-only');
-        $this->assertNotContains('staff.create', $perms('branch_manager'));
-        $this->assertContains('staff.view', $perms('branch_manager'));
+        // Branch managers add and manage their branches' staff, but cannot change business settings or roles.
+        $this->assertContains('staff.create', $perms('branch_manager'));
+        $this->assertContains('staff.credentials', $perms('branch_manager'));
+        foreach (['tenant.manage', 'branches.manage', 'roles.manage'] as $forbidden) {
+            $this->assertNotContains($forbidden, $perms('branch_manager'));
+        }
         $this->assertDatabaseMissing('permissions', ['key' => 'members.manage']);
     }
 }

@@ -114,7 +114,8 @@ function RoleAndBranchFields({ roleIds, onRolesChange, all, setAll, branchIds, s
       <div>
         <p className="mb-2 text-sm font-medium text-slate-700">Role</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          {roles.data?.data.map((r) => (
+          {/* Only roles this user may give; e.g. branch managers cannot create other managers. */}
+          {roles.data?.data.filter((r) => r.assignable !== false || roleIds.includes(r.id)).map((r) => (
             <label key={r.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm hover:bg-slate-50 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50/40">
               <input type="checkbox" className="mt-0.5 accent-teal-700" checked={roleIds.includes(r.id)} onChange={() => onRolesChange(toggle(roleIds, r.id))} />
               <span><span className="font-medium text-slate-900">{r.name}</span><span className="block text-xs text-slate-500">{r.description}</span></span>
