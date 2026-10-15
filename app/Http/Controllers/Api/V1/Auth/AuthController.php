@@ -211,6 +211,16 @@ class AuthController extends Controller
             return ['session' => true];
         }
 
+        // A browser whose address is not a trusted SPA origin gets no session (e.g. the dev server moved to
+        // another port). Say so plainly instead of asking for a token-client field.
+        $origin = $request->headers->get('origin') ?? $request->headers->get('referer');
+        if ($origin !== null) {
+            throw ValidationException::withMessages([
+                'origin' => 'Sign-in is not allowed from this web address ('.parse_url($origin, PHP_URL_HOST).':'.parse_url($origin, PHP_URL_PORT)
+                    .'). Open SmartPOS at its usual address, or add this address to SANCTUM_STATEFUL_DOMAINS.',
+            ]);
+        }
+
         throw ValidationException::withMessages([
             'device_name' => 'device_name is required for token-based clients.',
         ]);

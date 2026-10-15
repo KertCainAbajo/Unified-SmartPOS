@@ -62,7 +62,7 @@ by email.
 |---|---|---|
 | Business Owner (`business_owner`) | Everything in the business | Full |
 | User & Access Manager (`user_access_manager`) | Staff accounts and access only | `staff.*` (no sales/stock/finance) |
-| Branch Manager (`branch_manager`) | Branch operations | Adds and manages staff of **own branches** with non-administrative roles (same process as the owner); cannot change other managers. Owner-only to grant |
+| Branch Manager (`branch_manager`) | Branch operations | Adds branches (gets access to new ones) and runs own branches: staff with non-administrative roles, stock, sales, sales reports. **Not**: business settings, roles, profit/cost/expense reports, full audit log, other managers, final hiring approval. Owner-only to grant |
 | Cashier (`cashier`) | Selling | None |
 | Inventory Staff (`inventory_staff`) | Stock operations | None |
 | Accountant / Finance (`accountant`) | Reports, expenses, financial review | None |

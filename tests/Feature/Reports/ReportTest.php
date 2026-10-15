@@ -107,7 +107,13 @@ class ReportTest extends TestCase
 
         $this->getJson($this->tenantUrl($tenant, 'reports/sales-by-branch?branch_id='.$main->id))->assertForbidden();
 
-        // Business-wide expenses are excluded for branch-restricted members.
+        // Profit and cost reports are for the owner (and finance roles), not branch managers.
+        $this->getJson($this->tenantUrl($tenant, 'reports/profit'))->assertForbidden();
+        $this->getJson($this->tenantUrl($tenant, 'reports/expenses'))->assertForbidden();
+        $this->getJson($this->tenantUrl($tenant, 'audit-logs'))->assertForbidden();
+
+        // Business-wide expenses are excluded for branch-restricted members (here: an accountant of one branch).
+        $this->actingAsUser($this->addMember($tenant, 'accountant', [$b2]));
         $profit = $this->getJson($this->tenantUrl($tenant, 'reports/profit'))->assertOk()->json('data');
         $this->assertSame('0.00', $profit['operating_expenses']);
         $this->assertFalse($profit['data_quality']['business_wide_expenses_included']);

@@ -7,9 +7,11 @@ use App\Http\Resources\BranchResource;
 use App\Models\Branch;
 use App\Models\Tenant;
 use App\Services\AuditLogger;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -29,8 +31,11 @@ class BranchController extends Controller
         );
     }
 
-    /** Create a branch. Requires `branches.manage`. */
-    public function store(Request $request, Tenant $tenant): JsonResponse
+    /**
+     * Create a branch. Requires `branches.manage` (owner and branch managers). A creator who is limited to certain
+     * branches is given access to the new branch so they can run it.
+     */
+    public function store(Request $request, Tenant $tenant, TenantContext $context): JsonResponse
     {
         $this->authorize('create', Branch::class);
 
@@ -42,8 +47,19 @@ class BranchController extends Controller
         ]);
         $data['code'] = strtoupper($data['code']);
 
-        $branch = $tenant->branches()->create($data);
-        $this->audit->log('branch.created', $branch, null, $data, branchId: $branch->id);
+        $branch = DB::transaction(function () use ($tenant, $data, $context) {
+            $branch = $tenant->branches()->create($data);
+            $this->audit->log('branch.created', $branch, null, $data, branchId: $branch->id);
+
+            $membership = $context->membership();
+            if (! $membership->all_branches) {
+                $membership->branches()->syncWithoutDetaching([$branch->id]);
+                $this->audit->log('staff.branches_changed', $membership, null, ['added_branch_id' => $branch->id],
+                    ['reason' => 'creator_of_new_branch', 'user_id' => $membership->user_id], branchId: $branch->id);
+            }
+
+            return $branch;
+        });
 
         return (new BranchResource($branch))->response()->setStatusCode(201);
     }

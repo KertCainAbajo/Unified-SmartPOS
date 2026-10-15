@@ -1,6 +1,6 @@
 # Implementation Status
 
-Last updated: 2026-10-14. Test runs: backend **162/162 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing. End-to-end HTTP flow check (whole business day across all modules and roles, against a separate test database): **106/106**.
+Last updated: 2026-10-14. Test runs: backend **170/170 passed on SQLite and on MySQL 8.0.46**; web app **15/15 unit tests**, typecheck and production build passing. End-to-end HTTP flow check (whole business day across all modules and roles, against a separate test database): **106/106**.
 
 Legend: ✅ implemented and covered by automated tests · 🟡 implemented, partially verified · ⛔ not implemented
 

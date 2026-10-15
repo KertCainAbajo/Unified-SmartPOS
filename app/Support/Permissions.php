@@ -225,13 +225,15 @@ final class Permissions
             ],
             self::ROLE_MANAGER => [
                 'name' => 'Branch Manager',
-                'description' => 'Runs day-to-day operations of assigned branches, including adding and managing their staff.',
+                'description' => 'Runs day-to-day operations of assigned branches: staff, stock, sales and new branches. No business settings, profit reports or full audit log.',
                 // Staff administration is limited by the usual rules: own branches only, non-administrative roles only,
                 // and other managers or administrators can only be changed by the owner.
+                // Owner-only: business settings, roles, profit/cost reports and the full audit log.
                 'permissions' => array_values(array_diff($all, [
                     self::TENANT_MANAGE,
-                    self::BRANCHES_MANAGE,
                     self::ROLES_MANAGE,
+                    self::REPORTS_FINANCIAL,
+                    self::AUDIT_VIEW,
                     // Recruitment: second interview only; screening, offers and final approval belong to HR and the owner.
                     self::RECRUITMENT_VACANCIES,
                     self::RECRUITMENT_HR,

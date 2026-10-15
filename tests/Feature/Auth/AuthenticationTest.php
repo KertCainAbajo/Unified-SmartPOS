@@ -125,6 +125,21 @@ class AuthenticationTest extends TestCase
         $this->assertSame(0, $user->tokens()->count());
     }
 
+    public function test_browser_on_an_untrusted_address_gets_a_clear_message(): void
+    {
+        User::factory()->create(['email' => 'a@example.com', 'password' => 'Secret123']);
+
+        $this->withHeader('Origin', 'http://localhost:9999')
+            ->postJson('/api/v1/auth/login', ['email' => 'a@example.com', 'password' => 'Secret123'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('origin')
+            ->assertJsonMissingValidationErrors('device_name');
+
+        // Token clients without an Origin still get the device_name hint.
+        $this->flushHeaders()->postJson('/api/v1/auth/login', ['email' => 'a@example.com', 'password' => 'Secret123'])
+            ->assertUnprocessable()->assertJsonValidationErrors('device_name');
+    }
+
     public function test_login_rejects_bad_credentials_and_disabled_accounts(): void
     {
         User::factory()->create(['email' => 'a@example.com', 'password' => 'Secret123']);

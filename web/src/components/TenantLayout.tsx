@@ -4,6 +4,8 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  CalendarDays,
+  ChevronDown,
   ClipboardList,
   Clock,
   LayoutDashboard,
@@ -14,6 +16,7 @@ import {
   RotateCcw,
   Settings,
   ShoppingCart,
+  Store,
   Tags,
   Truck,
   UserRound,
@@ -28,7 +31,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { api, ApiError } from '../lib/api';
 import type { AppNotification, Paginated } from '../lib/types';
 import { TenantProvider, useTenant, useTenantContextQuery } from '../tenant/TenantProvider';
-import { Button, ErrorBanner, Spinner, cx } from './ui';
+import { BrandLogo } from './BrandLogo';
+import { ErrorBanner, Spinner, cx } from './ui';
 import { NotificationsPanel } from './NotificationsPanel';
 
 interface NavItem {
@@ -86,7 +90,7 @@ export function TenantLayout() {
     return (
       <div className="mx-auto mt-24 max-w-md space-y-4 px-4 text-center">
         <ErrorBanner error={notFound ? new Error('This business was not found, or you are not a member of it.') : context.error} />
-        <Link to="/" className="text-sm font-medium text-teal-700 hover:underline">
+        <Link to="/" className="text-sm font-medium text-brand-700 hover:underline">
           Choose another business
         </Link>
       </div>
@@ -100,8 +104,20 @@ export function TenantLayout() {
   );
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  business_owner: 'Owner',
+  user_access_manager: 'HR · User & Access',
+  branch_manager: 'Branch Manager',
+  cashier: 'Cashier',
+  inventory_staff: 'Inventory Staff',
+  accountant: 'Accountant',
+  purchasing_staff: 'Purchasing',
+  auditor: 'Auditor',
+  customer_service: 'Customer Service',
+};
+
 function Shell() {
-  const { tenant, tenantId, branches, branch, setBranchId, permissions, path } = useTenant();
+  const { tenant, tenantId, branches, branch, setBranchId, permissions, path, roles } = useTenant();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -117,53 +133,83 @@ function Shell() {
   const visible = NAV.map((s) => ({ ...s, items: s.items.filter((i) => i.any.length === 0 || i.any.some((p) => permissions.has(p))) })).filter(
     (s) => s.items.length > 0,
   );
+  const roleLabel = roles.map((r) => ROLE_LABELS[r] ?? r.replaceAll('_', ' ')).join(', ');
+  const initials = (user?.name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
+  const signOut = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const sidebar = (
-    <nav className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-5" aria-label="Main">
-      <Link to={`/t/${tenantId}`} className="flex items-center gap-2 px-2" onClick={() => setMobileOpen(false)}>
-        <span className="grid size-8 place-items-center rounded-lg bg-teal-700 text-sm font-bold text-white">SP</span>
+    <nav className="relative flex h-full flex-col overflow-hidden bg-gradient-to-b from-brand-800 via-brand-900 to-[#0b2619] text-white" aria-label="Main">
+      {/* Warm glow echoing the logo's sunrise. */}
+      <div className="pointer-events-none absolute -top-24 left-1/2 size-64 -translate-x-1/2 rounded-full bg-sun-400/15 blur-3xl" />
+
+      <Link to={`/t/${tenantId}`} className="relative mx-3 mt-4 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/5" onClick={() => setMobileOpen(false)}>
+        <span className="w-12 shrink-0 rounded-xl bg-cream p-1 shadow-lg shadow-black/20 ring-1 ring-white/20"><BrandLogo /></span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-white">{tenant.name}</span>
-          <span className="block text-xs text-slate-400">Unified SmartPOS</span>
+          <span className="line-clamp-2 block font-display text-[0.95rem] font-semibold leading-tight">{tenant.name}</span>
+          <span className="block text-[11px] text-brand-100/60">Unified SmartPOS</span>
         </span>
       </Link>
-      {visible.map((section) => (
-        <div key={section.section}>
-          <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{section.section}</p>
-          <ul className="space-y-0.5">
-            {section.items.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to === '' ? `/t/${tenantId}` : `/t/${tenantId}/${item.to}`}
-                  end={item.to === ''}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    cx(
-                      'flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium [&_svg]:size-4',
-                      isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
-                    )
-                  }
-                >
-                  {item.icon}
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
+
+      <div className="relative mt-4 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+        {visible.map((section) => (
+          <div key={section.section}>
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-100/40">{section.section}</p>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to === '' ? `/t/${tenantId}` : `/t/${tenantId}/${item.to}`}
+                    end={item.to === ''}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      cx(
+                        'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition [&_svg]:size-[1.05rem]',
+                        isActive ? 'bg-white/10 text-white shadow-inner shadow-black/10' : 'text-brand-100/70 hover:bg-white/5 hover:text-white',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-sun-400 shadow-[0_0_10px] shadow-sun-400/60" />}
+                        <span className={cx('transition', isActive ? 'text-sun-300' : 'text-brand-100/50 group-hover:text-brand-100')}>{item.icon}</span>
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="relative border-t border-white/10 p-3">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-2.5 ring-1 ring-white/10">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-sun-300 to-sun-500 font-display text-sm font-bold text-brand-900">{initials}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{user?.name}</span>
+            <span className="block truncate text-[11px] text-brand-100/60">{roleLabel}</span>
+          </span>
+          <button type="button" onClick={signOut} className="grid size-8 place-items-center rounded-lg text-brand-100/70 transition hover:bg-white/10 hover:text-white" aria-label="Sign out" title="Sign out">
+            <LogOut className="size-4" />
+          </button>
         </div>
-      ))}
+      </div>
     </nav>
   );
 
   return (
-    <div className="flex h-full">
-      <aside className="hidden w-60 shrink-0 bg-slate-900 lg:block print:hidden">{sidebar}</aside>
+    <div className="flex h-full bg-[#f6f7f2]">
+      <aside className="hidden w-64 shrink-0 lg:block print:hidden">{sidebar}</aside>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden print:hidden">
-          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-slate-900">
-            <button className="absolute right-3 top-4 text-slate-400" onClick={() => setMobileOpen(false)} aria-label="Close menu">
+          <div className="absolute inset-0 bg-brand-900/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 w-72">
+            <button className="absolute right-3 top-5 z-10 text-brand-100/70" onClick={() => setMobileOpen(false)} aria-label="Close menu">
               <X className="size-5" />
             </button>
             {sidebar}
@@ -172,17 +218,19 @@ function Shell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 print:hidden">
-          <button className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-            <Menu className="size-5 text-slate-600" />
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+          <button className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+            <Menu className="size-5" />
           </button>
 
-          <label className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="hidden sm:inline">Branch</span>
+          <label className="relative flex items-center">
+            <span className="sr-only">Branch</span>
+            <Store className="pointer-events-none absolute left-3 size-4 text-brand-600" />
             <select
-              className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium text-slate-800"
+              className="h-10 cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pl-9 pr-9 text-sm font-semibold text-slate-800 shadow-sm outline-none transition hover:border-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
               value={branch?.id ?? ''}
               onChange={(e) => setBranchId(Number(e.target.value))}
+              disabled={branches.length < 2}
             >
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -190,38 +238,32 @@ function Shell() {
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-3 size-4 text-slate-400" />
           </label>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+            <span className="hidden items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1.5 text-xs font-medium text-slate-600 md:flex">
+              <CalendarDays className="size-3.5 text-brand-600" />
+              {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+            </span>
             <button
-              className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+              className="relative grid size-10 place-items-center rounded-full text-slate-600 transition hover:bg-slate-100"
               onClick={() => setNotificationsOpen(true)}
               aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
             >
               <Bell className="size-5" />
               {unreadCount > 0 && (
-                <span className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                <span className="absolute right-1.5 top-1.5 grid min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
-            <span className="hidden text-sm text-slate-600 sm:inline">{user?.name}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<LogOut className="size-4" />}
-              onClick={async () => {
-                await logout();
-                navigate('/login');
-              }}
-            >
-              <span className="hidden sm:inline">Sign out</span>
-            </Button>
+            <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 font-display text-xs font-bold text-white shadow-sm lg:hidden" title={user?.name}>{initials}</span>
           </div>
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+          <div className="mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8 2xl:px-10">
             <Outlet />
           </div>
         </main>
