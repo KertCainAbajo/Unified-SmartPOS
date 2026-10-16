@@ -10,14 +10,16 @@ import {
   Info,
   Package,
   PackageCheck,
+  PackagePlus,
   RotateCcw,
   ShoppingCart,
   SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { LineItem, LineList, ProductSearch, QtyInput } from '../../components/ProductSearch';
 import { BranchTag } from '../../components/BranchSwitcher';
+import { RestockModal, type RestockItem } from './RestockModal';
 import { Avatar, Badge, Button, EmptyState, ErrorBanner, Field, FormSection, Input, LoadingRows, Modal, PageHeader, Pagination, SearchField, Select, StatCard, Tabs, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatDateTime, formatMoney, formatQty, titleCase } from '../../lib/format';
@@ -35,6 +37,7 @@ export function InventoryPage() {
   const [tab, setTab] = useState<Tab>('stock');
   const [adjusting, setAdjusting] = useState(false);
   const [counting, setCounting] = useState(false);
+  const [restockAll, setRestockAll] = useState(0);
   const tracked = useTenantQuery<Paginated<InventoryRow>>('/inventory', { branch_id: scopeBranchId, per_page: 1 }, { enabled: can('inventory.view') });
   const low = useTenantQuery<Paginated<InventoryRow>>('/inventory/low-stock', { branch_id: scopeBranchId, per_page: 1 }, { enabled: can('inventory.view') });
   const drafts = useTenantQuery<Paginated<CountRecord>>('/stock-counts', { branch_id: scopeBranchId, status: 'draft', per_page: 1 }, { enabled: can('inventory.view') });
@@ -52,7 +55,10 @@ export function InventoryPage() {
         actions={
           <>
             {can('inventory.count') && <Button variant="secondary" icon={<ClipboardCheck className="size-4" />} onClick={() => setCounting(true)}>Stock count</Button>}
-            {can('inventory.adjust') && <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => setAdjusting(true)}>Adjust stock</Button>}
+            {can('inventory.adjust') && <Button variant="secondary" icon={<SlidersHorizontal className="size-4" />} onClick={() => setAdjusting(true)}>Adjust stock</Button>}
+            {(can('purchasing.receive') || can('purchasing.manage') || can('inventory.transfer')) && (lowCount ?? 0) > 0 && (
+              <Button icon={<PackagePlus className="size-4" />} onClick={() => { setTab('low'); setRestockAll((n) => n + 1); }}>Restock {lowCount} low items</Button>
+            )}
           </>
         }
       />
@@ -71,7 +77,7 @@ export function InventoryPage() {
       ]} />
       <div key={tab} className="auth-fade">
         {tab === 'stock' && <StockTab />}
-        {tab === 'low' && <LowStockTab />}
+        {tab === 'low' && <LowStockTab selectAll={restockAll} onAutoOpened={() => setRestockAll(0)} />}
         {tab === 'history' && <HistoryTab />}
         {tab === 'counts' && <CountsTab />}
       </div>
@@ -164,11 +170,35 @@ function StockTab() {
   );
 }
 
-function LowStockTab() {
-  const { viewAll, scopeBranchId } = useTenant();
+function LowStockTab({ selectAll, onAutoOpened }: { selectAll: number; onAutoOpened: () => void }) {
+  const { viewAll, scopeBranchId, can, branchName } = useTenant();
   const [page, setPage] = useState(1);
-  const list = useTenantQuery<Paginated<{ branch_id: number; product_id: number; sku: string; name: string; unit: string; quantity: string; reorder_level: string }>>('/inventory/low-stock', { branch_id: scopeBranchId, page });
+  const list = useTenantQuery<Paginated<RestockItem>>('/inventory/low-stock', { branch_id: scopeBranchId, page, per_page: 100 });
   const rows = list.data?.data ?? [];
+  const keyOf = (r: RestockItem) => `${r.branch_id}-${r.product_id}`;
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [restocking, setRestocking] = useState<RestockItem[] | null>(null);
+  const canRestock = can('purchasing.receive') || can('purchasing.manage') || can('inventory.transfer');
+
+  // "Restock" in the page header selects everything at once (one branch at a time).
+  useEffect(() => {
+    if (selectAll && rows.length) {
+      const first = rows[0].branch_id;
+      setRestocking(rows.filter((r) => r.branch_id === first));
+      onAutoOpened();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectAll, list.data]);
+
+  const chosen = rows.filter((r) => selected.has(keyOf(r)));
+  const mixed = new Set(chosen.map((r) => r.branch_id)).size > 1;
+  const toggle = (r: RestockItem) => setSelected((s) => {
+    const next = new Set(s);
+    if (next.has(keyOf(r))) next.delete(keyOf(r));
+    else next.add(keyOf(r));
+    return next;
+  });
+  const allOn = rows.length > 0 && rows.every((r) => selected.has(keyOf(r)));
 
   return (
     <Panel>
@@ -176,25 +206,44 @@ function LowStockTab() {
         <EmptyState icon={PackageCheck} title="All stocked up" description="Nothing is below its reorder level at this branch." />
       ) : (
         <>
-          <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50/60 px-5 py-3 text-sm text-amber-900">
+          <div className="flex flex-wrap items-center gap-3 border-b border-amber-100 bg-amber-50/60 px-5 py-3 text-sm text-amber-900">
             <AlertTriangle className="size-4 shrink-0 text-amber-600" />
-            These products are at or below their reorder level. Create a purchase order or transfer to restock.
+            <span className="flex-1">{rows.length} {rows.length === 1 ? 'product is' : 'products are'} at or below the reorder level. Tick the ones to restock, or restock everything in one go.</span>
+            {canRestock && !viewAll && <Button size="sm" icon={<PackagePlus className="size-4" />} onClick={() => setRestocking(rows)}>Restock all {rows.length}</Button>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th>{viewAll && <Th>Branch</Th>}<Th right>On hand</Th><Th right>Reorder at</Th><Th right>Short by</Th><Th>Status</Th></tr></thead>
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
+                  {canRestock && (
+                    <th className="w-10 py-3 pl-5">
+                      <input type="checkbox" aria-label="Select all" className="size-4 accent-brand-600" checked={allOn} onChange={() => setSelected(allOn ? new Set() : new Set(rows.map(keyOf)))} />
+                    </th>
+                  )}
+                  <Th first={!canRestock}>Product</Th>{viewAll && <Th>Branch</Th>}<Th right>On hand</Th><Th right>Reorder at</Th><Th right>Short by</Th><Th>Status</Th>{canRestock && <Th />}
+                </tr>
+              </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r) => {
                   const qty = Number(r.quantity);
                   const reorder = Number(r.reorder_level);
+                  const on = selected.has(keyOf(r));
                   return (
-                    <tr key={`${r.branch_id}-${r.product_id}`} className="transition-colors hover:bg-amber-50/40">
-                      <td className="py-3 pl-5 pr-3"><ProductCell name={r.name} sku={r.sku} /></td>
+                    <tr key={keyOf(r)} className={cx('group transition-colors', on ? 'bg-brand-50/50' : 'hover:bg-amber-50/40')}>
+                      {canRestock && <td className="py-3 pl-5"><input type="checkbox" aria-label={`Select ${r.name}`} className="size-4 accent-brand-600" checked={on} onChange={() => toggle(r)} /></td>}
+                      <td className={cx('py-3 pr-3', canRestock ? 'pl-3' : 'pl-5')}><ProductCell name={r.name} sku={r.sku} /></td>
                       {viewAll && <td className="px-3 py-3"><BranchTag id={r.branch_id} /></td>}
                       <td className="px-3 py-3 text-right"><span className={cx('font-display font-semibold tabular-nums', qty <= 0 ? 'text-rose-600' : 'text-amber-700')}>{formatQty(r.quantity)}</span> <span className="text-xs text-slate-400">{r.unit}</span></td>
                       <td className="px-3 py-3 text-right tabular-nums text-slate-500">{formatQty(r.reorder_level)}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-medium text-slate-700">{formatQty(String(Math.max(0, reorder - qty)))}</td>
-                      <td className="px-3 py-3 pr-5"><LevelPill qty={qty} reorder={reorder} /></td>
+                      <td className="px-3 py-3"><LevelPill qty={qty} reorder={reorder} /></td>
+                      {canRestock && (
+                        <td className="px-3 py-3 pr-5 text-right">
+                          <button type="button" onClick={() => setRestocking([r])} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-50">
+                            <PackagePlus className="size-3.5" /> Restock
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -204,6 +253,20 @@ function LowStockTab() {
         </>
       )}
       <Pagination page={page} data={list.data} onPage={setPage} />
+
+      {/* Selection bar */}
+      {chosen.length > 0 && (
+        <div className="auth-fade sticky bottom-4 z-20 mx-4 mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-brand-900 px-4 py-3 text-white shadow-2xl shadow-brand-900/30">
+          <span className="grid size-8 place-items-center rounded-lg bg-white/10 font-display text-sm font-bold">{chosen.length}</span>
+          <span className="flex-1 text-sm">{mixed ? 'Pick products from one branch at a time to restock.' : `selected for ${branchName(chosen[0].branch_id)}`}</span>
+          <button type="button" onClick={() => setSelected(new Set())} className="rounded-lg px-3 py-1.5 text-sm text-brand-100 transition hover:bg-white/10">Clear</button>
+          <button type="button" disabled={mixed} onClick={() => setRestocking(chosen)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-sun-400 px-4 text-sm font-semibold text-brand-900 transition hover:bg-sun-300 disabled:opacity-50">
+            <PackagePlus className="size-4" /> Restock selected
+          </button>
+        </div>
+      )}
+
+      <RestockModal items={restocking ?? []} open={restocking !== null} onClose={() => setRestocking(null)} onDone={() => { setRestocking(null); setSelected(new Set()); }} />
     </Panel>
   );
 }

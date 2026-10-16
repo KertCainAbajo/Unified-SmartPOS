@@ -1,9 +1,12 @@
-import { Check, ClipboardList, FileText, Mail, PackageCheck, Phone, Plus, RotateCcw, ShoppingBag, Truck, Users, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, ClipboardList, FileText, Mail, Minus, PackageCheck, Phone, Plus, RotateCcw, Send, ShoppingBag, Truck, Users, XCircle } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { LineItem, LineList, ProductSearch, QtyInput } from '../../components/ProductSearch';
+import { ProductBrowser } from '../../components/ProductBrowser';
+import { LineItem, LineList, QtyInput } from '../../components/ProductSearch';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../../components/Toast';
+import { api, ApiError } from '../../lib/api';
 import { BranchTag } from '../../components/BranchSwitcher';
 import { Avatar, Badge, Button, Checkbox, EmptyState, ErrorBanner, Field, FormSection, Input, LoadingRows, Modal, PageHeader, Pagination, Segmented, Select, Tabs, cx } from '../../components/ui';
-import { ApiError } from '../../lib/api';
 import { formatDate, formatDateTime, formatMoney, formatQty } from '../../lib/format';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Paginated, Product, PurchaseOrder, Supplier } from '../../lib/types';
@@ -131,6 +134,8 @@ function OrderDetail({ id, onClose }: { id: number | null; onClose: () => void }
   const detail = useTenantQuery<{ data: PurchaseOrder }>(`/purchase-orders/${id}`, undefined, { enabled: id !== null });
   const [receiving, setReceiving] = useState(false);
   const act = useTenantMutation<{ id: number; action: 'order' | 'cancel' | 'close'; reason?: string }>('POST', (b) => `/purchase-orders/${b.id}/${b.action}`, { success: 'Purchase order updated.' });
+  // One tap when the whole delivery arrived; "Receive part" is for short deliveries.
+  const receiveAll = useTenantMutation<Record<string, unknown>>('POST', '/goods-receipts', { success: 'Everything received into stock.', onSuccess: onClose });
   const o = detail.data?.data;
   const receivable = o && (o.status === 'ordered' || o.status === 'partially_received');
 
@@ -149,7 +154,8 @@ function OrderDetail({ id, onClose }: { id: number | null; onClose: () => void }
               {can('purchasing.manage') && (o.status === 'draft' || o.status === 'ordered') && <Button variant="secondary" onClick={() => act.mutate({ id: o.id, action: 'cancel' })}>Cancel PO</Button>}
               {can('purchasing.manage') && o.status === 'draft' && <Button icon={<Truck className="size-4" />} loading={act.isPending} onClick={() => act.mutate({ id: o.id, action: 'order' })}>Mark as ordered</Button>}
               {can('purchasing.manage') && o.status === 'partially_received' && <Button variant="secondary" onClick={() => { const reason = prompt('Why close this PO? The remaining quantity will not be received.'); if (reason) act.mutate({ id: o.id, action: 'close', reason }); }}>Close short</Button>}
-              {can('purchasing.receive') && receivable && <Button icon={<PackageCheck className="size-4" />} onClick={() => setReceiving(true)}>Receive goods</Button>}
+              {can('purchasing.receive') && receivable && <Button variant="secondary" onClick={() => setReceiving(true)}>Receive part</Button>}
+              {can('purchasing.receive') && receivable && <Button icon={<PackageCheck className="size-4" />} loading={receiveAll.isPending} onClick={() => receiveAll.mutate({ branch_id: o.branch_id, purchase_order_id: o.id, items: (o.items ?? []).map((i) => ({ purchase_order_item_id: i.id, quantity: Math.max(Number(i.quantity_ordered) - Number(i.quantity_received), 0) })).filter((i) => i.quantity > 0) })}>Receive everything</Button>}
             </>
           )
         }
@@ -245,49 +251,228 @@ function ReceiveModal({ order, onClose }: { order: PurchaseOrder; onClose: () =>
   );
 }
 
+const addDays = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('en-CA');
+};
+
+type OrderLine = { product: Product; quantity: string; unit_cost: string };
+
 function CreateOrder({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { branch: working, branches } = useTenant();
+  const { branch: working, branches, path, tenantId, can } = useTenant();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const [branchId, setBranchId] = useState<number | undefined>(working?.id);
   const branch = branches.find((b) => b.id === (branchId ?? working?.id)) ?? working;
   const suppliers = useTenantQuery<Paginated<Supplier>>('/suppliers', { active_only: 1, per_page: 100 }, { enabled: open });
-  const [supplierId, setSupplierId] = useState('');
-  const [expected, setExpected] = useState('');
-  const [lines, setLines] = useState<{ product: Product; quantity: string; unit_cost: string }[]>([]);
-  const create = useTenantMutation<unknown>('POST', '/purchase-orders', { success: 'Purchase order created (draft).', onSuccess: () => { setLines([]); onClose(); }, toastErrors: false });
-  const update = (i: number, patch: Partial<{ quantity: string; unit_cost: string }>) => setLines((ls) => ls.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  const low = useTenantQuery<Paginated<{ product_id: number; quantity: string; reorder_level: string }>>('/inventory/low-stock', { branch_id: branch?.id, per_page: 100 }, { enabled: open && !!branch });
+  const products = useTenantQuery<Paginated<Product>>('/products', { per_page: 100 }, { enabled: open });
+  const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [expected, setExpected] = useState(addDays(3));
+  const [lines, setLines] = useState<OrderLine[]>([]);
+  const [newSupplier, setNewSupplier] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'draft' | 'send' | 'supplier' | 'repeat' | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  const reset = () => {
+    setLines([]);
+    setSupplierId(null);
+    setExpected(addDays(3));
+    setNewSupplier(null);
+    setError(null);
+  };
+  const close = () => { reset(); onClose(); };
+  const update = (i: number, patch: Partial<OrderLine>) => setLines((ls) => ls.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  const addLines = (add: OrderLine[]) => setLines((ls) => [...ls, ...add.filter((a) => !ls.some((l) => l.product.id === a.product.id))]);
   const total = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0), 0);
+  const productOf = (id: number) => products.data?.data.find((p) => p.id === id);
+  const lowRows = low.data?.data ?? [];
+
+  // Every low-stock product at this branch, filled up to twice its reorder level.
+  const addLowStock = () => {
+    const add = lowRows.flatMap((r) => {
+      const p = productOf(r.product_id);
+      if (!p) return [];
+      const reorder = Number(r.reorder_level);
+      const qty = Math.max(Math.ceil(Math.max(reorder * 2, reorder + 1) - Number(r.quantity)), 1);
+      return [{ product: p, quantity: String(qty), unit_cost: p.cost_price ?? '' }];
+    });
+    addLines(add);
+    toast.success(`${add.length} low-stock ${add.length === 1 ? 'product' : 'products'} added.`);
+  };
+
+  // Copy the items of the latest order from the chosen supplier.
+  const repeatLast = async () => {
+    if (!supplierId) return;
+    setBusy('repeat');
+    try {
+      const last = await api<Paginated<PurchaseOrder>>(path('/purchase-orders'), { query: { supplier_id: supplierId, per_page: 1 } });
+      const id = last.data[0]?.id;
+      if (!id) {
+        toast.error('No earlier order from this supplier yet.');
+        return;
+      }
+      const po = await api<{ data: PurchaseOrder }>(path(`/purchase-orders/${id}`));
+      const add = (po.data.items ?? []).flatMap((i) => {
+        const p = productOf(i.product_id);
+        return p ? [{ product: p, quantity: formatQty(i.quantity_ordered), unit_cost: i.unit_cost }] : [];
+      });
+      addLines(add);
+      toast.success(`Copied ${add.length} items from ${po.data.reference}.`);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const createSupplier = async () => {
+    if (!newSupplier?.trim()) return;
+    setBusy('supplier');
+    try {
+      const s = await api<{ data: Supplier }>(path('/suppliers'), { method: 'POST', body: { name: newSupplier.trim() } });
+      await queryClient.invalidateQueries({ queryKey: ['t', tenantId] });
+      setSupplierId(s.data.id);
+      setNewSupplier(null);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const save = async (send: boolean) => {
+    setBusy(send ? 'send' : 'draft');
+    setError(null);
+    try {
+      const po = await api<{ data: { id: number; reference: string } }>(path('/purchase-orders'), {
+        method: 'POST',
+        body: { branch_id: branch?.id, supplier_id: supplierId, expected_date: expected || null, items: lines.map((l) => ({ product_id: l.product.id, quantity: l.quantity, unit_cost: l.unit_cost || '0' })) },
+      });
+      if (send) await api(path(`/purchase-orders/${po.data.id}/order`), { method: 'POST' });
+      void queryClient.invalidateQueries({ queryKey: ['t', tenantId] });
+      toast.success(send ? `${po.data.reference} sent. Receive it here when the delivery arrives.` : `${po.data.reference} saved as a draft.`);
+      close();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const ready = !!supplierId && lines.length > 0 && lines.every((l) => Number(l.quantity) > 0);
+  const supplierList = suppliers.data?.data ?? [];
+  const fieldErrors = error instanceof ApiError ? Object.values(error.errors).flat() : [];
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="New purchase order"
-      description={`Delivered to ${branch?.name ?? 'this branch'}. Saved as a draft.`}
+      description={`Delivered to ${branch?.name ?? 'this branch'}.`}
       icon={ShoppingBag}
-      size="lg"
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={!supplierId || lines.length === 0} loading={create.isPending} onClick={() => create.mutate({ branch_id: branch?.id, supplier_id: Number(supplierId), expected_date: expected || null, items: lines.map((l) => ({ product_id: l.product.id, quantity: l.quantity, unit_cost: l.unit_cost })) })}>Create PO</Button></>}
+      size="xl"
+      footer={
+        <>
+          <span className="mr-auto self-center text-xs text-slate-500">
+            <strong className="text-slate-800">{lines.length}</strong> items · total <strong className="font-display text-sm text-brand-900">{formatMoney(total.toFixed(2))}</strong>
+          </span>
+          <Button variant="secondary" onClick={close}>Cancel</Button>
+          <Button variant="secondary" disabled={!ready} loading={busy === 'draft'} onClick={() => void save(false)}>Save draft</Button>
+          <Button disabled={!ready} loading={busy === 'send'} icon={<Send className="size-4" />} onClick={() => void save(true)}>Send order</Button>
+        </>
+      }
     >
       <div className="space-y-6">
-        <ErrorBanner error={create.error} />
-        <FormSection title="Supplier">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {branches.length > 1 && <Field label="Deliver to" className="sm:col-span-2">{(id) => <Select id={id} value={branch?.id ?? ''} onChange={(e) => setBranchId(Number(e.target.value))}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>}
-            <Field label="Supplier">{(id) => <Select id={id} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}><option value="">Choose…</option>{suppliers.data?.data.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>}</Field>
-            <Field label="Expected delivery">{(id) => <Input id={id} type="date" value={expected} onChange={(e) => setExpected(e.target.value)} />}</Field>
+        {error !== null && fieldErrors.length === 0 && <ErrorBanner error={error} />}
+        {fieldErrors.map((m) => <p key={m} className="text-sm text-red-600">{m}</p>)}
+
+        {/* 1. Supplier */}
+        <section>
+          <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800"><span className="grid size-6 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">1</span>Who are you ordering from?</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {supplierList.map((s) => {
+              const on = supplierId === s.id;
+              return (
+                <button key={s.id} type="button" onClick={() => setSupplierId(s.id)} aria-pressed={on}
+                  className={cx('flex items-center gap-3 rounded-xl p-3 text-left ring-1 transition', on ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-white ring-slate-200 hover:bg-slate-50')}>
+                  <Avatar name={s.name} square size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-900">{s.name}</span>
+                    <span className="block truncate text-xs text-slate-400">{s.contact_person ?? s.phone ?? 'Supplier'}</span>
+                  </span>
+                  {on && <Check className="size-4 text-brand-600" />}
+                </button>
+              );
+            })}
+            {!can('suppliers.manage') ? null : newSupplier === null ? (
+              <button type="button" onClick={() => setNewSupplier('')} className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-3 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:bg-brand-50/40 hover:text-brand-700">
+                <Plus className="size-4" /> New supplier
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl p-2 ring-2 ring-brand-500">
+                <input autoFocus value={newSupplier} onChange={(e) => setNewSupplier(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void createSupplier(); if (e.key === 'Escape') setNewSupplier(null); }}
+                  placeholder="Supplier name" className="h-8 min-w-0 flex-1 bg-transparent px-1 text-sm outline-none" />
+                <Button size="sm" loading={busy === 'supplier'} disabled={!newSupplier.trim()} onClick={() => void createSupplier()}>Add</Button>
+              </div>
+            )}
           </div>
-        </FormSection>
-        <FormSection title="Items">
-          <ProductSearch onPick={(p) => setLines((ls) => (ls.some((l) => l.product.id === p.id) ? ls : [...ls, { product: p, quantity: '', unit_cost: p.cost_price ?? '' }]))} />
-          <LineList count={lines.length} empty="Search above to add the products you're ordering."
-            header={<span className="normal-case tracking-normal text-slate-700">Total <strong className="font-display text-sm text-brand-900">{formatMoney(total.toFixed(2))}</strong></span>}>
+        </section>
+
+        {/* 2. Delivery */}
+        <section className="grid gap-4 sm:grid-cols-2">
+          {branches.length > 1 && (
+            <Field label="Deliver to">{(id) => <Select id={id} value={branch?.id ?? ''} onChange={(e) => setBranchId(Number(e.target.value))}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>
+          )}
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Expected delivery</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {[['Tomorrow', 1], ['In 3 days', 3], ['Next week', 7]].map(([l, n]) => (
+                <button key={l} type="button" onClick={() => setExpected(addDays(n as number))}
+                  className={cx('rounded-lg px-3 py-2 text-xs font-semibold ring-1 transition', expected === addDays(n as number) ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50')}>{l}</button>
+              ))}
+              <Input type="date" aria-label="Expected delivery date" className="h-9 w-40" value={expected} onChange={(e) => setExpected(e.target.value)} />
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Items */}
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="mr-auto flex items-center gap-2 text-sm font-semibold text-slate-800"><span className="grid size-6 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">2</span>What do you need?</p>
+            {lowRows.length > 0 && (
+              <button type="button" onClick={addLowStock} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100">
+                <AlertTriangle className="size-3.5" /> Add {lowRows.length} low-stock items
+              </button>
+            )}
+            <button type="button" disabled={!supplierId || busy === 'repeat'} onClick={() => void repeatLast()} title={supplierId ? 'Copy the last order from this supplier' : 'Choose a supplier first'}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:opacity-50">
+              <RotateCcw className="size-3.5" /> Repeat last order
+            </button>
+          </div>
+          <ProductBrowser
+            branchId={branch?.id}
+            picked={Object.fromEntries(lines.map((l) => [l.product.id, l.quantity]))}
+            onPick={(p) => setLines((ls) => (ls.some((l) => l.product.id === p.id)
+              ? ls.map((l) => (l.product.id === p.id ? { ...l, quantity: String((Number(l.quantity) || 0) + 1) } : l))
+              : [...ls, { product: p, quantity: '1', unit_cost: p.cost_price ?? '' }]))}
+          />
+          <LineList count={lines.length} empty="Tap products above, or use “Add low-stock items” to fill the order in one tap."
+            header={lines.length > 0 && <button type="button" onClick={() => setLines([])} className="normal-case tracking-normal text-slate-500 hover:text-rose-600">Clear all</button>}>
             {lines.map((l, i) => (
               <LineItem key={l.product.id} name={l.product.name} sku={l.product.sku} onRemove={() => setLines((ls) => ls.filter((_, idx) => idx !== i))}>
-                <QtyInput label={`Quantity ${l.product.name}`} suffix={l.product.unit} value={l.quantity} onChange={(v) => update(i, { quantity: v })} />
+                <span className="inline-flex items-center rounded-lg bg-white ring-1 ring-slate-200">
+                  <button type="button" aria-label="Less" onClick={() => update(i, { quantity: String(Math.max((Number(l.quantity) || 0) - 1, 0)) })} className="grid size-9 place-items-center rounded-l-lg text-slate-500 hover:bg-slate-50 hover:text-brand-700"><Minus className="size-3.5" /></button>
+                  <input inputMode="decimal" aria-label={`Quantity ${l.product.name}`} value={l.quantity} onChange={(e) => update(i, { quantity: e.target.value.replace(/[^\d.]/g, '') })} className="h-9 w-14 bg-transparent text-center text-sm font-semibold tabular-nums outline-none" />
+                  <button type="button" aria-label="More" onClick={() => update(i, { quantity: String((Number(l.quantity) || 0) + 1) })} className="grid size-9 place-items-center rounded-r-lg text-slate-500 hover:bg-slate-50 hover:text-brand-700"><Plus className="size-3.5" /></button>
+                </span>
                 <QtyInput label={`Unit cost ${l.product.name}`} prefix="₱" placeholder="0.00" value={l.unit_cost} onChange={(v) => update(i, { unit_cost: v })} />
+                <span className="w-24 text-right text-sm font-semibold tabular-nums text-slate-900">{formatMoney(((Number(l.quantity) || 0) * (Number(l.unit_cost) || 0)).toFixed(2))}</span>
               </LineItem>
             ))}
           </LineList>
-        </FormSection>
+        </section>
       </div>
     </Modal>
   );

@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, Clock, LogOut, Minus, Monitor, PackageSearch, Percent, Plus, Printer, ScanBarcode, Search, ShoppingCart, Store, Trash2, UserRound, Wallet, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, LogOut, Minus, Monitor, PackageSearch, Percent, Plus, Printer, ScanBarcode, Search, ShoppingCart, Store, Trash2, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react';
 import { ReceiptView } from '../../components/ReceiptView';
 import { useToast } from '../../components/Toast';
@@ -9,32 +9,44 @@ import { cartPayload, cartReducer, emptyCart, isValidQuantity, type CartLine, ty
 import { formatMoney, formatQty, newIdempotencyKey } from '../../lib/format';
 import { printDocument } from '../../lib/print';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
-import type { Category, Customer, Paginated, Product, QuoteLine, QuoteTotals, Receipt, Register, RegisterSession, Sale } from '../../lib/types';
+import type { Branch, Category, Customer, Paginated, Product, QuoteLine, QuoteTotals, Receipt, Register, RegisterSession, Sale } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
-import { CloseShiftModal, OpenShiftCard } from './ShiftDialogs';
+import { CloseShiftModal, OpenShiftCard, ZReadingModal } from './ShiftDialogs';
 import { PaymentModal, type PaymentLine } from './PaymentModal';
 
 export function PosPage() {
   const { can, branch, branches } = useTenant();
   const current = useTenantQuery<{ data: RegisterSession | null }>('/register-sessions/current');
   const registers = useTenantQuery<{ data: Register[] }>('/registers', { branch_id: branch?.id }, { enabled: !!branch });
+  const [zReading, setZReading] = useState<RegisterSession | null>(null);
 
   if (!can('sales.create')) return <NoAccess what="the point of sale" />;
   if (current.isPending) return <Spinner />;
   if (current.error) return <ErrorBanner error={current.error} />;
 
   const session = current.data?.data;
+  const zModal = zReading && <ZReadingModal session={zReading} onClose={() => setZReading(null)} />;
   if (!session) {
     if (registers.isPending) return <Spinner />;
-    return <OpenShiftCard registers={registers.data?.data ?? []} branchName={branch?.name ?? ''} />;
+    return (
+      <>
+        <OpenShiftCard key={branch?.id} registers={registers.data?.data ?? []} branchName={branch?.name ?? ''} />
+        {zModal}
+      </>
+    );
   }
 
   const sessionBranch = branches.find((b) => b.id === session.branch_id);
-  return <Terminal session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} />;
+  return (
+    <>
+      <Terminal session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} onShiftClosed={setZReading} />
+      {zModal}
+    </>
+  );
 }
 
-function Terminal({ session, branchName }: { session: RegisterSession; branchName: string }) {
+function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSession; branchName: string; onShiftClosed: (s: RegisterSession) => void }) {
   const { can, path, tenantId } = useTenant();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -42,6 +54,9 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
   const [paying, setPaying] = useState(false);
   const [completed, setCompleted] = useState<{ sale: Sale; receipt: Receipt } | null>(null);
   const [closingShift, setClosingShift] = useState(false);
+  const [switchTo, setSwitchTo] = useState<Branch | null>(null);
+  const [switching, setSwitching] = useState<Branch | null>(null);
+  const { setBranchId } = useTenant();
   const [discountLine, setDiscountLine] = useState<CartLine | null>(null);
   const [customerPicker, setCustomerPicker] = useState(false);
   const lastAttempt = useRef<{ body: string; key: string } | null>(null);
@@ -93,7 +108,7 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
           <span className="relative inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
             <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> Shift open
           </span>
-          <span className="relative flex items-center gap-1.5 text-sm"><Store className="size-4 text-sun-300" />{branchName}</span>
+          <BranchPicker currentId={session.branch_id} currentName={branchName} onPick={(b) => setSwitchTo(b)} />
           <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Monitor className="size-4" />Register #{session.register_id}</span>
           <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Clock className="size-4" /><ShiftTimer since={session.opened_at} /></span>
           <button type="button" onClick={() => setClosingShift(true)} className="relative ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-semibold ring-1 ring-white/20 transition hover:bg-white/20">
@@ -304,7 +319,39 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
         }}
       />
 
-      <CloseShiftModal session={session} open={closingShift} onClose={() => setClosingShift(false)} />
+      <CloseShiftModal
+        session={session}
+        open={closingShift}
+        onClose={() => { setClosingShift(false); setSwitching(null); }}
+        onClosed={(closed) => {
+          setClosingShift(false);
+          if (switching) setBranchId(switching.id);
+          onShiftClosed(closed);
+        }}
+      />
+
+      <Modal
+        open={!!switchTo}
+        onClose={() => setSwitchTo(null)}
+        title={`Switch to ${switchTo?.name ?? ''}?`}
+        icon={Store}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setSwitchTo(null)}>Stay here</Button>
+            <Button onClick={() => { setSwitching(switchTo); setSwitchTo(null); setClosingShift(true); }}>Close shift &amp; switch</Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm text-slate-600">
+          <p>Sales are recorded on the register where your shift is open. Your shift at <strong className="text-slate-900">{branchName}</strong> (Register #{session.register_id}) is still open.</p>
+          <ol className="space-y-2">
+            <li className="flex gap-2"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-[11px] font-bold text-white">1</span>Count the drawer and close this shift.</li>
+            <li className="flex gap-2"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-[11px] font-bold text-white">2</span><span>Open a new shift at <strong className="text-slate-900">{switchTo?.name}</strong> and keep selling.</span></li>
+          </ol>
+          {cart.lines.length > 0 && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800 ring-1 ring-amber-100">The {cart.lines.length} item(s) in the current sale will be cleared.</p>}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -441,6 +488,55 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
 }
 
 const TILES = ['from-brand-400 to-brand-600', 'from-sky-400 to-sky-600', 'from-amber-400 to-orange-500', 'from-violet-400 to-violet-600', 'from-rose-400 to-rose-600', 'from-teal-400 to-emerald-600'];
+
+/** Branch name on the POS bar; opens a list of the branches you can sell at. */
+function BranchPicker({ currentId, currentName, onPick }: { currentId: number; currentName: string; onPick: (b: Branch) => void }) {
+  const { branches } = useTenant();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [open]);
+
+  if (branches.length < 2) return <span className="relative flex items-center gap-1.5 text-sm"><Store className="size-4 text-sun-300" />{currentName}</span>;
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium ring-1 ring-white/20 transition hover:bg-white/10">
+        <Store className="size-4 text-sun-300" />{currentName}<ChevronDown className={cx('size-4 text-brand-100 transition', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div role="listbox" aria-label="Branches" className="auth-fade absolute left-0 top-10 z-40 w-64 rounded-2xl bg-white p-1.5 text-slate-700 shadow-xl ring-1 ring-slate-900/10">
+          <p className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Sell at</p>
+          {branches.map((b) => {
+            const here = b.id === currentId;
+            return (
+              <button key={b.id} type="button" role="option" aria-selected={here} disabled={here}
+                onClick={() => { setOpen(false); onPick(b); }}
+                className={cx('flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition', here ? 'bg-brand-50 text-brand-900' : 'hover:bg-slate-50')}>
+                <span className={cx('grid size-8 place-items-center rounded-lg', here ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500')}><Store className="size-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{b.name}</span>
+                  {here && <span className="block text-[11px] text-emerald-700">Shift open here</span>}
+                </span>
+                {here && <Check className="size-4 text-brand-600" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Live "2h 14m" since the shift opened. */
 function ShiftTimer({ since }: { since: string }) {

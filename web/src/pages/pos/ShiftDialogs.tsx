@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, Info, Lock, Monitor, Play, ReceiptText } from 'lucide-react';
+import { AlertTriangle, Check, Info, Lock, Monitor, Play, ReceiptText, Store } from 'lucide-react';
+import { useTenant } from '../../tenant/TenantProvider';
 import { Badge, Button, ErrorBanner, Modal, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatMoney, titleCase } from '../../lib/format';
@@ -9,6 +10,7 @@ import type { Register, RegisterSession, ShiftSummary } from '../../lib/types';
 
 /** Shown on the POS when the cashier has no open shift. */
 export function OpenShiftCard({ registers, branchName }: { registers: Register[]; branchName: string }) {
+  const { branches, branch, setBranchId } = useTenant();
   const available = registers.filter((r) => r.is_active && !r.open_session);
   const [registerId, setRegisterId] = useState<number | ''>(available[0]?.id ?? '');
   const [float, setFloat] = useState('1000.00');
@@ -26,6 +28,22 @@ export function OpenShiftCard({ registers, branchName }: { registers: Register[]
           <span className="relative grid size-14 place-items-center rounded-2xl bg-white/15 text-sun-300 ring-1 ring-white/20"><Monitor className="size-7" /></span>
           <h1 className="relative mt-4 font-display text-2xl font-bold">Open a shift</h1>
           <p className="relative mt-1 text-sm text-brand-100/80">{branchName} · Count the cash in the drawer and enter it as the opening float. Sales are recorded against this shift until you close it.</p>
+          {branches.length > 1 && (
+            <div className="relative mt-4">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-100">Which branch are you selling at?</p>
+              <div role="radiogroup" aria-label="Branch" className="flex flex-wrap gap-2">
+                {branches.map((b) => {
+                  const on = b.id === branch?.id;
+                  return (
+                    <button key={b.id} type="button" role="radio" aria-checked={on} onClick={() => setBranchId(b.id)}
+                      className={cx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition', on ? 'bg-sun-400 text-brand-900 ring-sun-300' : 'bg-white/10 text-white ring-white/20 hover:bg-white/20')}>
+                      {on ? <Check className="size-3.5" /> : <Store className="size-3.5" />}{b.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-6">
@@ -131,12 +149,40 @@ export function ShiftSummaryView({ summary }: { summary: ShiftSummary }) {
   );
 }
 
-export function CloseShiftModal({ session, open, onClose }: { session: RegisterSession; open: boolean; onClose: () => void }) {
+/** Z reading of a shift that was just closed, shown after the POS has already switched back to "Open a shift". */
+export function ZReadingModal({ session, onClose }: { session: RegisterSession; onClose: () => void }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Shift closed — Z reading"
+      icon={ReceiptText}
+      description="Print this summary for your records."
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => printDocument()}>Print</Button>
+          <Button onClick={onClose}>Done</Button>
+        </>
+      }
+    >
+      {session.summary ? (
+        <div className="print-area" data-print-width="80mm">
+          <ShiftSummaryView summary={session.summary} />
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600">Shift closed.</p>
+      )}
+    </Modal>
+  );
+}
+
+export function CloseShiftModal({ session, open, onClose, onClosed }: { session: RegisterSession; open: boolean; onClose: () => void; onClosed?: (session: RegisterSession) => void }) {
   const [counted, setCounted] = useState('');
   const [closed, setClosed] = useState<RegisterSession | null>(null);
   const close = useTenantMutation<{ counted_cash: string }, { data: RegisterSession }>('POST', `/register-sessions/${session.id}/close`, {
     success: 'Shift closed.',
-    onSuccess: (r) => setClosed(r.data),
+    // With onClosed the caller shows the Z reading (the POS screen changes as soon as the shift closes).
+    onSuccess: (r) => (onClosed ? onClosed(r.data) : setClosed(r.data)),
     toastErrors: false,
   });
 
