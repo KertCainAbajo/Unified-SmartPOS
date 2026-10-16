@@ -96,16 +96,18 @@ export function TenantProvider({ data, tenantId, children }: { data: TenantConte
 
   const value = useMemo<TenantValue>(() => {
     const permissions = new Set(data.permissions);
-    const branch = data.branches.find((b) => b.id === branchId) ?? data.branches[0] ?? null;
+    // Inactive branches stay in history (names on old sales, reports) but cannot be picked to work in.
+    const active = data.branches.filter((b) => b.is_active);
+    const branch = active.find((b) => b.id === branchId) ?? active[0] ?? null;
     // "All branches" only makes sense when there is more than one to look at.
-    const viewAll = viewAllState && data.branches.length > 1;
+    const viewAll = viewAllState && active.length > 1;
     return {
       tenantId,
       tenant: data.tenant,
       membershipId: data.membership_id,
       permissions,
       roles: data.roles,
-      branches: data.branches,
+      branches: active,
       allBranches: data.all_branches,
       branch,
       viewAll,

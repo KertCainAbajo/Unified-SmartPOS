@@ -151,7 +151,7 @@ class PurchaseOrderController extends Controller
         $required = $updating ? 'sometimes' : 'required';
 
         return $request->validate([
-            'branch_id' => [$updating ? 'prohibited' : 'required', 'integer', Rule::exists('branches', 'id')->where('tenant_id', $tenant->id)],
+            'branch_id' => [$updating ? 'prohibited' : 'required', 'integer', Rule::exists('branches', 'id')->where('tenant_id', $tenant->id)->where('is_active', true)],
             'supplier_id' => [$required, 'integer', Rule::exists('suppliers', 'id')->where('tenant_id', $tenant->id)->where('is_active', true)],
             'order_date' => ['sometimes', 'date_format:Y-m-d'],
             'expected_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],

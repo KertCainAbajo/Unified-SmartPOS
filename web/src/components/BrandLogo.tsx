@@ -1,4 +1,4 @@
-import logoSvg from '../../public/brand/minimart-logo.svg?raw';
+import logoSvg from '../brand/minimart-logo.svg?raw';
 
 /**
  * The store logo as inline SVG: sharp at any size and uses the page's bundled Poppins font for the wordmark.

@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Middleware\EnsureEmailIsVerifiedWhenRequired;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsurePlatformAdmin;
@@ -32,6 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Business-rule violations are expected outcomes (shown to the user as 422), not errors worth a stack trace.
+        $exceptions->dontReport(BusinessRuleException::class);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

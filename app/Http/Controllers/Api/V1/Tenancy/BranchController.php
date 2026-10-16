@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1\Tenancy;
 
+use App\Enums\RegisterSessionStatus;
+use App\Enums\StockTransferStatus;
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BranchResource;
 use App\Models\Branch;
+use App\Models\RegisterSession;
+use App\Models\StockTransfer;
 use App\Models\Tenant;
 use App\Services\AuditLogger;
 use App\Support\TenantContext;
@@ -83,10 +88,31 @@ class BranchController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        if (($data['is_active'] ?? true) === false && $branch->is_active) {
+            $this->assertCanDeactivate($tenant, $branch);
+        }
+
         $original = $branch->getOriginal();
         $branch->fill($data)->save();
         $this->audit->logChanges('branch.updated', $branch, $original);
 
         return new BranchResource($branch);
+    }
+
+    /** A branch with work in progress would strand shifts or stock if it disappeared from every list. */
+    private function assertCanDeactivate(Tenant $tenant, Branch $branch): void
+    {
+        if (! $tenant->branches()->where('is_active', true)->whereKeyNot($branch->id)->exists()) {
+            throw new BusinessRuleException('A business needs at least one active branch.', 'LAST_ACTIVE_BRANCH');
+        }
+        if (RegisterSession::query()->where('branch_id', $branch->id)->where('status', RegisterSessionStatus::Open->value)->exists()) {
+            throw new BusinessRuleException('Close the open shifts at this branch before deactivating it.', 'BRANCH_HAS_OPEN_SHIFTS');
+        }
+        $inTransit = StockTransfer::query()->where('status', StockTransferStatus::InTransit->value)
+            ->where(fn ($q) => $q->where('from_branch_id', $branch->id)->orWhere('to_branch_id', $branch->id))
+            ->exists();
+        if ($inTransit) {
+            throw new BusinessRuleException('Receive or cancel the stock transfers in transit for this branch first.', 'BRANCH_HAS_TRANSFERS_IN_TRANSIT');
+        }
     }
 }

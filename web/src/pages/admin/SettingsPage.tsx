@@ -321,6 +321,7 @@ function BranchesPanel() {
         description={isNew ? 'The code is printed on receipts and cannot be changed later.' : `Code ${form.code}`}
         footer={<><Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button disabled={!form.name.trim() || (isNew && !form.code.trim())} loading={save.isPending} onClick={() => save.mutate(isNew ? { code: form.code, name: form.name, address: form.address || null, phone: form.phone || null } : { name: form.name, address: form.address || null, phone: form.phone || null, is_active: form.is_active })}>{isNew ? 'Add branch' : 'Save changes'}</Button></>}>
         <div className="space-y-5">
+          {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} />}
           <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
             {isNew && <Field label="Code" error={err('code')} hint="e.g. MKT">{(id) => <Input id={id} className="font-mono uppercase" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} />}</Field>}
             <Field label="Name" error={err('name')} className={isNew ? undefined : 'sm:col-span-2'}>{(id) => <Input id={id} placeholder="e.g. Makati Branch" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />}</Field>

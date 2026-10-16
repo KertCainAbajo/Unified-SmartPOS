@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Pos;
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\Register;
 use App\Models\Tenant;
@@ -58,6 +59,11 @@ class RegisterController extends Controller
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+
+        // A cashier selling on this register would be locked out mid-shift.
+        if (($data['is_active'] ?? true) === false && $register->openSession()->exists()) {
+            throw new BusinessRuleException('Close the open shift on this register before deactivating it.', 'REGISTER_IN_USE');
+        }
 
         $original = $register->getOriginal();
         $register->fill($data)->save();

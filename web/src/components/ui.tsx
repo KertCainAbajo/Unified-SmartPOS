@@ -441,6 +441,8 @@ export function Modal({
   icon?: LucideIcon;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -454,6 +456,8 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();
@@ -471,8 +475,8 @@ export function Modal({
                 </span>
               )}
               <div className="min-w-0">
-                <h2 className="truncate font-display font-semibold text-slate-900">{title}</h2>
-                {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+                <h2 id={titleId} className="truncate font-display font-semibold text-slate-900">{title}</h2>
+                {description && <p id={descriptionId} className="mt-0.5 text-xs text-slate-500">{description}</p>}
               </div>
             </div>
             <button type="button" onClick={onClose} aria-label="Close" className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">

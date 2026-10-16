@@ -7,6 +7,7 @@ use App\Http\Resources\StockMovementResource;
 use App\Models\Branch;
 use App\Models\Tenant;
 use App\Services\Inventory\StockAdjustmentService;
+use App\Support\Money;
 use App\Support\Permissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,7 +88,12 @@ class InventoryController extends Controller
                 DB::raw('COALESCE(inventory.quantity, 0) as quantity'),
                 DB::raw('COALESCE(inventory.reorder_level, products.reorder_level) as reorder_level'),
             ])
-            ->paginate($this->perPage($request, 50));
+            ->paginate($this->perPage($request, 50))
+            ->through(fn ($row) => [
+                ...(array) $row,
+                'quantity' => Money::fromDatabase($row->quantity, 3),
+                'reorder_level' => Money::fromDatabase($row->reorder_level, 3),
+            ]);
 
         return response()->json($rows);
     }

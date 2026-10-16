@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // Browser tests in e2e/ run with Playwright (npm run e2e), not Vitest.
+      exclude: ['e2e/**', 'node_modules/**'],
     },
   };
 });

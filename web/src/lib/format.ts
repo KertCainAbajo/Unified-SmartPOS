@@ -3,8 +3,9 @@
  * as strings, never converted through floating point.
  */
 
-export function formatMoney(value: string | null | undefined, currencySymbol = '₱'): string {
-  if (value === null || value === undefined || value === '') return '—';
+export function formatMoney(input: string | number | null | undefined, currencySymbol = '₱'): string {
+  if (input === null || input === undefined || input === '') return '—';
+  const value = typeof input === 'number' ? input.toFixed(2) : input;
   const negative = value.startsWith('-');
   const [intPart, fracPart = ''] = value.replace('-', '').split('.');
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -13,8 +14,9 @@ export function formatMoney(value: string | null | undefined, currencySymbol = '
 }
 
 /** Trim trailing zeros from a 3-decimal quantity: "2.000" → "2", "1.250" → "1.25". */
-export function formatQty(value: string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '—';
+export function formatQty(input: string | number | null | undefined): string {
+  if (input === null || input === undefined || input === '') return '—';
+  const value = String(input);
   if (!value.includes('.')) return value;
   return value.replace(/\.?0+$/, '');
 }

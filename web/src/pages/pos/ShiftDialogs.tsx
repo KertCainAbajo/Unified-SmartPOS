@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { AlertTriangle, Check, Info, Lock, Monitor, Play, ReceiptText, Store } from 'lucide-react';
 import { useTenant } from '../../tenant/TenantProvider';
 import { Badge, Button, ErrorBanner, Modal, cx } from '../../components/ui';
@@ -59,7 +59,7 @@ export function OpenShiftCard({ registers, branchName }: { registers: Register[]
               className="space-y-6"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (registerId) open.mutate({ register_id: registerId, opening_float: float });
+                if (registerId) open.mutate({ register_id: registerId, opening_float: float || '0' });
               }}
             >
               <div>
@@ -84,10 +84,17 @@ export function OpenShiftCard({ registers, branchName }: { registers: Register[]
               </div>
 
               <div>
-                <label htmlFor="opening-float" className="mb-2 block text-sm font-medium text-slate-700">Opening float</label>
+                <label htmlFor="opening-float" className="block text-sm font-medium text-slate-700">Opening float <span className="font-normal text-slate-400">(cash already in the drawer)</span></label>
+                <p className="mb-2 mt-0.5 text-xs text-slate-500">Count the bills and coins in the drawer before your first sale. It is change money, not sales. At closing, the system expects this amount plus your cash sales. Enter 0 if the drawer is empty.</p>
                 <div className="flex h-14 items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-100">
                   <span className="font-display text-2xl font-bold text-slate-400">₱</span>
-                  <input id="opening-float" inputMode="decimal" value={float} onChange={(e) => setFloat(e.target.value)} className="h-full w-full bg-transparent px-2 font-display text-2xl font-bold tabular-nums outline-none" />
+                  <input id="opening-float" inputMode="decimal" placeholder="0.00" value={float}
+                    onChange={(e) => {
+                      // Digits with up to 2 decimals, at most ₱9,999,999.99 (the server limit).
+                      const v = e.target.value.replace(/[^\d.]/g, '');
+                      if (/^\d{0,7}(\.\d{0,2})?$/.test(v)) setFloat(v);
+                    }}
+                    className="h-full w-full bg-transparent px-2 font-display text-2xl font-bold tabular-nums outline-none placeholder:text-slate-300" />
                 </div>
                 {fieldErr('opening_float') && <p className="mt-1 text-xs text-red-600">{fieldErr('opening_float')}</p>}
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -129,7 +136,7 @@ export function ShiftSummaryView({ summary }: { summary: ShiftSummary }) {
       <div className="border-t border-slate-100 pt-3">
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">Payments</p>
         {summary.payments_by_method.length === 0 && <p className="text-sm text-slate-500">No payments.</p>}
-        {summary.payments_by_method.map((p) => row(`${titleCase(p.method)} (${p.count})`, formatMoney(p.amount)))}
+        {summary.payments_by_method.map((p) => <Fragment key={p.method}>{row(`${titleCase(p.method)} (${p.count})`, formatMoney(p.amount))}</Fragment>)}
       </div>
       <div className="border-t border-slate-100 pt-3">
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">Cash drawer</p>
