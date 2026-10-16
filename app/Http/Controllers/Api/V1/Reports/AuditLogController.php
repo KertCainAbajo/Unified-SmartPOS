@@ -41,6 +41,7 @@ class AuditLogController extends Controller
                     ? $q->where('action', 'like', str_replace(['%', '_'], ['\%', '\_'], rtrim($action, '*')).'%')
                     : $q->where('action', $action);
             })
+            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->when($request->filled('user_id'), fn ($q) => $q->where('user_id', $request->integer('user_id')))
             ->when($request->filled('auditable_type'), fn ($q) => $q->where('auditable_type', $request->string('auditable_type')))
             ->when($request->filled('auditable_id'), fn ($q) => $q->where('auditable_id', $request->integer('auditable_id')))

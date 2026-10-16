@@ -67,15 +67,14 @@ const dayParts = (iso: string) => {
 };
 
 export function ExpensesPage() {
-  const { can, branches } = useTenant();
+  const { can, branchName, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [from, setFrom] = useState(firstOfMonthManila());
   const [to, setTo] = useState(todayManila());
   const [adding, setAdding] = useState(false);
-  const list = useTenantQuery<Paginated<Expense>>('/expenses', { date_from: from, date_to: to, page });
+  const list = useTenantQuery<Paginated<Expense>>('/expenses', { date_from: from, date_to: to, branch_id: scopeBranchId, page });
   const categories = useTenantQuery<{ data: ExpenseCategory[] }>('/expense-categories');
   const remove = useTenantMutation<number>('DELETE', (id) => `/expenses/${id}`, { success: 'Expense deleted.' });
-  const branchName = (id: number | null) => (id === null ? 'Business-wide' : branches.find((b) => b.id === id)?.name ?? `#${id}`);
 
   if (!can('expenses.view')) return <NoAccess what="expenses" />;
 

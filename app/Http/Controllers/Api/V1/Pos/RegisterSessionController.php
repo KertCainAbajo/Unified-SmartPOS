@@ -23,7 +23,7 @@ class RegisterSessionController extends Controller
 {
     public function __construct(private readonly RegisterSessionService $sessions) {}
 
-    /** Own shifts, or all shifts in authorized branches with `shifts.view_all`. Filter by `status`, `register_id`. */
+    /** Own shifts, or all shifts in authorized branches with `shifts.view_all`. Filter by `status`, `register_id`, `branch_id`. */
     public function index(Request $request, Tenant $tenant): AnonymousResourceCollection
     {
         $context = $this->tenantContext();
@@ -32,6 +32,7 @@ class RegisterSessionController extends Controller
         $sessions = $this->scopeToAccessibleBranches($tenant->registerSessions())
             ->when(! $context->can(Permissions::SHIFTS_VIEW_ALL), fn ($q) => $q->where('opened_by', $request->user()->id))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->when($request->filled('register_id'), fn ($q) => $q->where('register_id', $request->integer('register_id')))
             ->latest('id')
             ->paginate($this->perPage($request));

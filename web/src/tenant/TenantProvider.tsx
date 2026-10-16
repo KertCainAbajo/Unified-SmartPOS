@@ -13,8 +13,16 @@ interface TenantValue {
   roles: string[];
   branches: Branch[];
   allBranches: boolean;
+  /** The branch you work in (POS, stock adjustments, new records). Always a real branch. */
   branch: Branch | null;
-  setBranchId: (id: number) => void;
+  /** True when the branch switcher is on "All branches": lists show every authorized branch. */
+  viewAll: boolean;
+  /** Branch id to filter lists by, or undefined for all authorized branches. */
+  scopeBranchId: number | undefined;
+  /** Pick a branch, or 'all' to view every authorized branch at once. */
+  setBranchId: (id: number | 'all') => void;
+  /** Display name of a branch id (null = business-wide). */
+  branchName: (id: number | null | undefined) => string;
   can: (permission: string) => boolean;
   /** Prefix a tenant-relative API path: path('/products') → '/tenants/1/products'. */
   path: (relative: string) => string;
@@ -23,6 +31,15 @@ interface TenantValue {
 const TenantContext = createContext<TenantValue | null>(null);
 
 const storageKey = (tenantId: number) => `smartpos.branch.${tenantId}`;
+const viewAllKey = (tenantId: number) => `smartpos.branch-view-all.${tenantId}`;
+
+function readViewAll(tenantId: number): boolean {
+  try {
+    return localStorage.getItem(viewAllKey(tenantId)) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function readStoredBranch(tenantId: number): number | null {
   try {
@@ -49,6 +66,7 @@ export function useTenantContextQuery(tenantId: number) {
 
 export function TenantProvider({ data, tenantId, children }: { data: TenantContextData; tenantId: number; children: ReactNode }) {
   const [branchId, setBranchIdState] = useState<number | null>(() => readStoredBranch(tenantId));
+  const [viewAllState, setViewAll] = useState(() => readViewAll(tenantId));
 
   // This device now belongs to this business: staff here sign in with just username / employee ID.
   useEffect(() => {
@@ -63,10 +81,12 @@ export function TenantProvider({ data, tenantId, children }: { data: TenantConte
   }, [data.branches, branchId]);
 
   const setBranchId = useCallback(
-    (id: number) => {
-      setBranchIdState(id);
+    (id: number | 'all') => {
+      setViewAll(id === 'all');
+      if (id !== 'all') setBranchIdState(id);
       try {
-        localStorage.setItem(storageKey(tenantId), String(id));
+        localStorage.setItem(viewAllKey(tenantId), id === 'all' ? '1' : '0');
+        if (id !== 'all') localStorage.setItem(storageKey(tenantId), String(id));
       } catch {
         // Storage unavailable (private mode); the choice simply is not remembered.
       }
@@ -76,6 +96,9 @@ export function TenantProvider({ data, tenantId, children }: { data: TenantConte
 
   const value = useMemo<TenantValue>(() => {
     const permissions = new Set(data.permissions);
+    const branch = data.branches.find((b) => b.id === branchId) ?? data.branches[0] ?? null;
+    // "All branches" only makes sense when there is more than one to look at.
+    const viewAll = viewAllState && data.branches.length > 1;
     return {
       tenantId,
       tenant: data.tenant,
@@ -84,12 +107,15 @@ export function TenantProvider({ data, tenantId, children }: { data: TenantConte
       roles: data.roles,
       branches: data.branches,
       allBranches: data.all_branches,
-      branch: data.branches.find((b) => b.id === branchId) ?? data.branches[0] ?? null,
+      branch,
+      viewAll,
+      scopeBranchId: viewAll ? undefined : branch?.id,
       setBranchId,
+      branchName: (id) => (id === null || id === undefined ? 'Business-wide' : data.branches.find((b) => b.id === id)?.name ?? `Branch #${id}`),
       can: (permission: string) => permissions.has(permission),
       path: (relative: string) => `/tenants/${tenantId}${relative}`,
     };
-  }, [data, tenantId, branchId, setBranchId]);
+  }, [data, tenantId, branchId, viewAllState, setBranchId]);
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
 }

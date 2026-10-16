@@ -48,20 +48,27 @@ const marginOf = (price: string | number | undefined, cost: string | number | un
   return ((p - c) / p) * 100;
 };
 
-type StockLevel = { qty: number; level: 'out' | 'low' | 'ok' | 'untracked' };
+type StockLevel = { qty: number; level: 'out' | 'low' | 'ok' | 'untracked'; perBranch?: { branch_id: number; qty: number }[] };
 
-function stockOf(product: Product, branchId: number | undefined): StockLevel {
+/** Stock at one branch, or (branchId undefined) the total across branches; low if any branch is low. */
+function stockOf(product: Product, branchId: number | undefined, branchIds?: number[]): StockLevel {
   if (!product.track_inventory) return { qty: 0, level: 'untracked' };
-  const qty = Number(product.stock?.find((s) => s.branch_id === branchId)?.quantity ?? 0);
   const reorder = Number(product.reorder_level);
+  if (branchId === undefined) {
+    const perBranch = (branchIds ?? []).map((id) => ({ branch_id: id, qty: Number(product.stock?.find((s) => s.branch_id === id)?.quantity ?? 0) }));
+    const qty = perBranch.reduce((s, b) => s + b.qty, 0);
+    const anyLow = perBranch.some((b) => b.qty <= reorder);
+    return { qty, perBranch, level: qty <= 0 ? 'out' : anyLow ? 'low' : 'ok' };
+  }
+  const qty = Number(product.stock?.find((s) => s.branch_id === branchId)?.quantity ?? 0);
   return { qty, level: qty <= 0 ? 'out' : qty <= reorder ? 'low' : 'ok' };
 }
 
 /** Downloads the listed products as a CSV file. */
-function exportCsv(rows: Product[], branchId: number | undefined, withCost: boolean) {
+function exportCsv(rows: Product[], branchId: number | undefined, branchIds: number[], withCost: boolean) {
   const header = ['Name', 'SKU', 'Barcode', 'Category', 'Tax', 'Price', ...(withCost ? ['Cost'] : []), 'Stock', 'Unit', 'Reorder level', 'Status'];
   const lines = rows.map((p) => {
-    const stock = stockOf(p, branchId);
+    const stock = stockOf(p, branchId, branchIds);
     return [
       p.name, p.sku, p.barcode ?? '', p.category?.name ?? '', TAX[p.tax_type]?.label ?? p.tax_type, p.price,
       ...(withCost ? [p.cost_price ?? ''] : []),
@@ -76,7 +83,9 @@ function exportCsv(rows: Product[], branchId: number | undefined, withCost: bool
 }
 
 export function ProductsPage() {
-  const { can, branch } = useTenant();
+  const { can, branch, branches, viewAll, scopeBranchId } = useTenant();
+  const branchIds = branches.map((b) => b.id);
+  const scopeName = viewAll ? `all ${branches.length} branches` : branch?.name ?? 'the selected branch';
   const [page, setPage] = useState(1);
   const [term, setTerm] = useState('');
   const [status, setStatus] = useState('active');
@@ -97,11 +106,11 @@ export function ProductsPage() {
   const rows = list.data?.data ?? [];
   const total = list.data?.meta?.total ?? list.data?.total ?? rows.length;
   const partial = total > rows.length;
-  const levels = rows.map((p) => stockOf(p, branch?.id).level);
+  const levels = rows.map((p) => stockOf(p, scopeBranchId, branchIds).level);
   const low = levels.filter((l) => l === 'low').length;
   const out = levels.filter((l) => l === 'out').length;
   const filtered = term.trim() !== '' || categoryId !== '' || status !== 'active';
-  const pageNote = partial ? 'On this page' : `At ${branch?.name ?? 'this branch'}`;
+  const pageNote = partial ? 'On this page' : `Across ${scopeName}`;
   const resetFilters = () => { setTerm(''); setCategoryId(''); setStatus('active'); setPage(1); };
 
   return (
@@ -111,13 +120,13 @@ export function ProductsPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">Stock</p>
           <h1 className="mt-1 font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand-900">Products</h1>
-          <p className="mt-1 text-sm text-slate-500">One catalog for every branch. Stock levels are for <span className="font-medium text-slate-700">{branch?.name ?? 'the selected branch'}</span>.</p>
+          <p className="mt-1 text-sm text-slate-500">One catalog for every branch. Stock levels are for <span className="font-medium text-slate-700">{scopeName}</span>.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={rows.length === 0}
-            onClick={() => exportCsv(rows, branch?.id, canPrice)}
+            onClick={() => exportCsv(rows, scopeBranchId, branchIds, canPrice)}
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-brand-800 shadow-sm ring-1 ring-slate-900/5 transition hover:bg-brand-50 hover:ring-brand-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="size-4" /> Export CSV
@@ -205,14 +214,14 @@ export function ProductsPage() {
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Tax</th>
                   <th scope="col" className="px-3 py-3 text-right font-semibold">Price</th>
                   {canPrice && <th scope="col" className="px-3 py-3 text-right font-semibold">Cost · Margin</th>}
-                  <th scope="col" className="px-3 py-3 text-left font-semibold">Stock ({branch?.code ?? '—'})</th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">{viewAll ? 'Stock (all branches)' : `Stock (${branch?.code ?? '—'})`}</th>
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Status</th>
                   <th scope="col" className="pr-5 text-right font-semibold"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((p) => {
-                  const stock = stockOf(p, branch?.id);
+                  const stock = stockOf(p, scopeBranchId, branchIds);
                   const margin = marginOf(p.price, p.cost_price);
                   const archived = p.status !== 'active';
                   const tax = TAX[p.tax_type];
@@ -323,6 +332,8 @@ function Stat({ Icon, label, value, note, tint }: { Icon: LucideIcon; label: str
 
 /** Quantity with a small bar against twice the reorder level, and a Low / Out badge. */
 function StockCell({ product, stock }: { product: Product; stock: StockLevel }) {
+  const { branches, branchName } = useTenant();
+  const branchCode = (id: number) => branches.find((b) => b.id === id)?.code ?? branchName(id);
   if (stock.level === 'untracked') return <span className="text-xs text-slate-400">Not tracked</span>;
   const reorder = Number(product.reorder_level);
   const scale = Math.max(reorder * 2, stock.qty, 1);
@@ -340,9 +351,19 @@ function StockCell({ product, stock }: { product: Product; stock: StockLevel }) 
           </span>
         )}
       </div>
-      <div className="mt-1.5 h-1 w-28 overflow-hidden rounded-full bg-slate-100" title={`Reorder level ${formatQty(product.reorder_level)} ${product.unit}`}>
-        <div className={cx('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${fill}%` }} />
-      </div>
+      {stock.perBranch ? (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {stock.perBranch.map((b) => (
+            <span key={b.branch_id} title={branchName(b.branch_id)} className={cx('rounded px-1.5 py-px text-[10px] font-medium tabular-nums ring-1 ring-inset', b.qty <= 0 ? 'bg-rose-50 text-rose-600 ring-rose-200' : b.qty <= reorder ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200')}>
+              {branchCode(b.branch_id)} {formatQty(String(b.qty))}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-1.5 h-1 w-28 overflow-hidden rounded-full bg-slate-100" title={`Reorder level ${formatQty(product.reorder_level)} ${product.unit}`}>
+          <div className={cx('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${fill}%` }} />
+        </div>
+      )}
     </div>
   );
 }

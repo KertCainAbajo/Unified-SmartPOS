@@ -1,6 +1,7 @@
 import { KeyRound, Plus, Printer } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Badge, Button, Card, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Pagination, Select, Tabs, Textarea } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
 import { formatDate, formatDateTime, titleCase } from '../../lib/format';
@@ -60,13 +61,13 @@ export const toCredentials = (r: IssuedResponse): Credentials => ({
 });
 
 function MembersTab() {
-  const { can, tenant } = useTenant();
+  const { can, tenant, viewAll, scopeBranchId } = useTenant();
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const list = useTenantQuery<Paginated<StaffMember>>('/staff', { page, status });
+  const list = useTenantQuery<Paginated<StaffMember>>('/staff', { page, status, branch_id: scopeBranchId });
 
   return (
     <Card
@@ -93,7 +94,14 @@ function MembersTab() {
           { header: 'Name', cell: (m) => <><p className="font-medium text-slate-900">{m.name ?? m.email}{m.user_id === tenant.owner_user_id && <span className="ml-2 text-xs text-teal-700">Owner</span>}{m.user_id === user?.id && <span className="ml-2 text-xs text-slate-400">You</span>}</p><p className="text-xs text-slate-500">{m.username ?? m.email}</p></> },
           { header: 'Employee ID', cell: (m) => m.employee_code ?? '—' },
           { header: 'Roles', cell: (m) => m.roles?.map((r) => r.name).join(', ') },
-          { header: 'Branches', cell: (m) => (m.all_branches ? 'All branches' : m.branches?.map((b) => b.name).join(', ') || 'None') },
+          {
+            header: 'Branches',
+            cell: (m) => m.all_branches
+              ? <span className="inline-flex items-center rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-200">All branches</span>
+              : m.branches?.length
+                ? <span className="flex flex-wrap gap-1">{m.branches.map((b) => <BranchTag key={b.id} id={b.id} className={!viewAll && b.id === scopeBranchId ? 'bg-brand-50 text-brand-800 ring-brand-200' : undefined} />)}</span>
+                : <span className="text-slate-400">None</span>,
+          },
           { header: 'Status', cell: (m) => <>{<Badge status={m.status} />}{m.must_change_password && <span className="ml-2 text-xs text-amber-700">First sign-in pending</span>}</> },
         ]}
       />

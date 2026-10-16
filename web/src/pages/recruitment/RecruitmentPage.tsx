@@ -2,6 +2,7 @@ import { Copy, Download, Plus, Printer } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { HiringSteps } from '../../components/HiringSteps';
 import { useToast } from '../../components/Toast';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Badge, Button, Card, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Pagination, Select, Tabs, Textarea } from '../../components/ui';
 import { ApiError, downloadFile } from '../../lib/api';
 import { formatDate, formatDateTime, formatMoney, titleCase } from '../../lib/format';
@@ -76,12 +77,13 @@ export function RecruitmentPage() {
 /* =========================================================================== Applications */
 
 function ApplicationsTab() {
+  const { scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
   const [openId, setOpenId] = useState<number | null>(null);
-  const list = useTenantQuery<Paginated<JobApplication>>('/applications', { page, status, q });
+  const list = useTenantQuery<Paginated<JobApplication>>('/applications', { page, status, q, branch_id: scopeBranchId });
 
   return (
     <Card
@@ -105,7 +107,7 @@ function ApplicationsTab() {
         empty="No applications yet. Share your careers page link so people can apply."
         columns={[
           { header: 'Applicant', cell: (a) => <><p className="font-medium text-slate-900">{a.name}</p><p className="text-xs text-slate-500">{a.reference} · {a.email}</p></> },
-          { header: 'Position', cell: (a) => <>{a.vacancy?.title}<p className="text-xs text-slate-500">{a.branch?.name}</p></> },
+          { header: 'Position', cell: (a) => <>{a.vacancy?.title}<p className="mt-0.5"><BranchTag id={a.branch_id} /></p></> },
           { header: 'Stage', cell: (a) => <Badge status={STATUS_TONE[a.status] ?? 'draft'}>{a.status_label}</Badge> },
           { header: 'Applied', cell: (a) => formatDate(a.created_at) },
         ]}
@@ -571,8 +573,8 @@ function Onboarding({ app, onProvisioned }: { app: JobApplication; onProvisioned
 /* =========================================================================== Vacancies */
 
 function VacanciesTab() {
-  const { can } = useTenant();
-  const list = useTenantQuery<{ data: Vacancy[] }>('/vacancies');
+  const { can, scopeBranchId } = useTenant();
+  const list = useTenantQuery<{ data: Vacancy[] }>('/vacancies', { branch_id: scopeBranchId });
   const [editing, setEditing] = useState<Vacancy | 'new' | null>(null);
   return (
     <Card padded={false} actions={can('recruitment.vacancies') ? <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setEditing('new')}>New vacancy</Button> : undefined}>
@@ -585,7 +587,7 @@ function VacanciesTab() {
         empty="No vacancies yet."
         columns={[
           { header: 'Position', cell: (v) => <span className="font-medium text-slate-900">{v.title}</span> },
-          { header: 'Branch', cell: (v) => v.branch?.name },
+          { header: 'Branch', cell: (v) => <BranchTag id={v.branch_id} /> },
           { header: 'Role on hire', cell: (v) => v.role?.name },
           { header: 'Applications', cell: (v) => v.applications_count ?? 0, align: 'right' },
           { header: 'Status', cell: (v) => <Badge status={v.status} /> },

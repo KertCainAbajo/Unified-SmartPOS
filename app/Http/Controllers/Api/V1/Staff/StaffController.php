@@ -38,7 +38,8 @@ class StaffController extends Controller
         $members = $this->staff->visibleMemberships()
             ->with(self::RELATIONS)
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('branch_id'), fn ($q) => $q->whereHas('branches', fn ($b) => $b->where('branches.id', $request->integer('branch_id'))))
+            ->when($request->filled('branch_id'), fn ($q) => $q->where(fn ($w) => $w->where('all_branches', true)
+                ->orWhereHas('branches', fn ($b) => $b->where('branches.id', $request->integer('branch_id')))))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
                 $q->where(fn ($w) => $w->where('employee_code', 'like', $term)

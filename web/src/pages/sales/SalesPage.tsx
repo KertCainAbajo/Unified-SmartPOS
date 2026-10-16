@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
 import { ErrorBanner, Pagination, cx } from '../../components/ui';
 import { formatMoney, todayManila } from '../../lib/format';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
@@ -22,7 +23,7 @@ import type { Paginated, Sale } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
 
-type Filters = { date_from: string; date_to: string; status: string; branch_id: string; receipt_number: string };
+type Filters = { date_from: string; date_to: string; status: string; receipt_number: string };
 
 const addDays = (isoDate: string, days: number): string => {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -104,12 +105,12 @@ function exportCsv(rows: Sale[]) {
 }
 
 export function SalesPage() {
-  const { can, tenantId, branches, branch } = useTenant();
+  const { can, tenantId, viewAll, scopeBranchId } = useTenant();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<Filters>({ date_from: '', date_to: '', status: '', branch_id: String(branch?.id ?? ''), receipt_number: '' });
+  const [filters, setFilters] = useState<Filters>({ date_from: '', date_to: '', status: '', receipt_number: '' });
   const receipt = useDebounced(filters.receipt_number.trim());
-  const list = useTenantQuery<Paginated<Sale>>('/sales', { ...filters, receipt_number: receipt || undefined, page });
+  const list = useTenantQuery<Paginated<Sale>>('/sales', { ...filters, branch_id: scopeBranchId, receipt_number: receipt || undefined, page });
 
   if (!can('sales.view') && !can('sales.view_all')) return <NoAccess what="sales" />;
   const set = (patch: Partial<Filters>) => {
@@ -132,7 +133,6 @@ export function SalesPage() {
   const partial = total > rows.length;
   const refundShare = gross > 0 ? Math.min(100, (refunds / gross) * 100) : 0;
   const scope = partial ? 'This page' : filtered ? 'Matching your filters' : 'All recorded sales';
-  const branchName = filters.branch_id ? branches.find((b) => String(b.id) === filters.branch_id)?.name : 'All branches';
   const periodLabel = activePeriod && activePeriod.key !== 'all'
     ? activePeriod.label
     : filters.date_from || filters.date_to
@@ -158,8 +158,8 @@ export function SalesPage() {
           <span className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-3.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-900/5">
             <CalendarDays className="size-3.5 text-brand-600" />
             <span className="font-semibold text-slate-800">{periodLabel}</span>
-            {branches.length > 1 && <><span className="text-slate-300">•</span>{branchName}</>}
           </span>
+          <ScopeChip />
           <button
             type="button"
             disabled={rows.length === 0}
@@ -215,15 +215,6 @@ export function SalesPage() {
             <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
               <Pills label="Status" value={filters.status} onChange={(status) => set({ status })}
                 options={[{ value: '', label: 'All' }, { value: 'completed', label: 'Completed' }, { value: 'voided', label: 'Voided' }]} />
-              <select
-                className="h-10 cursor-pointer rounded-xl bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none ring-1 ring-slate-200 transition hover:bg-white focus:bg-white focus:ring-2 focus:ring-brand-500"
-                value={filters.branch_id}
-                onChange={(e) => set({ branch_id: e.target.value })}
-                aria-label="Branch"
-              >
-                <option value="">All my branches</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
             </div>
           </div>
 
@@ -268,6 +259,7 @@ export function SalesPage() {
                 <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Receipt</th>
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Time</th>
+                  {viewAll && <th scope="col" className="px-3 py-3 text-left font-semibold">Branch</th>}
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Cashier</th>
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Discount</th>
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Status</th>
@@ -278,7 +270,7 @@ export function SalesPage() {
               {groupByDay(rows).map((day) => (
                 <tbody key={day.date} className="border-b border-slate-100 last:border-b-0">
                   <tr className="bg-gradient-to-r from-brand-50/70 via-slate-50/60 to-slate-50/30">
-                    <th scope="colgroup" colSpan={4} className="py-2.5 pl-5 pr-3 text-left">
+                    <th scope="colgroup" colSpan={viewAll ? 5 : 4} className="py-2.5 pl-5 pr-3 text-left">
                       <span className="inline-flex items-center gap-2.5">
                         <span className="grid size-7 place-items-center rounded-lg bg-white text-brand-600 shadow-sm ring-1 ring-slate-900/5">
                           <CalendarDays className="size-3.5" />
@@ -319,6 +311,7 @@ export function SalesPage() {
                           </span>
                         </td>
                         <td className="px-3 py-3.5 tabular-nums text-slate-500">{timeOf(sale.sold_at)}</td>
+                        {viewAll && <td className="px-3 py-3.5"><BranchTag id={sale.branch_id} /></td>}
                         <td className="px-3 py-3.5">
                           {cashier ? (
                             <span className="inline-flex items-center gap-2.5">

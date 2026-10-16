@@ -1,6 +1,7 @@
 import { Check, ClipboardList, FileText, Mail, PackageCheck, Phone, Plus, RotateCcw, ShoppingBag, Truck, Users, XCircle } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { LineItem, LineList, ProductSearch, QtyInput } from '../../components/ProductSearch';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Avatar, Badge, Button, Checkbox, EmptyState, ErrorBanner, Field, FormSection, Input, LoadingRows, Modal, PageHeader, Pagination, Segmented, Select, Tabs, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatDate, formatDateTime, formatMoney, formatQty } from '../../lib/format';
@@ -12,7 +13,7 @@ import { NoAccess } from '../NotFoundPage';
 type Tab = 'orders' | 'receipts' | 'suppliers';
 
 export function PurchasingPage() {
-  const { can, branch } = useTenant();
+  const { can, branch, branches, viewAll } = useTenant();
   const [tab, setTab] = useState<Tab>(can('purchasing.view') ? 'orders' : 'suppliers');
   if (!can('purchasing.view') && !can('suppliers.view')) return <NoAccess what="purchasing" />;
 
@@ -26,7 +27,7 @@ export function PurchasingPage() {
       <PageHeader
         eyebrow="Purchasing"
         title="Purchasing"
-        description={<>Order from suppliers and receive goods into stock at <strong className="font-semibold text-slate-700">{branch?.name ?? 'your branch'}</strong>. Receipts update average cost.</>}
+        description={<>Order from suppliers and receive goods into stock at <strong className="font-semibold text-slate-700">{viewAll ? `all ${branches.length} branches` : branch?.name ?? 'your branch'}</strong>. Receipts update average cost.</>}
       />
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       <div key={tab} className="auth-fade">
@@ -50,12 +51,12 @@ const Panel = ({ toolbar, children }: { toolbar?: ReactNode; children: ReactNode
 const PO_FLOW = ['draft', 'ordered', 'received'] as const;
 
 function OrdersTab() {
-  const { can, branch } = useTenant();
+  const { can, viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  const list = useTenantQuery<Paginated<PurchaseOrder>>('/purchase-orders', { status, branch_id: branch?.id, page });
+  const list = useTenantQuery<Paginated<PurchaseOrder>>('/purchase-orders', { status, branch_id: scopeBranchId, page });
   const rows = list.data?.data ?? [];
 
   return (
@@ -79,7 +80,7 @@ function OrdersTab() {
                 <Avatar name={o.supplier?.name ?? '?'} square />
                 <span className="min-w-40 flex-1">
                   <span className="block font-medium text-slate-900">{o.supplier?.name ?? 'Unknown supplier'}</span>
-                  <span className="block text-xs text-slate-400"><span className="font-mono">{o.reference}</span> · ordered {formatDate(o.order_date)}{o.expected_date && <> · due {formatDate(o.expected_date)}</>}</span>
+                  <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-400">{viewAll && <BranchTag id={o.branch_id} className="mr-1" />}<span className="font-mono">{o.reference}</span> · ordered {formatDate(o.order_date)}{o.expected_date && <> · due {formatDate(o.expected_date)}</>}</span>
                 </span>
                 <Badge status={o.status} />
                 <span className="w-32 text-right font-display font-semibold tabular-nums text-slate-900">{formatMoney(o.total)}</span>
@@ -245,7 +246,9 @@ function ReceiveModal({ order, onClose }: { order: PurchaseOrder; onClose: () =>
 }
 
 function CreateOrder({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { branch } = useTenant();
+  const { branch: working, branches } = useTenant();
+  const [branchId, setBranchId] = useState<number | undefined>(working?.id);
+  const branch = branches.find((b) => b.id === (branchId ?? working?.id)) ?? working;
   const suppliers = useTenantQuery<Paginated<Supplier>>('/suppliers', { active_only: 1, per_page: 100 }, { enabled: open });
   const [supplierId, setSupplierId] = useState('');
   const [expected, setExpected] = useState('');
@@ -268,6 +271,7 @@ function CreateOrder({ open, onClose }: { open: boolean; onClose: () => void }) 
         <ErrorBanner error={create.error} />
         <FormSection title="Supplier">
           <div className="grid gap-4 sm:grid-cols-2">
+            {branches.length > 1 && <Field label="Deliver to" className="sm:col-span-2">{(id) => <Select id={id} value={branch?.id ?? ''} onChange={(e) => setBranchId(Number(e.target.value))}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>}
             <Field label="Supplier">{(id) => <Select id={id} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}><option value="">Choose…</option>{suppliers.data?.data.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>}</Field>
             <Field label="Expected delivery">{(id) => <Input id={id} type="date" value={expected} onChange={(e) => setExpected(e.target.value)} />}</Field>
           </div>
@@ -292,9 +296,9 @@ function CreateOrder({ open, onClose }: { open: boolean; onClose: () => void }) 
 /* ------------------------------------------------------------------ Receipts */
 
 function ReceiptsTab() {
-  const { branch } = useTenant();
+  const { viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
-  const list = useTenantQuery<Paginated<{ id: number; reference: string; purchase_order_id: number | null; supplier: { name: string } | null; supplier_invoice_number: string | null; received_at: string; total_cost: string; items: unknown[] }>>('/goods-receipts', { branch_id: branch?.id, page });
+  const list = useTenantQuery<Paginated<{ id: number; branch_id: number; reference: string; purchase_order_id: number | null; supplier: { name: string } | null; supplier_invoice_number: string | null; received_at: string; total_cost: string; items: unknown[] }>>('/goods-receipts', { branch_id: scopeBranchId, page });
   const rows = list.data?.data ?? [];
 
   return (
@@ -308,7 +312,7 @@ function ReceiptsTab() {
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><PackageCheck className="size-5" /></span>
               <span className="min-w-40 flex-1">
                 <span className="block font-medium text-slate-900">{r.supplier?.name ?? 'Direct receipt'}</span>
-                <span className="block text-xs text-slate-400"><span className="font-mono">{r.reference}</span> · {formatDateTime(r.received_at)}</span>
+                <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-400">{viewAll && <BranchTag id={r.branch_id} className="mr-1" />}<span className="font-mono">{r.reference}</span> · {formatDateTime(r.received_at)}</span>
               </span>
               {r.supplier_invoice_number && <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200"><FileText className="size-3.5 text-slate-400" />{r.supplier_invoice_number}</span>}
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{r.items.length} {r.items.length === 1 ? 'line' : 'lines'}</span>

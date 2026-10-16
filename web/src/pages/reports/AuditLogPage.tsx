@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Card, DataTable, Input, Modal, PageHeader, Pagination } from '../../components/ui';
 import { formatDateTime } from '../../lib/format';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
@@ -7,12 +8,12 @@ import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
 
 export function AuditLogPage() {
-  const { can } = useTenant();
+  const { can, viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [action, setAction] = useState('');
   const [selected, setSelected] = useState<AuditLogEntry | null>(null);
   const a = useDebounced(action.trim());
-  const list = useTenantQuery<Paginated<AuditLogEntry>>('/audit-logs', { action: a ? (a.includes('*') || a.includes('.') ? a : `${a}.*`) : undefined, page });
+  const list = useTenantQuery<Paginated<AuditLogEntry>>('/audit-logs', { action: a ? (a.includes('*') || a.includes('.') ? a : `${a}.*`) : undefined, branch_id: scopeBranchId, page });
 
   if (!can('audit_logs.view')) return <NoAccess what="the audit log" />;
 
@@ -34,6 +35,7 @@ export function AuditLogPage() {
             { header: 'When', cell: (r) => formatDateTime(r.created_at) },
             { header: 'Action', cell: (r) => <code className="text-xs">{r.action}</code> },
             { header: 'User', cell: (r) => r.user?.name ?? 'System' },
+            ...(viewAll ? [{ header: 'Branch', cell: (r: AuditLogEntry) => (r.branch_id === null ? <span className="text-xs text-slate-400">Business-wide</span> : <BranchTag id={r.branch_id} />) }] : []),
             { header: 'Record', cell: (r) => (r.auditable_type ? `${r.auditable_type.split('\\').pop()} #${r.auditable_id}` : '—') },
             { header: 'IP', cell: (r) => <span className="text-xs text-slate-500">{r.ip_address}</span> },
           ]}

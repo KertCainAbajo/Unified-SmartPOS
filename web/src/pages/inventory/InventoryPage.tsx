@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { LineItem, LineList, ProductSearch, QtyInput } from '../../components/ProductSearch';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Avatar, Badge, Button, EmptyState, ErrorBanner, Field, FormSection, Input, LoadingRows, Modal, PageHeader, Pagination, SearchField, Select, StatCard, Tabs, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatDateTime, formatMoney, formatQty, titleCase } from '../../lib/format';
@@ -29,13 +30,14 @@ type Tab = 'stock' | 'low' | 'history' | 'counts';
 const totalOf = (p?: { meta?: { total: number }; total?: number; data: unknown[] }) => (p ? p.meta?.total ?? p.total ?? p.data.length : null);
 
 export function InventoryPage() {
-  const { can, branch } = useTenant();
+  const { can, branch, branches, viewAll, scopeBranchId } = useTenant();
+  const scopeName = viewAll ? `all ${branches.length} branches` : branch?.name ?? 'your branch';
   const [tab, setTab] = useState<Tab>('stock');
   const [adjusting, setAdjusting] = useState(false);
   const [counting, setCounting] = useState(false);
-  const tracked = useTenantQuery<Paginated<InventoryRow>>('/inventory', { branch_id: branch?.id, per_page: 1 }, { enabled: can('inventory.view') });
-  const low = useTenantQuery<Paginated<InventoryRow>>('/inventory/low-stock', { branch_id: branch?.id, per_page: 1 }, { enabled: can('inventory.view') });
-  const drafts = useTenantQuery<Paginated<CountRecord>>('/stock-counts', { branch_id: branch?.id, status: 'draft', per_page: 1 }, { enabled: can('inventory.view') });
+  const tracked = useTenantQuery<Paginated<InventoryRow>>('/inventory', { branch_id: scopeBranchId, per_page: 1 }, { enabled: can('inventory.view') });
+  const low = useTenantQuery<Paginated<InventoryRow>>('/inventory/low-stock', { branch_id: scopeBranchId, per_page: 1 }, { enabled: can('inventory.view') });
+  const drafts = useTenantQuery<Paginated<CountRecord>>('/stock-counts', { branch_id: scopeBranchId, status: 'draft', per_page: 1 }, { enabled: can('inventory.view') });
 
   if (!can('inventory.view')) return <NoAccess what="inventory" />;
   const lowCount = totalOf(low.data);
@@ -46,7 +48,7 @@ export function InventoryPage() {
       <PageHeader
         eyebrow="Stock"
         title="Inventory"
-        description={<>Stock at <strong className="font-semibold text-slate-700">{branch?.name ?? 'your branch'}</strong>. Balances change only through recorded movements.</>}
+        description={<>Stock at <strong className="font-semibold text-slate-700">{scopeName}</strong>. Balances change only through recorded movements.</>}
         actions={
           <>
             {can('inventory.count') && <Button variant="secondary" icon={<ClipboardCheck className="size-4" />} onClick={() => setCounting(true)}>Stock count</Button>}
@@ -56,7 +58,7 @@ export function InventoryPage() {
       />
 
       <section className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard tone="featured" icon={Boxes} label="Products tracked" value={totalOf(tracked.data)} hint={`At ${branch?.name ?? 'this branch'}`} />
+        <StatCard tone="featured" icon={Boxes} label="Products tracked" value={totalOf(tracked.data)} hint={viewAll ? 'Product × branch records' : `At ${scopeName}`} />
         <StatCard tone={lowCount ? 'warn' : 'brand'} icon={lowCount ? AlertTriangle : PackageCheck} label="Below reorder level" value={lowCount} hint={lowCount ? 'Time to reorder' : 'Everything is well stocked'} />
         <StatCard tone="sky" icon={ClipboardList} label="Counts in progress" value={draftCount} hint={draftCount ? 'Drafts waiting to be completed' : 'No open counts'} />
       </section>
@@ -114,11 +116,11 @@ function LevelPill({ qty, reorder }: { qty: number; reorder: number }) {
 }
 
 function StockTab() {
-  const { branch } = useTenant();
+  const { viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [term, setTerm] = useState('');
   const q = useDebounced(term);
-  const list = useTenantQuery<Paginated<InventoryRow>>('/inventory', { branch_id: branch?.id, q: q || undefined, page });
+  const list = useTenantQuery<Paginated<InventoryRow>>('/inventory', { branch_id: scopeBranchId, q: q || undefined, page });
   const rows = list.data?.data ?? [];
 
   return (
@@ -128,7 +130,7 @@ function StockTab() {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th><Th right>On hand</Th><Th>Level</Th><Th right>Reorder at</Th><Th>Status</Th></tr></thead>
+            <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th>{viewAll && <Th>Branch</Th>}<Th right>On hand</Th><Th>Level</Th><Th right>Reorder at</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => {
                 const qty = Number(r.quantity);
@@ -138,6 +140,7 @@ function StockTab() {
                 return (
                   <tr key={`${r.branch_id}-${r.product_id}`} className="transition-colors hover:bg-brand-50/40">
                     <td className="py-3 pl-5 pr-3"><ProductCell name={r.name} sku={r.sku} /></td>
+                    {viewAll && <td className="px-3 py-3"><BranchTag id={r.branch_id} /></td>}
                     <td className="px-3 py-3 text-right">
                       <span className={cx('font-display font-semibold tabular-nums', qty < 0 ? 'text-rose-600' : 'text-slate-900')}>{formatQty(r.quantity)}</span>
                       <span className="ml-1 text-xs text-slate-400">{r.unit}</span>
@@ -162,9 +165,9 @@ function StockTab() {
 }
 
 function LowStockTab() {
-  const { branch } = useTenant();
+  const { viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
-  const list = useTenantQuery<Paginated<{ branch_id: number; product_id: number; sku: string; name: string; unit: string; quantity: string; reorder_level: string }>>('/inventory/low-stock', { branch_id: branch?.id, page });
+  const list = useTenantQuery<Paginated<{ branch_id: number; product_id: number; sku: string; name: string; unit: string; quantity: string; reorder_level: string }>>('/inventory/low-stock', { branch_id: scopeBranchId, page });
   const rows = list.data?.data ?? [];
 
   return (
@@ -179,7 +182,7 @@ function LowStockTab() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th><Th right>On hand</Th><Th right>Reorder at</Th><Th right>Short by</Th><Th>Status</Th></tr></thead>
+              <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th>{viewAll && <Th>Branch</Th>}<Th right>On hand</Th><Th right>Reorder at</Th><Th right>Short by</Th><Th>Status</Th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r) => {
                   const qty = Number(r.quantity);
@@ -187,6 +190,7 @@ function LowStockTab() {
                   return (
                     <tr key={`${r.branch_id}-${r.product_id}`} className="transition-colors hover:bg-amber-50/40">
                       <td className="py-3 pl-5 pr-3"><ProductCell name={r.name} sku={r.sku} /></td>
+                      {viewAll && <td className="px-3 py-3"><BranchTag id={r.branch_id} /></td>}
                       <td className="px-3 py-3 text-right"><span className={cx('font-display font-semibold tabular-nums', qty <= 0 ? 'text-rose-600' : 'text-amber-700')}>{formatQty(r.quantity)}</span> <span className="text-xs text-slate-400">{r.unit}</span></td>
                       <td className="px-3 py-3 text-right tabular-nums text-slate-500">{formatQty(r.reorder_level)}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-medium text-slate-700">{formatQty(String(Math.max(0, reorder - qty)))}</td>
@@ -220,10 +224,10 @@ const MOVEMENT_STYLE: Record<string, { icon: LucideIcon; chip: string }> = {
 };
 
 function HistoryTab() {
-  const { branch } = useTenant();
+  const { viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [type, setType] = useState('');
-  const list = useTenantQuery<Paginated<StockMovement>>('/stock-movements', { branch_id: branch?.id, type, page });
+  const list = useTenantQuery<Paginated<StockMovement>>('/stock-movements', { branch_id: scopeBranchId, type, page });
   const rows = list.data?.data ?? [];
 
   return (
@@ -247,7 +251,7 @@ function HistoryTab() {
                   <tr key={m.id} className="transition-colors hover:bg-brand-50/40">
                     <td className="py-3 pl-5 pr-3">
                       <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset', s.chip)}><s.icon className="size-3.5" />{titleCase(m.type)}</span>
-                      <span className="mt-1 block text-xs text-slate-400">{formatDateTime(m.created_at)}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">{formatDateTime(m.created_at)}{viewAll && <BranchTag id={m.branch_id} />}</span>
                     </td>
                     <td className="px-3 py-3">
                       <span className="block font-medium text-slate-900">{m.product?.name ?? `#${m.product_id}`}</span>
@@ -284,10 +288,10 @@ interface CountRecord {
 }
 
 function CountsTab() {
-  const { branch, can } = useTenant();
+  const { can, viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<number | null>(null);
-  const list = useTenantQuery<Paginated<CountRecord>>('/stock-counts', { branch_id: branch?.id, page });
+  const list = useTenantQuery<Paginated<CountRecord>>('/stock-counts', { branch_id: scopeBranchId, page });
   const detail = useTenantQuery<{ data: CountRecord }>(`/stock-counts/${open}`, undefined, { enabled: open !== null });
   const complete = useTenantMutation<number>('POST', (id) => `/stock-counts/${id}/complete`, { success: 'Count completed. Variances posted to stock.' });
   const cancel = useTenantMutation<number>('POST', (id) => `/stock-counts/${id}/cancel`, { success: 'Count cancelled.', onSuccess: () => setOpen(null) });
@@ -307,7 +311,7 @@ function CountsTab() {
                 <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl', c.status === 'draft' ? 'bg-amber-50 text-amber-600' : c.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400')}><ClipboardCheck className="size-5" /></span>
                 <span className="min-w-36 flex-1">
                   <span className="block font-mono text-sm font-medium text-slate-900">{c.reference}</span>
-                  <span className="block text-xs text-slate-400">Started {formatDateTime(c.created_at)}{c.completed_at && <> · completed {formatDateTime(c.completed_at)}</>}</span>
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">{viewAll && <BranchTag id={c.branch_id} />}Started {formatDateTime(c.created_at)}{c.completed_at && <> · completed {formatDateTime(c.completed_at)}</>}</span>
                 </span>
                 <Badge status={c.status} />
               </button>
@@ -380,7 +384,9 @@ interface AdjustLine {
 }
 
 function AdjustModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { branch } = useTenant();
+  const { branch: working, branches, branchName } = useTenant();
+  const [branchId, setBranchId] = useState<number | undefined>(working?.id);
+  const branch = branches.find((b) => b.id === (branchId ?? working?.id)) ?? working;
   const [lines, setLines] = useState<AdjustLine[]>([]);
   const [reason, setReason] = useState('damaged');
   const [notes, setNotes] = useState('');
@@ -400,7 +406,7 @@ function AdjustModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       open={open}
       onClose={onClose}
       title="Adjust stock"
-      description={`Posting to ${branch?.name ?? 'this branch'}`}
+      description={`Posting to ${branchName(branch?.id)}`}
       icon={SlidersHorizontal}
       size="lg"
       footer={
@@ -431,6 +437,7 @@ function AdjustModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         <ErrorBanner error={adjust.error && fieldErrors.length === 0 ? adjust.error : null} />
         {fieldErrors.map((e) => <p key={e} className="text-sm text-red-600">{e}</p>)}
         <FormSection title="Reason">
+          {branches.length > 1 && <Field label="Branch">{(id) => <Select id={id} value={branch?.id ?? ''} onChange={(e) => setBranchId(Number(e.target.value))}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Reason">{(id) => <Select id={id} value={reason} onChange={(e) => setReason(e.target.value)}>{REASONS.map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}</Select>}</Field>
             <Field label="Notes">{(id) => <Input id={id} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional details" />}</Field>
@@ -454,7 +461,9 @@ function AdjustModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 }
 
 function CountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { branch } = useTenant();
+  const { branch: working, branches, branchName } = useTenant();
+  const [branchId, setBranchId] = useState<number | undefined>(working?.id);
+  const branch = branches.find((b) => b.id === (branchId ?? working?.id)) ?? working;
   const [lines, setLines] = useState<{ product: Product; counted: string }[]>([]);
   const [notes, setNotes] = useState('');
   const create = useTenantMutation<unknown>('POST', '/stock-counts', {
@@ -468,7 +477,7 @@ function CountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       open={open}
       onClose={onClose}
       title="New stock count"
-      description={`Counting at ${branch?.name ?? 'this branch'}`}
+      description={`Counting at ${branchName(branch?.id)}`}
       icon={ClipboardCheck}
       size="lg"
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={lines.length === 0 || lines.some((l) => l.counted === '')} loading={create.isPending} onClick={() => create.mutate({ branch_id: branch?.id, notes: notes || null, items: lines.map((l) => ({ product_id: l.product.id, counted_quantity: l.counted })) })}>Save draft</Button></>}
@@ -479,7 +488,10 @@ function CountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           Enter what you physically counted. When the count is completed, the system compares it with the recorded balance and posts the difference.
         </p>
         <ErrorBanner error={create.error} />
-        <Field label="Notes">{(id) => <Input id={id} value={notes} placeholder="Optional, e.g. aisle 3 shelf audit" onChange={(e) => setNotes(e.target.value)} />}</Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {branches.length > 1 && <Field label="Branch">{(id) => <Select id={id} value={branch?.id ?? ''} onChange={(e) => setBranchId(Number(e.target.value))}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>}
+          <Field label="Notes" className={branches.length > 1 ? undefined : 'sm:col-span-2'}>{(id) => <Input id={id} value={notes} placeholder="Optional, e.g. aisle 3 shelf audit" onChange={(e) => setNotes(e.target.value)} />}</Field>
+        </div>
         <FormSection title="Products counted">
           <ProductSearch onPick={(p) => setLines((ls) => (ls.some((l) => l.product.id === p.id) ? ls : [...ls, { product: p, counted: '' }]))} />
           <LineList count={lines.length} empty="Search above, then type the quantity you counted.">

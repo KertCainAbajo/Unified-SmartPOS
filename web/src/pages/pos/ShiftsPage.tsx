@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Badge, Button, Card, DataTable, Modal, PageHeader, Pagination, Select, Spinner } from '../../components/ui';
 import { formatDateTime, formatMoney } from '../../lib/format';
 import { useTenantQuery } from '../../lib/hooks';
@@ -8,12 +9,12 @@ import { NoAccess } from '../NotFoundPage';
 import { CloseShiftModal, ShiftSummaryView } from './ShiftDialogs';
 
 export function ShiftsPage() {
-  const { can } = useTenant();
+  const { can, viewAll, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [closing, setClosing] = useState<RegisterSession | null>(null);
-  const list = useTenantQuery<Paginated<RegisterSession>>('/register-sessions', { page, status });
+  const list = useTenantQuery<Paginated<RegisterSession>>('/register-sessions', { page, status, branch_id: scopeBranchId });
   const detail = useTenantQuery<{ data: RegisterSession }>(`/register-sessions/${selected}`, undefined, { enabled: selected !== null });
 
   if (!can('shifts.operate') && !can('shifts.view_all')) return <NoAccess what="shifts" />;
@@ -41,6 +42,7 @@ export function ShiftsPage() {
           empty="No shifts yet."
           columns={[
             { header: 'Shift', cell: (r) => `#${r.id}` },
+            ...(viewAll ? [{ header: 'Branch', cell: (r: RegisterSession) => <BranchTag id={r.branch_id} /> }] : []),
             { header: 'Register', cell: (r) => `#${r.register_id}` },
             { header: 'Opened', cell: (r) => formatDateTime(r.opened_at) },
             { header: 'Closed', cell: (r) => formatDateTime(r.closed_at) },

@@ -31,6 +31,7 @@ class RefundController extends Controller
             ->with('items')
             ->when(! $seesAll, fn ($q) => $q->where('requested_by', $request->user()->id))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->when($request->filled('sale_id'), fn ($q) => $q->where('sale_id', $request->integer('sale_id')))
             ->latest('id')
             ->paginate($this->perPage($request));

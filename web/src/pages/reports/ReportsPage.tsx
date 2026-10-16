@@ -18,6 +18,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { ScopeChip } from '../../components/BranchSwitcher';
 import { Avatar, Card, DateRange, EmptyState, ErrorBanner, LoadingRows, PageHeader, Segmented, StatCard, Tabs, cx } from '../../components/ui';
 import { downloadCsv } from '../../lib/csv';
 import { firstOfMonthManila, formatMoney, formatQty, fromCents, titleCase, toCents, todayManila } from '../../lib/format';
@@ -31,7 +32,7 @@ type Tab = 'sales' | 'breakdown' | 'products' | 'profit';
 interface Filters {
   date_from: string;
   date_to: string;
-  branch_id: string;
+  branch_id?: number;
 }
 
 const addDays = (iso: string, days: number) => {
@@ -56,9 +57,10 @@ function presets() {
 const pct = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : 0);
 
 export function ReportsPage() {
-  const { can, branches } = useTenant();
+  const { can, scopeBranchId } = useTenant();
   const [tab, setTab] = useState<Tab>(can('reports.view') ? 'sales' : 'profit');
-  const [filters, setFilters] = useState<Filters>({ date_from: firstOfMonthManila(), date_to: todayManila(), branch_id: '' });
+  const [range, setFilters] = useState({ date_from: firstOfMonthManila(), date_to: todayManila() });
+  const filters: Filters = { ...range, branch_id: scopeBranchId };
 
   if (!can('reports.view') && !can('reports.financial')) return <NoAccess what="reports" />;
 
@@ -80,13 +82,7 @@ export function ReportsPage() {
           options={[...ranges.map((r) => ({ value: r.key, label: r.label })), ...(active === 'custom' ? [{ value: 'custom', label: 'Custom' }] : [])]} />
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
           <DateRange from={filters.date_from} to={filters.date_to} onChange={(r) => setFilters((f) => ({ ...f, date_from: r.from, date_to: r.to }))} />
-          <label className="flex h-10 items-center gap-2 rounded-xl bg-slate-50 pl-3 ring-1 ring-slate-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500">
-            <Building2 className="size-4 text-slate-400" />
-            <select className="h-full cursor-pointer bg-transparent pr-3 text-sm font-medium text-slate-700 outline-none" value={filters.branch_id} onChange={(e) => setFilters((f) => ({ ...f, branch_id: e.target.value }))} aria-label="Branch">
-              <option value="">All my branches</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </label>
+          <ScopeChip />
         </div>
       </section>
 

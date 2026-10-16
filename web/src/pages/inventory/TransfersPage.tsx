@@ -27,12 +27,12 @@ function Route({ from, to }: { from: string; to: string }) {
 }
 
 export function TransfersPage() {
-  const { can, branches, allBranches } = useTenant();
+  const { can, branches, allBranches, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
-  const list = useTenantQuery<Paginated<StockTransfer>>('/stock-transfers', { status, page });
+  const list = useTenantQuery<Paginated<StockTransfer>>('/stock-transfers', { status, page, branch_id: scopeBranchId });
   // All business branches are needed as destinations; members limited to some branches only see theirs.
   const allBranchList = useTenantQuery<{ data: Branch[] }>('/branches');
   const nameOf = (id: number) => (allBranchList.data?.data ?? branches).find((b) => b.id === id)?.name ?? `Branch #${id}`;

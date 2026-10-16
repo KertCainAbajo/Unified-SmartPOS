@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { Badge, Button, Card, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Pagination, Select } from '../../components/ui';
 import { formatDateTime, formatMoney, titleCase } from '../../lib/format';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
@@ -9,13 +10,13 @@ import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
 
 export function RefundsPage() {
-  const { can, tenantId } = useTenant();
+  const { can, tenantId, viewAll, scopeBranchId } = useTenant();
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(can('refunds.approve') ? 'pending_approval' : '');
   const [rejecting, setRejecting] = useState<Refund | null>(null);
   const [reason, setReason] = useState('');
-  const list = useTenantQuery<Paginated<Refund>>('/refunds', { page, status });
+  const list = useTenantQuery<Paginated<Refund>>('/refunds', { page, status, branch_id: scopeBranchId });
   const approve = useTenantMutation<number>('POST', (id) => `/refunds/${id}/approve`, { success: 'Refund approved and completed.' });
   const reject = useTenantMutation<{ id: number; reason: string }>('POST', (b) => `/refunds/${b.id}/reject`, {
     success: 'Refund rejected.',
@@ -49,6 +50,7 @@ export function RefundsPage() {
           columns={[
             { header: 'Reference', cell: (r) => <span className="font-medium text-slate-900">{r.reference}</span> },
             { header: 'Sale', cell: (r) => <Link className="text-teal-700 hover:underline" to={`/t/${tenantId}/sales/${r.sale_id}`}>View sale</Link> },
+            ...(viewAll ? [{ header: 'Branch', cell: (r: Refund) => <BranchTag id={r.branch_id} /> }] : []),
             { header: 'Requested', cell: (r) => formatDateTime(r.created_at) },
             { header: 'Reason', cell: (r) => r.reason },
             { header: 'Method', cell: (r) => titleCase(r.refund_method) },

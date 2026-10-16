@@ -1,3 +1,4 @@
+import { BranchSwitcher } from './BranchSwitcher';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
@@ -5,7 +6,6 @@ import {
   Bell,
   Boxes,
   CalendarDays,
-  ChevronDown,
   ClipboardList,
   Clock,
   LayoutDashboard,
@@ -16,7 +16,6 @@ import {
   RotateCcw,
   Settings,
   ShoppingCart,
-  Store,
   Tags,
   Truck,
   UserRound,
@@ -26,7 +25,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { api, ApiError } from '../lib/api';
 import type { AppNotification, Paginated } from '../lib/types';
@@ -117,7 +116,10 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 function Shell() {
-  const { tenant, tenantId, branches, branch, setBranchId, permissions, path, roles } = useTenant();
+  const { tenant, tenantId, permissions, path, roles, viewAll, branch } = useTenant();
+  const location = useLocation();
+  // Switching branch remounts the page so paging and half-filled forms start fresh (except the POS cart).
+  const scopeKey = location.pathname.endsWith('/pos') ? 'pos' : viewAll ? 'all' : `b${branch?.id ?? ''}`;
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -223,23 +225,7 @@ function Shell() {
             <Menu className="size-5" />
           </button>
 
-          <label className="relative flex items-center">
-            <span className="sr-only">Branch</span>
-            <Store className="pointer-events-none absolute left-3 size-4 text-brand-600" />
-            <select
-              className="h-10 cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pl-9 pr-9 text-sm font-semibold text-slate-800 shadow-sm outline-none transition hover:border-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
-              value={branch?.id ?? ''}
-              onChange={(e) => setBranchId(Number(e.target.value))}
-              disabled={branches.length < 2}
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 size-4 text-slate-400" />
-          </label>
+          <BranchSwitcher />
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
             <span className="hidden items-center gap-2 rounded-full bg-slate-100/80 px-3 py-1.5 text-xs font-medium text-slate-600 md:flex">
@@ -264,7 +250,7 @@ function Shell() {
 
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8 2xl:px-10">
-            <Outlet />
+            <Outlet key={scopeKey} />
           </div>
         </main>
       </div>

@@ -1,3 +1,4 @@
+import { BranchTag } from '../components/BranchSwitcher';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -39,10 +40,10 @@ function greeting(): string {
 
 /** Store overview: today's numbers, what sells, what is running low and the latest sales. */
 export function DashboardPage() {
-  const { can, branch, tenant, tenantId } = useTenant();
+  const { can, branch, viewAll, scopeBranchId, branches, tenant, tenantId } = useTenant();
   const { user } = useAuth();
   const today = todayManila();
-  const scope = { branch_id: branch?.id };
+  const scope = { branch_id: scopeBranchId };
   const canReports = can('reports.view');
   const canSales = can('sales.view') || can('sales.view_all');
   const base = `/t/${tenantId}`;
@@ -51,7 +52,7 @@ export function DashboardPage() {
   const monthSummary = useTenantQuery<ReportResponse<SummaryRow[]>>('/reports/sales-summary', { ...scope, date_from: firstOfMonthManila(), date_to: today, group_by: 'month' }, { enabled: canReports });
   const methods = useTenantQuery<ReportResponse<{ method: string; payments: number; net: string }[]>>('/reports/sales-by-payment-method', { ...scope, date_from: today, date_to: today }, { enabled: canReports });
   const best = useTenantQuery<ReportResponse<{ product_id: number; name: string; net_quantity: string; revenue: string }[]>>('/reports/best-sellers', { ...scope, date_from: firstOfMonthManila(), date_to: today, limit: 5 }, { enabled: canReports });
-  const lowStock = useTenantQuery<Paginated<{ product_id: number; name: string; sku: string; quantity: string; reorder_level: string; unit: string }>>('/inventory/low-stock', { ...scope, per_page: 6 }, { enabled: can('inventory.view') });
+  const lowStock = useTenantQuery<Paginated<{ branch_id: number; product_id: number; name: string; sku: string; quantity: string; reorder_level: string; unit: string }>>('/inventory/low-stock', { ...scope, per_page: 6 }, { enabled: can('inventory.view') });
   const recent = useTenantQuery<Paginated<Sale>>('/sales', { ...scope, per_page: 6 }, { enabled: canSales });
 
   const t = todaySummary.data?.data[0];
@@ -71,7 +72,7 @@ export function DashboardPage() {
         <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-brand-50 ring-1 ring-white/15">
-              <Sparkles className="size-3.5 text-sun-300" /> {tenant.name} · {branch?.name ?? 'All branches'}
+              <Sparkles className="size-3.5 text-sun-300" /> {tenant.name} · {viewAll ? `All ${branches.length} branches` : branch?.name ?? 'All branches'}
             </p>
             <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
               {greeting()}, <span className="text-sun-300">{firstName}</span>
@@ -143,11 +144,11 @@ export function DashboardPage() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {lowStock.data.data.map((r) => (
-                  <li key={r.product_id} className="flex items-center gap-3 px-5 py-3">
+                  <li key={`${r.branch_id}-${r.product_id}`} className="flex items-center gap-3 px-5 py-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600"><Package className="size-4" /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-slate-900">{r.name}</span>
-                      <span className="block text-xs text-slate-500">Reorder at {formatQty(r.reorder_level)}</span>
+                      <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">{viewAll && <BranchTag id={r.branch_id} />}Reorder at {formatQty(r.reorder_level)}</span>
                     </span>
                     <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">{formatQty(r.quantity)} {r.unit}</span>
                   </li>
@@ -169,7 +170,7 @@ export function DashboardPage() {
                       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><Receipt className="size-4" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-slate-900">{r.receipt_number}</span>
-                        <span className="block text-xs text-slate-500">{formatDateTime(r.sold_at)}</span>
+                        <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">{viewAll && <BranchTag id={r.branch_id} />}{formatDateTime(r.sold_at)}</span>
                       </span>
                       <Badge status={r.payment_status} />
                       <span className="w-24 text-right font-display text-sm font-semibold tabular-nums text-slate-900">{formatMoney(r.total)}</span>

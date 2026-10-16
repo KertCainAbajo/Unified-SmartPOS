@@ -29,6 +29,7 @@ class StockTransferController extends Controller
 
         $transfers = $tenant->stockTransfers()
             ->when($branchIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereIn('from_branch_id', $branchIds)->orWhereIn('to_branch_id', $branchIds)))
+            ->when($request->filled('branch_id'), fn ($q) => $q->where(fn ($w) => $w->where('from_branch_id', $request->integer('branch_id'))->orWhere('to_branch_id', $request->integer('branch_id'))))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->latest('id')
             ->paginate($this->perPage($request));

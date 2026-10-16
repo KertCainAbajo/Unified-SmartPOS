@@ -29,6 +29,7 @@ class VacancyController extends Controller
 
         $vacancies = $tenant->vacancies()
             ->when(! $this->context->hasAllBranches(), fn ($q) => $q->whereIn('branch_id', $this->context->branchIds() ?? []))
+            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->with(['branch', 'role'])
             ->withCount('applications')
