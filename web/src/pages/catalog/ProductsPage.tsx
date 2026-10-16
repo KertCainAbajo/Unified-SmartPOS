@@ -1,12 +1,79 @@
-import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Badge, Button, Card, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Pagination, Select } from '../../components/ui';
+import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
+  Barcode,
+  Download,
+  Layers,
+  Package,
+  PackageX,
+  Pencil,
+  Plus,
+  Search,
+  Tag,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Button, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, Pagination, Select, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
-import { formatDateTime, formatMoney, formatQty, titleCase } from '../../lib/format';
+import { formatDateTime, formatMoney, formatQty, todayManila } from '../../lib/format';
 import { useDebounced, useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Category, Paginated, Product, TaxType } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
+
+const TAX: Record<TaxType, { label: string; className: string }> = {
+  vatable: { label: 'VATable', className: 'bg-slate-100 text-slate-600 ring-slate-500/15' },
+  vat_exempt: { label: 'VAT-exempt', className: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
+  zero_rated: { label: 'Zero-rated', className: 'bg-violet-50 text-violet-700 ring-violet-600/20' },
+};
+
+/** A stable tile colour per category, so products of one category look alike. */
+const TILES = [
+  'bg-brand-50 text-brand-600 ring-brand-100',
+  'bg-sun-300/25 text-amber-700 ring-amber-200',
+  'bg-sky-50 text-sky-600 ring-sky-100',
+  'bg-violet-50 text-violet-600 ring-violet-100',
+  'bg-rose-50 text-rose-600 ring-rose-100',
+  'bg-emerald-50 text-emerald-600 ring-emerald-100',
+];
+const tileFor = (categoryId: number | null) => (categoryId === null ? 'bg-slate-100 text-slate-500 ring-slate-200' : TILES[categoryId % TILES.length]);
+
+/** Margin on the selling price, or null when there is no usable cost. */
+const marginOf = (price: string | number | undefined, cost: string | number | undefined | null) => {
+  const p = Number(price);
+  const c = Number(cost);
+  if (!cost || !Number.isFinite(p) || !Number.isFinite(c) || p <= 0) return null;
+  return ((p - c) / p) * 100;
+};
+
+type StockLevel = { qty: number; level: 'out' | 'low' | 'ok' | 'untracked' };
+
+function stockOf(product: Product, branchId: number | undefined): StockLevel {
+  if (!product.track_inventory) return { qty: 0, level: 'untracked' };
+  const qty = Number(product.stock?.find((s) => s.branch_id === branchId)?.quantity ?? 0);
+  const reorder = Number(product.reorder_level);
+  return { qty, level: qty <= 0 ? 'out' : qty <= reorder ? 'low' : 'ok' };
+}
+
+/** Downloads the listed products as a CSV file. */
+function exportCsv(rows: Product[], branchId: number | undefined, withCost: boolean) {
+  const header = ['Name', 'SKU', 'Barcode', 'Category', 'Tax', 'Price', ...(withCost ? ['Cost'] : []), 'Stock', 'Unit', 'Reorder level', 'Status'];
+  const lines = rows.map((p) => {
+    const stock = stockOf(p, branchId);
+    return [
+      p.name, p.sku, p.barcode ?? '', p.category?.name ?? '', TAX[p.tax_type]?.label ?? p.tax_type, p.price,
+      ...(withCost ? [p.cost_price ?? ''] : []),
+      stock.level === 'untracked' ? 'n/a' : String(stock.qty), p.unit, formatQty(p.reorder_level), p.status,
+    ];
+  });
+  const csv = [header, ...lines].map((cols) => cols.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: `products-${todayManila()}.csv` });
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function ProductsPage() {
   const { can, branch } = useTenant();
@@ -24,70 +91,306 @@ export function ProductsPage() {
   });
 
   if (!can('products.view')) return <NoAccess what="products" />;
+  const canManage = can('products.manage');
+  const canPrice = can('products.price');
+
+  const rows = list.data?.data ?? [];
+  const total = list.data?.meta?.total ?? list.data?.total ?? rows.length;
+  const partial = total > rows.length;
+  const levels = rows.map((p) => stockOf(p, branch?.id).level);
+  const low = levels.filter((l) => l === 'low').length;
+  const out = levels.filter((l) => l === 'out').length;
+  const filtered = term.trim() !== '' || categoryId !== '' || status !== 'active';
+  const pageNote = partial ? 'On this page' : `At ${branch?.name ?? 'this branch'}`;
+  const resetFilters = () => { setTerm(''); setCategoryId(''); setStatus('active'); setPage(1); };
 
   return (
-    <>
-      <PageHeader
-        title="Products"
-        description="Catalog shared by all branches. Stock shown for the selected branch."
-        actions={can('products.manage') && <Button icon={<Plus className="size-4" />} onClick={() => setEditing('new')}>Add product</Button>}
-      />
-      <Card padded={false}>
-        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
-          <Input placeholder="Search name, SKU or barcode" value={term} onChange={(e) => { setTerm(e.target.value); setPage(1); }} aria-label="Search" />
-          <Select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); }} aria-label="Category">
+    <div className="space-y-6">
+      {/* Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">Stock</p>
+          <h1 className="mt-1 font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand-900">Products</h1>
+          <p className="mt-1 text-sm text-slate-500">One catalog for every branch. Stock levels are for <span className="font-medium text-slate-700">{branch?.name ?? 'the selected branch'}</span>.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={rows.length === 0}
+            onClick={() => exportCsv(rows, branch?.id, canPrice)}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-brand-800 shadow-sm ring-1 ring-slate-900/5 transition hover:bg-brand-50 hover:ring-brand-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="size-4" /> Export CSV
+          </button>
+          {canManage && <Button icon={<Plus className="size-4" />} onClick={() => setEditing('new')}>Add product</Button>}
+        </div>
+      </header>
+
+      {/* Summary */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat Icon={Package} label="Products" value={list.data ? String(total) : null} note={filtered ? 'Matching your filters' : 'Active in the catalog'} tint="brand" />
+        <Stat Icon={AlertTriangle} label="Low stock" value={list.data ? String(low) : null} note={low ? `At or below reorder level · ${pageNote.toLowerCase()}` : pageNote} tint={low ? 'amber' : 'slate'} />
+        <Stat Icon={PackageX} label="Out of stock" value={list.data ? String(out) : null} note={out ? 'Restock soon' : pageNote} tint={out ? 'rose' : 'slate'} />
+        <Stat Icon={Layers} label="Categories" value={categories.data ? String(categories.data.data.length) : null} note="Used to group products" tint="sun" />
+      </section>
+
+      {/* Catalog */}
+      <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center">
+          <label className="group relative flex h-10 flex-1 items-center rounded-xl bg-slate-50 ring-1 ring-slate-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500 lg:max-w-md">
+            <Search className="pointer-events-none ml-3 size-4 text-slate-400 transition group-focus-within:text-brand-600" />
+            <input
+              className="h-full w-full bg-transparent pl-2.5 pr-8 text-sm outline-none placeholder:text-slate-400"
+              placeholder="Search name, SKU or scan a barcode"
+              value={term}
+              onChange={(e) => { setTerm(e.target.value); setPage(1); }}
+              aria-label="Search products"
+            />
+            {term ? (
+              <button type="button" aria-label="Clear search" onClick={() => { setTerm(''); setPage(1); }} className="absolute right-2 grid size-6 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                <X className="size-3.5" />
+              </button>
+            ) : (
+              <Barcode className="pointer-events-none absolute right-3 size-4 text-slate-300" />
+            )}
+          </label>
+
+          <select
+            className="h-10 cursor-pointer rounded-xl bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none ring-1 ring-slate-200 transition hover:bg-white focus:bg-white focus:ring-2 focus:ring-brand-500 lg:w-56"
+            value={categoryId}
+            onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
+            aria-label="Category"
+          >
             <option value="">All categories</option>
             {categories.data?.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-          <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Status">
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="all">All</option>
-          </Select>
+          </select>
+
+          <div role="radiogroup" aria-label="Status" className="inline-flex h-10 items-center gap-0.5 rounded-xl bg-slate-100 p-1 text-xs font-medium lg:ml-auto">
+            {[{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }, { value: 'all', label: 'All' }].map((o) => (
+              <button key={o.value} type="button" role="radio" aria-checked={status === o.value} onClick={() => { setStatus(o.value); setPage(1); }}
+                className={cx('h-full rounded-lg px-3.5 transition', status === o.value ? 'bg-white text-brand-800 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-800')}>
+                {o.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <DataTable
-          rows={list.data?.data}
-          loading={list.isPending}
-          error={list.error}
-          rowKey={(p) => p.id}
-          empty="No products found."
-          columns={[
-            { header: 'Product', cell: (p) => <><p className="font-medium text-slate-900">{p.name}</p><p className="text-xs text-slate-500">{p.sku}{p.barcode ? ` · ${p.barcode}` : ''}</p></> },
-            { header: 'Category', cell: (p) => p.category?.name ?? '—' },
-            { header: 'Tax', cell: (p) => titleCase(p.tax_type) },
-            { header: 'Price', cell: (p) => formatMoney(p.price), align: 'right' },
-            ...(can('products.price') ? [{ header: 'Cost', cell: (p: Product) => formatMoney(p.cost_price), align: 'right' as const }] : []),
-            {
-              header: `Stock (${branch?.code ?? ''})`,
-              align: 'right',
-              cell: (p) => {
-                if (!p.track_inventory) return <span className="text-slate-400">n/a</span>;
-                const qty = p.stock?.find((s) => s.branch_id === branch?.id)?.quantity ?? '0';
-                const low = Number(qty) <= Number(p.reorder_level);
-                return <span className={low ? 'font-medium text-amber-700' : ''}>{formatQty(qty)} {p.unit}</span>;
-              },
-            },
-            { header: 'Status', cell: (p) => <Badge status={p.status} /> },
-            {
-              header: '',
-              cell: (p) => (
-                <div className="flex justify-end gap-1">
-                  {can('products.manage') && <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>}
-                  {can('products.price') && <Button size="sm" variant="ghost" onClick={() => setPricing(p)}>Price</Button>}
-                  {can('products.manage') && (
-                    <Button size="sm" variant="ghost" onClick={() => archive.mutate(p)}>{p.status === 'active' ? 'Archive' : 'Restore'}</Button>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-        />
+
+        {list.error ? (
+          <ErrorBanner error={list.error} className="m-4" />
+        ) : list.isPending ? (
+          <LoadingRows />
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center px-6 py-16 text-center">
+            <span className="relative grid size-16 place-items-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+              {filtered ? <Search className="size-7" /> : <Package className="size-7" />}
+              <span aria-hidden className="absolute -right-1.5 -top-1.5 size-4 rounded-full bg-sun-400 ring-4 ring-white" />
+            </span>
+            <p className="mt-5 font-display text-base font-semibold text-slate-900">{filtered ? 'No products match' : 'No products yet'}</p>
+            <p className="mt-1 max-w-md text-sm text-slate-500">{filtered ? 'Try another name, SKU, category or status.' : 'Add the items you sell so cashiers can scan them and stock can be tracked.'}</p>
+            <div className="mt-5">
+              {filtered ? (
+                <button type="button" onClick={resetFilters} className="text-sm font-semibold text-brand-700 hover:underline">Clear filters</button>
+              ) : canManage ? (
+                <Button icon={<Plus className="size-4" />} onClick={() => setEditing('new')}>Add your first product</Button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50/70">
+                <tr className="text-[11px] uppercase tracking-wider text-slate-400">
+                  <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Product</th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">Category</th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">Tax</th>
+                  <th scope="col" className="px-3 py-3 text-right font-semibold">Price</th>
+                  {canPrice && <th scope="col" className="px-3 py-3 text-right font-semibold">Cost · Margin</th>}
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">Stock ({branch?.code ?? '—'})</th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">Status</th>
+                  <th scope="col" className="pr-5 text-right font-semibold"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((p) => {
+                  const stock = stockOf(p, branch?.id);
+                  const margin = marginOf(p.price, p.cost_price);
+                  const archived = p.status !== 'active';
+                  const tax = TAX[p.tax_type];
+                  return (
+                    <tr key={p.id} className={cx('group transition-colors hover:bg-brand-50/40', archived && 'opacity-60')}>
+                      <td className="py-3.5 pl-5 pr-3">
+                        <span className="flex items-center gap-3">
+                          <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold ring-1', tileFor(p.category_id))}>
+                            {p.name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold text-slate-900">{p.name}</span>
+                            <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-slate-600">{p.sku}</span>
+                              {p.barcode && (
+                                <span className="inline-flex items-center gap-1 font-mono text-[10.5px] text-slate-400"><Barcode className="size-3" />{p.barcode}</span>
+                              )}
+                            </span>
+                          </span>
+                        </span>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        {p.category ? <span className="text-slate-700">{p.category.name}</span> : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span className={cx('whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset', tax?.className)}>{tax?.label ?? p.tax_type}</span>
+                      </td>
+                      <td className="px-3 py-3.5 text-right">
+                        <span className="font-display font-semibold tabular-nums text-slate-900">{formatMoney(p.price)}</span>
+                        <span className="block text-[11px] text-slate-400">per {p.unit}</span>
+                      </td>
+                      {canPrice && (
+                        <td className="px-3 py-3.5 text-right">
+                          <span className="tabular-nums text-slate-600">{p.cost_price ? formatMoney(p.cost_price) : '—'}</span>
+                          {margin !== null && (
+                            <span className={cx('block text-[11px] font-semibold tabular-nums', margin < 10 ? 'text-rose-600' : margin < 20 ? 'text-amber-600' : 'text-emerald-600')}>
+                              {margin.toFixed(1)}% margin
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      <td className="px-3 py-3.5">
+                        <StockCell product={p} stock={stock} />
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
+                          archived ? 'bg-slate-100 text-slate-500 ring-slate-500/15' : 'bg-emerald-50 text-emerald-700 ring-emerald-600/15')}>
+                          <span className={cx('size-1.5 rounded-full', archived ? 'bg-slate-400' : 'bg-emerald-500')} />
+                          {archived ? 'Archived' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 pl-3 pr-5">
+                        <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
+                          {canManage && <IconAction Icon={Pencil} label={`Edit ${p.name}`} onClick={() => setEditing(p)} />}
+                          {canPrice && <IconAction Icon={Tag} label={`Change price of ${p.name}`} onClick={() => setPricing(p)} />}
+                          {canManage && (
+                            <IconAction
+                              Icon={archived ? ArchiveRestore : Archive}
+                              label={archived ? `Restore ${p.name}` : `Archive ${p.name}`}
+                              tone={archived ? 'brand' : 'danger'}
+                              onClick={() => archive.mutate(p)}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
         <Pagination page={page} data={list.data} onPage={setPage} />
-      </Card>
+      </section>
 
       <ProductForm product={editing} categories={categories.data?.data ?? []} onClose={() => setEditing(null)} />
       <PriceModal product={pricing} onClose={() => setPricing(null)} />
-    </>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------- Pieces */
+
+const TINTS = {
+  brand: 'bg-brand-50 text-brand-600',
+  amber: 'bg-amber-50 text-amber-600',
+  rose: 'bg-rose-50 text-rose-600',
+  slate: 'bg-slate-100 text-slate-500',
+  sun: 'bg-sun-300/30 text-amber-700',
+};
+
+function Stat({ Icon, label, value, note, tint }: { Icon: LucideIcon; label: string; value: string | null; note: string; tint: keyof typeof TINTS }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5 transition hover:shadow-md">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+        <span className={cx('grid size-9 place-items-center rounded-xl', TINTS[tint])}><Icon className="size-4" /></span>
+      </div>
+      {value === null ? (
+        <span className="mt-3 block h-8 w-16 animate-pulse rounded-lg bg-slate-100" />
+      ) : (
+        <p className="mt-2 font-display text-[1.65rem] font-bold leading-tight tabular-nums text-slate-900">{value}</p>
+      )}
+      <p className="mt-1 truncate text-xs text-slate-400">{note}</p>
+    </div>
+  );
+}
+
+/** Quantity with a small bar against twice the reorder level, and a Low / Out badge. */
+function StockCell({ product, stock }: { product: Product; stock: StockLevel }) {
+  if (stock.level === 'untracked') return <span className="text-xs text-slate-400">Not tracked</span>;
+  const reorder = Number(product.reorder_level);
+  const scale = Math.max(reorder * 2, stock.qty, 1);
+  const fill = Math.max(0, Math.min(100, (stock.qty / scale) * 100));
+  const color = stock.level === 'out' ? 'bg-rose-500' : stock.level === 'low' ? 'bg-amber-500' : 'bg-emerald-500';
+  return (
+    <div className="min-w-[8.5rem]">
+      <div className="flex items-center gap-2">
+        <span className={cx('font-semibold tabular-nums', stock.level === 'out' ? 'text-rose-600' : stock.level === 'low' ? 'text-amber-700' : 'text-slate-800')}>
+          {formatQty(String(stock.qty))} <span className="font-normal text-slate-400">{product.unit}</span>
+        </span>
+        {stock.level !== 'ok' && (
+          <span className={cx('rounded-full px-1.5 py-px text-[10px] font-bold uppercase tracking-wide', stock.level === 'out' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700')}>
+            {stock.level === 'out' ? 'Out' : 'Low'}
+          </span>
+        )}
+      </div>
+      <div className="mt-1.5 h-1 w-28 overflow-hidden rounded-full bg-slate-100" title={`Reorder level ${formatQty(product.reorder_level)} ${product.unit}`}>
+        <div className={cx('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${fill}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function IconAction({ Icon, label, onClick, tone = 'default' }: { Icon: LucideIcon; label: string; onClick: () => void; tone?: 'default' | 'brand' | 'danger' }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={cx(
+        'grid size-8 place-items-center rounded-lg text-slate-500 ring-1 ring-transparent transition hover:bg-white hover:shadow-sm hover:ring-slate-200',
+        tone === 'danger' ? 'hover:text-rose-600' : tone === 'brand' ? 'hover:text-brand-700' : 'hover:text-brand-700',
+      )}
+    >
+      <Icon className="size-4" />
+    </button>
+  );
+}
+
+/** Placeholder rows shown while products load. */
+function LoadingRows() {
+  return (
+    <div className="divide-y divide-slate-100" role="status" aria-label="Loading products">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="flex items-center gap-4 px-5 py-4">
+          <span className="size-10 animate-pulse rounded-xl bg-slate-100" />
+          <span className="space-y-2">
+            <span className="block h-3 w-44 animate-pulse rounded bg-slate-100" />
+            <span className="block h-2.5 w-28 animate-pulse rounded bg-slate-100" />
+          </span>
+          <span className="ml-auto hidden h-3 w-24 animate-pulse rounded bg-slate-100 sm:block" />
+          <span className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+          <span className="h-5 w-16 animate-pulse rounded-full bg-slate-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <fieldset className="mb-5 last:mb-0">
+      <legend className="text-[11px] font-semibold uppercase tracking-wider text-brand-700">{title}</legend>
+      {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">{children}</div>
+    </fieldset>
   );
 }
 
@@ -113,6 +416,7 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
   });
   const err = (f: string) => (save.error instanceof ApiError ? save.error.field(f) : undefined);
   const set = (k: keyof typeof form) => (v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+  const margin = isNew ? marginOf(form.price, form.cost_price) : null;
 
   function submit() {
     const body: Record<string, unknown> = {
@@ -133,34 +437,43 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
       onClose={onClose}
       title={isNew ? 'Add product' : 'Edit product'}
       size="lg"
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} onClick={submit}>Save</Button></>}
+      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} disabled={!form.name.trim() || !form.sku.trim()} onClick={submit}>{isNew ? 'Add product' : 'Save changes'}</Button></>}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} className="sm:col-span-2" />}
-        <Field label="Name" error={err('name')} className="sm:col-span-2">{(id) => <Input id={id} value={form.name} onChange={(e) => set('name')(e.target.value)} />}</Field>
-        <Field label="SKU" error={err('sku')} hint="Letters, digits, - _ . / (stored in upper case)">{(id) => <Input id={id} value={form.sku} onChange={(e) => set('sku')(e.target.value)} />}</Field>
-        <Field label="Barcode" error={err('barcode')} hint="EAN/UPC check digit is verified">{(id) => <Input id={id} value={form.barcode} onChange={(e) => set('barcode')(e.target.value)} />}</Field>
+      {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} className="mb-4" />}
+
+      <FormSection title="Basics">
+        <Field label="Name" error={err('name')} className="sm:col-span-2">{(id) => <Input id={id} value={form.name} autoFocus placeholder="e.g. Coca-Cola 1L" onChange={(e) => set('name')(e.target.value)} />}</Field>
+        <Field label="SKU" error={err('sku')} hint="Letters, digits, - _ . / (stored in upper case)">{(id) => <Input id={id} value={form.sku} placeholder="BEV-COKE-1L" onChange={(e) => set('sku')(e.target.value)} />}</Field>
+        <Field label="Barcode" error={err('barcode')} hint="EAN/UPC check digit is verified">{(id) => <Input id={id} value={form.barcode} placeholder="Scan or type" onChange={(e) => set('barcode')(e.target.value)} />}</Field>
         <Field label="Category" error={err('category_id')}>
           {(id) => <Select id={id} value={form.category_id} onChange={(e) => set('category_id')(e.target.value)}><option value="">None</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>}
         </Field>
         <Field label="Unit" error={err('unit')} hint="e.g. pc, kg, pack">{(id) => <Input id={id} value={form.unit} onChange={(e) => set('unit')(e.target.value)} />}</Field>
+      </FormSection>
+
+      <FormSection title="Pricing & tax">
         {isNew ? (
           <>
-            <Field label="Selling price (₱)" error={err('price')} hint="VAT-inclusive for VAT-registered businesses">{(id) => <Input id={id} inputMode="decimal" value={form.price} onChange={(e) => set('price')(e.target.value)} />}</Field>
-            <Field label="Cost (₱)" error={err('cost_price')}>{(id) => <Input id={id} inputMode="decimal" value={form.cost_price} onChange={(e) => set('cost_price')(e.target.value)} />}</Field>
+            <Field label="Selling price (₱)" error={err('price')} hint="VAT-inclusive for VAT-registered businesses">{(id) => <Input id={id} inputMode="decimal" value={form.price} placeholder="0.00" onChange={(e) => set('price')(e.target.value)} />}</Field>
+            <Field label="Cost (₱)" error={err('cost_price')} hint={margin !== null ? `${margin.toFixed(1)}% margin at this price` : 'Optional, used for margins'}>{(id) => <Input id={id} inputMode="decimal" value={form.cost_price} placeholder="0.00" onChange={(e) => set('cost_price')(e.target.value)} />}</Field>
           </>
         ) : (
-          <p className="text-sm text-slate-500 sm:col-span-2">Price: {formatMoney((product as Product | null)?.price)}. Use the Price action to change it (recorded in price history).</p>
+          <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 sm:col-span-2">
+            Current price <span className="font-semibold text-slate-900">{formatMoney((product as Product | null)?.price)}</span>. Use the <Tag className="inline size-3.5" /> Price action to change it, so the change is recorded in price history.
+          </p>
         )}
         <Field label="Tax type" error={err('tax_type')}>
           {(id) => <Select id={id} value={form.tax_type} onChange={(e) => set('tax_type')(e.target.value)}><option value="vatable">VATable</option><option value="vat_exempt">VAT-exempt</option><option value="zero_rated">Zero-rated</option></Select>}
         </Field>
-        <Field label="Reorder level" error={err('reorder_level')}>{(id) => <Input id={id} inputMode="decimal" value={form.reorder_level} onChange={(e) => set('reorder_level')(e.target.value)} />}</Field>
-        <div className="flex flex-col gap-2 sm:col-span-2">
+      </FormSection>
+
+      <FormSection title="Stock">
+        <Field label="Reorder level" error={err('reorder_level')} hint="Flagged as low stock at or below this">{(id) => <Input id={id} inputMode="decimal" value={form.reorder_level} onChange={(e) => set('reorder_level')(e.target.value)} />}</Field>
+        <div className="flex flex-col justify-center gap-2.5 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
           <Checkbox label="Track stock for this product" checked={form.track_inventory} onChange={set('track_inventory')} />
-          <Checkbox label="Allow decimal quantities (sold by weight/length)" checked={form.allow_decimal_quantity} onChange={set('allow_decimal_quantity')} />
+          <Checkbox label="Sold by weight or length (decimals)" checked={form.allow_decimal_quantity} onChange={set('allow_decimal_quantity')} />
         </div>
-      </div>
+      </FormSection>
     </Modal>
   );
 }
@@ -178,6 +491,8 @@ function PriceModal({ product, onClose }: { product: Product | null; onClose: ()
     setReason('');
   }, [product]);
   const save = useTenantMutation<{ price: string; cost_price: string; reason: string }>('PATCH', `/products/${product?.id}/price`, { success: 'Price updated.', onSuccess: onClose, toastErrors: false });
+  const margin = marginOf(price, cost);
+  const change = product && Number(product.price) > 0 && Number.isFinite(Number(price)) ? ((Number(price) - Number(product.price)) / Number(product.price)) * 100 : 0;
 
   return (
     <Modal
@@ -188,25 +503,44 @@ function PriceModal({ product, onClose }: { product: Product | null; onClose: ()
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} onClick={() => save.mutate({ price, cost_price: cost, reason })}>Save price</Button></>}
     >
       <ErrorBanner error={save.error} className="mb-4" />
+
+      {/* Live summary of the new price */}
+      <div className="mb-5 grid grid-cols-3 divide-x divide-brand-100 rounded-2xl bg-gradient-to-r from-brand-50 to-cream/60 ring-1 ring-brand-100">
+        <Summary label="New price" value={formatMoney(price || '0')} />
+        <Summary label="Change" value={change === 0 ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`} tone={change > 0 ? 'up' : change < 0 ? 'down' : undefined} />
+        <Summary label="Margin" value={margin === null ? '—' : `${margin.toFixed(1)}%`} tone={margin === null ? undefined : margin < 10 ? 'down' : 'up'} />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Selling price (₱)">{(id) => <Input id={id} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />}</Field>
         <Field label="Cost (₱)">{(id) => <Input id={id} inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} />}</Field>
         <Field label="Reason">{(id) => <Input id={id} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Supplier increase" />}</Field>
       </div>
-      <h3 className="mb-2 mt-6 text-sm font-semibold text-slate-800">History</h3>
-      <DataTable
-        rows={history.data?.data}
-        loading={history.isPending}
-        rowKey={(h) => h.id}
-        empty="No changes yet."
-        columns={[
-          { header: 'When', cell: (h) => formatDateTime(h.created_at) },
-          { header: 'Price', cell: (h) => `${h.old_price ? formatMoney(h.old_price) + ' → ' : ''}${formatMoney(h.new_price)}` },
-          { header: 'Cost', cell: (h) => (h.new_cost ? `${h.old_cost ? formatMoney(h.old_cost) + ' → ' : ''}${formatMoney(h.new_cost)}` : '—') },
-          { header: 'By', cell: (h) => h.changed_by?.name ?? '—' },
-          { header: 'Reason', cell: (h) => h.reason ?? '' },
-        ]}
-      />
+      <h3 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-wider text-brand-700">Price history</h3>
+      <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+        <DataTable
+          rows={history.data?.data}
+          loading={history.isPending}
+          rowKey={(h) => h.id}
+          empty="No changes yet."
+          columns={[
+            { header: 'When', cell: (h) => formatDateTime(h.created_at) },
+            { header: 'Price', cell: (h) => `${h.old_price ? formatMoney(h.old_price) + ' → ' : ''}${formatMoney(h.new_price)}` },
+            { header: 'Cost', cell: (h) => (h.new_cost ? `${h.old_cost ? formatMoney(h.old_cost) + ' → ' : ''}${formatMoney(h.new_cost)}` : '—') },
+            { header: 'By', cell: (h) => h.changed_by?.name ?? '—' },
+            { header: 'Reason', cell: (h) => h.reason ?? '' },
+          ]}
+        />
+      </div>
     </Modal>
+  );
+}
+
+function Summary({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' }) {
+  return (
+    <div className="px-4 py-3 text-center">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className={cx('mt-0.5 font-display text-lg font-bold tabular-nums', tone === 'up' ? 'text-emerald-700' : tone === 'down' ? 'text-rose-600' : 'text-slate-900')}>{value}</p>
+    </div>
   );
 }

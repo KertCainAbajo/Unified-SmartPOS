@@ -18,6 +18,17 @@
   --color-sun-400: #f5c347;
   --color-sun-500: #e9ac1c;
   --color-cream: #fcf5e2;
+  /* Older screens still say "teal": point them at the brand green. */
+  --color-teal-50: var(--color-brand-50);
+  --color-teal-100: var(--color-brand-100);
+  --color-teal-200: var(--color-brand-200);
+  --color-teal-300: var(--color-brand-300);
+  --color-teal-400: var(--color-brand-400);
+  --color-teal-500: var(--color-brand-500);
+  --color-teal-600: var(--color-brand-600);
+  --color-teal-700: var(--color-brand-700);
+  --color-teal-800: var(--color-brand-800);
+  --color-teal-900: var(--color-brand-900);
 }
 
 html,

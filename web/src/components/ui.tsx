@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Inbox, Loader2, X } from 'lucide-react';
 import {
   useEffect,
   useId,
@@ -17,8 +17,8 @@ const cx = (...classes: (string | false | null | undefined)[]) => classes.filter
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-teal-700 text-white hover:bg-teal-800 focus-visible:outline-teal-700 disabled:bg-teal-700/50',
-  secondary: 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 focus-visible:outline-slate-400 disabled:text-slate-400',
+  primary: 'bg-gradient-to-b from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-700/20 ring-1 ring-brand-800/20 hover:to-brand-600 focus-visible:outline-brand-600 disabled:opacity-50',
+  secondary: 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-slate-400 disabled:text-slate-400',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600 disabled:bg-red-600/50',
   ghost: 'text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400 disabled:text-slate-400',
 };
@@ -37,7 +37,7 @@ export function Button({ variant = 'primary', size = 'md', loading, icon, classN
       type={type}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
+        'inline-flex shrink-0 items-center justify-center rounded-xl font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
         sizes[size],
         variants[variant],
         className,
@@ -74,7 +74,7 @@ export function Field({ label, error, hint, children, className }: FieldProps) {
 }
 
 const control =
-  'h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 disabled:bg-slate-50 aria-[invalid=true]:border-red-500';
+  'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 aria-[invalid=true]:border-red-500';
 
 export function Input({ className, ...rest }: ComponentProps<'input'>) {
   return <input className={cx(control, className)} {...rest} />;
@@ -86,7 +86,7 @@ export function Textarea({ className, ...rest }: ComponentProps<'textarea'>) {
 
 export function Select({ className, children, ...rest }: ComponentProps<'select'>) {
   return (
-    <select className={cx(control, 'pr-8', className)} {...rest}>
+    <select className={cx(control, 'cursor-pointer pr-8', className)} {...rest}>
       {children}
     </select>
   );
@@ -97,7 +97,7 @@ export function Checkbox({ label, checked, onChange, disabled }: { label: string
     <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
       <input
         type="checkbox"
-        className="size-4 rounded border-slate-300 accent-teal-700"
+        className="size-4 rounded border-slate-300 accent-brand-600"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
@@ -113,7 +113,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-brand-900 sm:text-[1.7rem]">{title}</h1>
         {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -123,10 +123,10 @@ export function PageHeader({ title, description, actions }: { title: string; des
 
 export function Card({ title, actions, children, className, padded = true }: { title?: string; actions?: ReactNode; children: ReactNode; className?: string; padded?: boolean }) {
   return (
-    <section className={cx('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
+    <section className={cx('rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5', className)}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
-          {title && <h2 className="text-sm font-semibold text-slate-800">{title}</h2>}
+        <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
+          {title && <h2 className="font-display text-sm font-semibold text-slate-900">{title}</h2>}
           {actions}
         </header>
       )}
@@ -137,9 +137,9 @@ export function Card({ title, actions, children, className, padded = true }: { t
 
 export function StatCard({ label, value, hint, tone = 'default' }: { label: string; value: ReactNode; hint?: ReactNode; tone?: 'default' | 'warn' }) {
   return (
-    <div className={cx('rounded-xl border bg-white p-5 shadow-sm', tone === 'warn' ? 'border-amber-200' : 'border-slate-200')}>
+    <div className={cx('rounded-2xl bg-white p-5 shadow-sm ring-1', tone === 'warn' ? 'ring-amber-300' : 'ring-slate-900/5')}>
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="mt-2 font-display text-2xl font-bold tabular-nums text-slate-900">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
@@ -168,7 +168,8 @@ const badgeTones: Record<string, string> = {
 
 export function Badge({ status, children }: { status?: string; children?: ReactNode }) {
   return (
-    <span className={cx('inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset', badgeTones[status ?? ''] ?? 'bg-slate-100 text-slate-700 ring-slate-500/20')}>
+    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset', badgeTones[status ?? ''] ?? 'bg-slate-100 text-slate-700 ring-slate-500/20')}>
+      <span className="size-1.5 rounded-full bg-current opacity-70" />
       {children ?? titleCase(status ?? '')}
     </span>
   );
@@ -184,8 +185,9 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-      <p className="font-medium text-slate-700">{title}</p>
+    <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+      <span className="grid size-12 place-items-center rounded-2xl bg-slate-100 text-slate-400"><Inbox className="size-6" /></span>
+      <p className="mt-1 font-semibold text-slate-800">{title}</p>
       {description && <p className="max-w-sm text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
@@ -214,7 +216,7 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
           onClick={() => onChange(t.value)}
           className={cx(
             '-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium',
-            value === t.value ? 'border-teal-700 text-teal-800' : 'border-transparent text-slate-500 hover:text-slate-800',
+            value === t.value ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-800',
           )}
         >
           {t.label}
@@ -260,12 +262,12 @@ export function Modal({
         e.preventDefault();
         onClose();
       }}
-      className={cx('m-auto w-[calc(100%-2rem)] rounded-xl p-0 shadow-xl backdrop:bg-slate-900/40', widths[size])}
+      className={cx('m-auto w-[calc(100%-2rem)] rounded-2xl p-0 shadow-2xl shadow-brand-900/20 backdrop:bg-brand-900/40 backdrop:backdrop-blur-sm', widths[size])}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">
           <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h2 className="font-semibold text-slate-900">{title}</h2>
+            <h2 className="font-display font-semibold text-slate-900">{title}</h2>
             <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-slate-500 hover:bg-slate-100">
               <X className="size-5" />
             </button>
@@ -311,10 +313,10 @@ export function DataTable<T>({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wider text-slate-500">
           <tr>
             {columns.map((c) => (
-              <th key={c.header} scope="col" className={cx('whitespace-nowrap px-4 py-2.5 font-medium', c.align === 'right' && 'text-right', c.className)}>
+              <th key={c.header} scope="col" className={cx('whitespace-nowrap px-5 py-3 font-semibold', c.align === 'right' && 'text-right', c.className)}>
                 {c.header}
               </th>
             ))}
@@ -325,10 +327,10 @@ export function DataTable<T>({
             <tr
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cx(onRowClick && 'cursor-pointer hover:bg-slate-50')}
+              className={cx('transition-colors', onRowClick && 'cursor-pointer hover:bg-brand-50/50')}
             >
               {columns.map((c) => (
-                <td key={c.header} className={cx('px-4 py-2.5 align-middle text-slate-700', c.align === 'right' && 'text-right tabular-nums', c.className)}>
+                <td key={c.header} className={cx('px-5 py-3.5 align-middle text-slate-700', c.align === 'right' && 'text-right tabular-nums', c.className)}>
                   {c.cell(row)}
                 </td>
               ))}
@@ -344,9 +346,9 @@ export function DataTable<T>({
 export function Pagination({ page, data, onPage }: { page: number; data?: { meta?: { last_page: number; total: number }; last_page?: number; total?: number }; onPage: (p: number) => void }) {
   const last = data?.meta?.last_page ?? data?.last_page ?? 1;
   const total = data?.meta?.total ?? data?.total;
-  if (last <= 1) return total !== undefined ? <p className="px-4 py-3 text-xs text-slate-500">{total} result{total === 1 ? '' : 's'}</p> : null;
+  if (last <= 1) return total !== undefined ? <p className="border-t border-slate-100 px-5 py-3 text-xs font-medium text-slate-500">{total} result{total === 1 ? '' : 's'}</p> : null;
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
+    <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm">
       <span className="text-xs text-slate-500">
         Page {page} of {last} {total !== undefined && `· ${total} results`}
       </span>

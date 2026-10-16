@@ -13,10 +13,9 @@ import {
   ShoppingCart,
   Smartphone,
   Sparkles,
-  Trophy,
   Wallet,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { Badge } from '../components/ui';
@@ -132,7 +131,7 @@ export function DashboardPage() {
         )}
 
         {canReports && (
-          <Panel className="lg:col-span-3" title="Best sellers this month" subtitle="Top 5 by quantity sold" icon={<Trophy className="size-4 text-sun-500" />}>
+          <Panel className="lg:col-span-3" title="Best sellers this month" subtitle="Top 5 products and their share">
             <BestSellers rows={best.data?.data} loading={best.isPending} />
           </Panel>
         )}
@@ -282,30 +281,78 @@ function PaymentBreakdown({ rows, loading }: { rows?: { method: string; payments
   );
 }
 
-function BestSellers({ rows, loading }: { rows?: { product_id: number; name: string; net_quantity: string; revenue: string }[]; loading: boolean }) {
+type Seller = { product_id: number; name: string; net_quantity: string; revenue: string };
+
+/** One colour per rank: brand greens, then the logo's yellow, then neutral. */
+const SHARE_COLORS = ['#13412b', '#2a7c51', '#78ba94', '#f5c347', '#cbd5e1'];
+
+/** Top sellers as share of the top five: leader summary, one stacked bar and an aligned ranking. */
+function BestSellers({ rows, loading }: { rows?: Seller[]; loading: boolean }) {
+  const [by, setBy] = useState<'qty' | 'revenue'>('qty');
   if (loading) return <Skeleton rows={5} />;
   if (!rows?.length) return <Empty icon={<PackageSearch />} tone="slate" title="No sales this month" text="Your top products will rank here." />;
-  const top = Math.max(...rows.map((r) => Number(r.net_quantity))) || 1;
-  const medal = ['bg-sun-400 text-brand-900', 'bg-slate-200 text-slate-700', 'bg-amber-200/70 text-amber-800'];
+
+  const metric = (r: Seller) => (by === 'qty' ? Number(r.net_quantity) : Number(r.revenue));
+  const ranked = [...rows].sort((a, b) => metric(b) - metric(a));
+  const total = ranked.reduce((sum, r) => sum + metric(r), 0) || 1;
+  const share = (r: Seller) => (metric(r) / total) * 100;
+  const leader = ranked[0];
+
   return (
-    <ol className="divide-y divide-slate-100">
-      {rows.map((r, i) => (
-        <li key={r.product_id} className="flex items-center gap-4 px-5 py-3">
-          <span className={`grid size-8 shrink-0 place-items-center rounded-full font-display text-sm font-bold ${medal[i] ?? 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-sm font-medium text-slate-900">{r.name}</span>
-              <span className="font-display text-sm font-semibold tabular-nums text-slate-900">{formatMoney(r.revenue)}</span>
-            </div>
-            <div className="mt-1.5 flex items-center gap-3">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-gradient-to-r from-sun-400 to-sun-500" style={{ width: `${(Number(r.net_quantity) / top) * 100}%` }} />
-              </div>
-              <span className="w-14 text-right text-xs text-slate-500">{formatQty(r.net_quantity)} sold</span>
-            </div>
-          </div>
-        </li>
-      ))}
-    </ol>
+    <div key={by} className="auth-fade">
+      <div className="flex flex-wrap items-end justify-between gap-4 px-5 pt-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Top product</p>
+          <p className="truncate font-display text-lg font-semibold text-slate-900">{leader.name}</p>
+          <p className="text-xs text-slate-500">
+            <span className="font-semibold text-brand-700">{Math.round(share(leader))}%</span> of top-5 {by === 'qty' ? 'units' : 'revenue'} ·{' '}
+            {by === 'qty' ? `${formatQty(leader.net_quantity)} sold` : formatMoney(leader.revenue)}
+          </p>
+        </div>
+        <div role="radiogroup" aria-label="Rank by" className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs font-medium">
+          {(['qty', 'revenue'] as const).map((v) => (
+            <button key={v} type="button" role="radio" aria-checked={by === v} onClick={() => setBy(v)}
+              className={`rounded-md px-3 py-1.5 transition ${by === v ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-800'}`}>
+              {v === 'qty' ? 'Units' : 'Revenue'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Composition of the top five. */}
+      <div className="mx-5 mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+        {ranked.map((r, i) => (
+          <span key={r.product_id} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${share(r)}%`, backgroundColor: SHARE_COLORS[i] ?? SHARE_COLORS[4] }} />
+        ))}
+      </div>
+
+      <table className="mt-3 w-full text-sm">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-wider text-slate-400">
+            <th className="py-2 pl-5 text-left font-medium">#</th>
+            <th className="py-2 text-left font-medium">Product</th>
+            <th className="py-2 text-right font-medium">Units</th>
+            <th className="py-2 text-right font-medium">Revenue</th>
+            <th className="py-2 pr-5 text-right font-medium">Share</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 border-t border-slate-100">
+          {ranked.map((r, i) => (
+            <tr key={r.product_id} className="transition hover:bg-slate-50/80">
+              <td className="w-10 py-3 pl-5 font-mono text-xs text-slate-400">{String(i + 1).padStart(2, '0')}</td>
+              <td className="max-w-0 py-3 pr-3">
+                <span className="flex items-center gap-2.5">
+                  <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: SHARE_COLORS[i] ?? SHARE_COLORS[4] }} />
+                  <span className={`truncate ${i === 0 ? 'font-semibold text-slate-900' : 'text-slate-700'}`}>{r.name}</span>
+                </span>
+              </td>
+              <td className={`py-3 text-right tabular-nums ${by === 'qty' ? 'font-semibold text-slate-900' : 'text-slate-500'}`}>{formatQty(r.net_quantity)}</td>
+              <td className={`py-3 text-right tabular-nums ${by === 'revenue' ? 'font-semibold text-slate-900' : 'text-slate-500'}`}>{formatMoney(r.revenue)}</td>
+              <td className="w-20 py-3 pr-5 text-right tabular-nums text-slate-500">{share(r).toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
