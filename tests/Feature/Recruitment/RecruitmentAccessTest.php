@@ -203,4 +203,18 @@ class RecruitmentAccessTest extends TestCase
             'title' => 'Bagger', 'branch_id' => $this->main->id, 'role_id' => Role::system('cashier')->id, 'required_documents' => ['resume'],
         ]);
     }
+
+    public function test_status_filter_accepts_several_statuses(): void
+    {
+        [$submitted] = $this->apply();
+        [$screening] = $this->apply(null, ['email' => 'ben@example.com']);
+        [$interviewing] = $this->apply(null, ['email' => 'cora@example.com']);
+        $this->actingAsUser($this->hr)->postJson($this->appUrl($screening, 'start-screening'))->assertOk();
+        $this->toManagerStage($interviewing);
+
+        $ids = fn (string $status) => array_column($this->actingAsUser($this->hr)->getJson($this->tenantUrl($this->tenant, 'applications?status='.$status))->assertOk()->json('data'), 'id');
+
+        $this->assertEqualsCanonicalizing([$submitted->id, $screening->id], $ids('submitted,hr_screening,incomplete'));
+        $this->assertSame([$interviewing->id], $ids('manager_interview'));
+    }
 }

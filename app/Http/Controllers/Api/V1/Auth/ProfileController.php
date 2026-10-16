@@ -29,7 +29,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update profile. Changing the email marks it unverified and sends a new verification link.
+     * Update profile. Changing the email needs the current password, marks it unverified and sends a new verification link.
      */
     public function update(Request $request): UserResource
     {
@@ -42,6 +42,10 @@ class ProfileController extends Controller
 
         if (isset($data['email'])) {
             $data['email'] = mb_strtolower(trim($data['email']));
+            // The email is the sign-in for owners and managers: confirm it is really them before moving it.
+            if ($data['email'] !== mb_strtolower((string) $user->email)) {
+                $request->validate(['current_password' => ['required', 'current_password']]);
+            }
         }
 
         $original = $user->getOriginal();

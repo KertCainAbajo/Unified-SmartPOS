@@ -29,7 +29,7 @@ class StaffController extends Controller
 
     public function __construct(private readonly StaffService $staff) {}
 
-    /** Staff visible to the caller. Filters: `status`, `q` (name, username, email, employee code), `branch_id`. Requires `staff.view`. */
+    /** Staff visible to the caller. Filters: `status`, `q` (name, username, email, employee code), `branch_id`, `role_id`. Requires `staff.view`. */
     public function index(Request $request, Tenant $tenant): AnonymousResourceCollection
     {
         $this->staff->authorize(Permissions::STAFF_VIEW, null, 'list');
@@ -40,6 +40,7 @@ class StaffController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('branch_id'), fn ($q) => $q->where(fn ($w) => $w->where('all_branches', true)
                 ->orWhereHas('branches', fn ($b) => $b->where('branches.id', $request->integer('branch_id')))))
+            ->when($request->filled('role_id'), fn ($q) => $q->whereHas('roles', fn ($r) => $r->where('roles.id', $request->integer('role_id'))))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
                 $q->where(fn ($w) => $w->where('employee_code', 'like', $term)

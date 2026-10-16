@@ -1,10 +1,12 @@
-import { ArrowLeft, Printer, RotateCcw, Ban } from 'lucide-react';
+import { ArrowLeft, Ban, Calculator, Package, Printer, ReceiptText, RotateCcw, Wallet } from 'lucide-react';
+import { BranchTag } from '../../components/BranchSwitcher';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ReceiptView } from '../../components/ReceiptView';
-import { Badge, Button, Card, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner } from '../../components/ui';
+import { Badge, Button, Card, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatDateTime, formatMoney, formatQty, titleCase } from '../../lib/format';
+import { printDocument } from '../../lib/print';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { PaymentMethod, Receipt, Refund, Sale, SaleItem } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
@@ -26,12 +28,13 @@ export function SaleDetailPage() {
 
   return (
     <>
-      <Link to={`/t/${tenantId}/sales`} className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="size-4" /> Sales
+      <Link to={`/t/${tenantId}/sales`} className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-900/5 transition hover:text-brand-800 hover:ring-brand-200">
+        <ArrowLeft className="size-3.5" /> All sales
       </Link>
       <PageHeader
+        eyebrow="Sale"
         title={`Receipt ${s.receipt_number}`}
-        description={`${formatDateTime(s.sold_at)} · Cashier: ${s.cashier?.name ?? '—'}${s.customer ? ` · Customer: ${s.customer.name}` : ''}`}
+        description={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{formatDateTime(s.sold_at)}</span><span>Cashier: <strong className="font-semibold text-slate-700">{s.cashier?.name ?? '—'}</strong></span>{s.customer && <span>Customer: <strong className="font-semibold text-slate-700">{s.customer.name}</strong></span>}<BranchTag id={s.branch_id} /></span>}
         actions={
           <>
             <Button variant="secondary" icon={<Printer className="size-4" />} onClick={() => setShowReceipt(true)} disabled={!receipt.data}>
@@ -51,8 +54,25 @@ export function SaleDetailPage() {
         }
       />
 
+      <section className={cx('mb-6 flex flex-wrap items-center gap-4 rounded-2xl p-5 shadow-sm ring-1', s.status === 'voided' ? 'bg-rose-50/60 ring-rose-100' : 'bg-gradient-to-r from-brand-700 to-brand-900 text-white ring-brand-900')}>
+        <span className={cx('grid size-12 place-items-center rounded-2xl', s.status === 'voided' ? 'bg-rose-100 text-rose-600' : 'bg-white/15 text-sun-300')}>{s.status === 'voided' ? <Ban className="size-6" /> : <ReceiptText className="size-6" />}</span>
+        <div className="flex-1">
+          <p className={cx('text-[11px] font-semibold uppercase tracking-wider', s.status === 'voided' ? 'text-rose-600' : 'text-brand-100')}>{s.status === 'voided' ? 'Voided sale' : 'Sale total'}</p>
+          <p className={cx('font-display text-3xl font-bold tabular-nums', s.status === 'voided' && 'text-slate-400 line-through')}>{formatMoney(s.total)}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          {[['Items', String(s.items?.length ?? 0)], ['Paid', formatMoney(s.amount_tendered)], ['Change', formatMoney(s.change_due)]].map(([l, v]) => (
+            <div key={l} className={cx('rounded-xl px-3 py-2', s.status === 'voided' ? 'bg-white ring-1 ring-rose-100' : 'bg-white/10 ring-1 ring-white/15')}>
+              <p className={s.status === 'voided' ? 'text-slate-400' : 'text-brand-100/80'}>{l}</p>
+              <p className="font-display font-semibold tabular-nums">{v}</p>
+            </div>
+          ))}
+        </div>
+        <Badge status={s.status === 'voided' ? 'voided' : s.payment_status} />
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card title="Items" padded={false} className="lg:col-span-2">
+        <Card title="Items" subtitle={`${s.items?.length ?? 0} lines`} icon={Package} padded={false} className="lg:col-span-2">
           <DataTable
             rows={s.items}
             rowKey={(i) => i.id}
@@ -67,7 +87,7 @@ export function SaleDetailPage() {
         </Card>
 
         <div className="space-y-6">
-          <Card title="Summary">
+          <Card title="Summary" icon={Calculator}>
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd><Badge status={s.status === 'voided' ? 'voided' : s.payment_status} /></dd></div>
               <Line label="Subtotal" value={s.subtotal} />
@@ -89,7 +109,7 @@ export function SaleDetailPage() {
             {s.void_reason && <p className="mt-3 rounded-lg bg-red-50 p-2 text-xs text-red-700">Voided {formatDateTime(s.voided_at)}: {s.void_reason}</p>}
           </Card>
 
-          <Card title="Payments" padded={false}>
+          <Card title="Payments" icon={Wallet} padded={false}>
             <DataTable
               rows={s.payments}
               rowKey={(p) => p.id}
@@ -102,7 +122,7 @@ export function SaleDetailPage() {
           </Card>
 
           {refunds.data && refunds.data.data.length > 0 && (
-            <Card title="Refunds" padded={false}>
+            <Card title="Refunds" icon={RotateCcw} padded={false}>
               <DataTable
                 rows={refunds.data.data}
                 rowKey={(r) => r.id}
@@ -117,7 +137,7 @@ export function SaleDetailPage() {
         </div>
       </div>
 
-      <Modal open={showReceipt} onClose={() => setShowReceipt(false)} title="Receipt" size="sm" footer={<Button onClick={() => window.print()} icon={<Printer className="size-4" />}>Print</Button>}>
+      <Modal open={showReceipt} onClose={() => setShowReceipt(false)} title="Receipt" icon={ReceiptText} size="sm" footer={<Button onClick={() => printDocument()} icon={<Printer className="size-4" />}>Print</Button>}>
         {receipt.data && <ReceiptView receipt={receipt.data.data} />}
       </Modal>
 
@@ -145,6 +165,7 @@ function VoidModal({ sale, open, onClose }: { sale: Sale; open: boolean; onClose
       open={open}
       onClose={onClose}
       title={`Void ${sale.receipt_number}?`}
+      icon={Ban}
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="danger" disabled={!reason.trim()} loading={voidSale.isPending} onClick={() => voidSale.mutate({ reason })}>Void sale</Button></>}
     >
       <p className="mb-4 text-sm text-slate-600">Voids are only allowed during the same open shift. The sale is kept on record as voided; stock and drawer cash are restored.</p>

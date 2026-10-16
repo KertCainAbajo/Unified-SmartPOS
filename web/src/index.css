@@ -41,14 +41,38 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
-/* Printing a receipt: only the element marked .print-area is printed, sized for 80 mm paper. */
+/*
+ * Print buttons use lib/print.ts (a separate frame sized per document). This is the fallback for the browser's own
+ * Ctrl+P: only .print-area is shown, and the open dialog stops clipping it so the whole document prints.
+ */
 @media print {
   @page {
     size: 80mm auto;
-    margin: 4mm;
+    margin: 3mm;
+  }
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
   }
   body * {
     visibility: hidden;
+  }
+  dialog[open],
+  dialog[open] * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  dialog[open] {
+    position: absolute !important;
+    inset: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  dialog::backdrop {
+    background: transparent !important;
   }
   .print-area,
   .print-area * {
@@ -57,7 +81,8 @@ body {
   .print-area {
     position: absolute;
     inset: 0 auto auto 0;
-    width: 72mm;
+    width: 74mm;
+    max-width: none !important;
   }
 }
 

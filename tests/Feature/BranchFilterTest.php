@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use Tests\Feature\Pos\PosTestHelpers;
 use Tests\Feature\Staff\StaffTestHelpers;
 use Tests\TestCase;
@@ -25,6 +26,17 @@ class BranchFilterTest extends TestCase
 
         $this->assertEqualsCanonicalizing([$ownerMembership, $davaoCashier->id], $ids('?branch_id='.$davao->id));
         $this->assertEqualsCanonicalizing([$ownerMembership, $mainCashier->id, $davaoCashier->id], $ids(''));
+    }
+
+    public function test_staff_can_be_filtered_by_role(): void
+    {
+        [$tenant, $owner, $main] = $this->createTenant();
+        [$cashier] = $this->activeStaff($tenant, $owner, 'cashier', [$main]);
+        $this->activeStaff($tenant, $owner, 'inventory_staff', [$main]);
+        $this->actingAsUser($owner);
+
+        $ids = array_column($this->getJson($this->tenantUrl($tenant, 'staff?role_id='.Role::system('cashier')->id))->assertOk()->json('data'), 'id');
+        $this->assertSame([$cashier->id], $ids);
     }
 
     public function test_transfer_filter_matches_source_or_destination(): void

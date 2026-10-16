@@ -34,12 +34,12 @@ class ApplicationController extends Controller
 
     public function __construct(private readonly RecruitmentService $recruitment) {}
 
-    /** Applications visible to you. Filters: `status`, `vacancy_id`, `branch_id`, `q` (name, email, reference). */
+    /** Applications visible to you. Filters: `status` (one, or several comma-separated), `vacancy_id`, `branch_id`, `q` (name, email, reference). */
     public function index(Request $request, Tenant $tenant): AnonymousResourceCollection
     {
         $query = $this->recruitment->visibleApplications()
             ->with(['vacancy', 'branch'])
-            ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($request->query('status'), fn ($q, $s) => $q->whereIn('status', explode(',', (string) $s)))
             ->when($request->query('vacancy_id'), fn ($q, $v) => $q->where('vacancy_id', $v))
             ->when($request->query('branch_id'), fn ($q, $b) => $q->where('branch_id', $b))
             ->when($request->query('q'), fn ($q, $term) => $q->where(fn ($w) => $w

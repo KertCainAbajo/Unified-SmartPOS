@@ -107,6 +107,32 @@ export function Checkbox({ label, checked, onChange, disabled }: { label: string
   );
 }
 
+/** On/off toggle with a label and optional description. */
+export function Switch({ label, description, checked, onChange, disabled, tone = 'brand' }: { label: string; description?: ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; tone?: 'brand' | 'warn' }) {
+  return (
+    <label className={cx('flex cursor-pointer items-start justify-between gap-4 rounded-xl p-3 transition hover:bg-slate-50', disabled && 'cursor-not-allowed opacity-60')}>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-slate-800">{label}</span>
+        {description && <span className="mt-0.5 block text-xs text-slate-500">{description}</span>}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={cx(
+          'relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+          checked ? (tone === 'warn' ? 'bg-amber-500' : 'bg-brand-600') : 'bg-slate-200',
+        )}
+      >
+        <span className={cx('inline-block size-5 rounded-full bg-white shadow-sm ring-1 ring-slate-900/5 transition', checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5')} />
+      </button>
+    </label>
+  );
+}
+
 /* ---------------------------------------------------------------- Layout pieces */
 
 export function PageHeader({ title, description, actions, eyebrow }: { title: string; description?: ReactNode; actions?: ReactNode; eyebrow?: string }) {

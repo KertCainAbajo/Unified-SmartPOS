@@ -1,14 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Minus, Percent, Plus, ScanBarcode, Search, Trash2, UserRound, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, Clock, LogOut, Minus, Monitor, PackageSearch, Percent, Plus, Printer, ScanBarcode, Search, ShoppingCart, Store, Trash2, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react';
 import { ReceiptView } from '../../components/ReceiptView';
 import { useToast } from '../../components/Toast';
-import { Badge, Button, Card, ErrorBanner, Field, Input, Modal, Select, Spinner, cx } from '../../components/ui';
+import { Avatar, Button, ErrorBanner, Input, Modal, SearchField, Spinner, cx } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { cartPayload, cartReducer, emptyCart, isValidQuantity, type CartLine, type LineDiscount, type SaleDiscountType } from '../../lib/cart';
 import { formatMoney, formatQty, newIdempotencyKey } from '../../lib/format';
+import { printDocument } from '../../lib/print';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
-import type { Customer, Paginated, Product, QuoteLine, QuoteTotals, Receipt, Register, RegisterSession, Sale } from '../../lib/types';
+import type { Category, Customer, Paginated, Product, QuoteLine, QuoteTotals, Receipt, Register, RegisterSession, Sale } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
 import { CloseShiftModal, OpenShiftCard } from './ShiftDialogs';
@@ -87,43 +88,60 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
     <div className="flex flex-col gap-4 lg:h-[calc(100vh-7.5rem)] lg:flex-row">
       {/* Products */}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          <Badge status="open">Shift open</Badge>
-          <span>
-            {branchName} · Register #{session.register_id}
+        <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 px-4 py-3 text-white shadow-md shadow-brand-900/20">
+          <span aria-hidden className="pointer-events-none absolute -right-10 -top-16 size-40 rounded-full bg-sun-400/20 blur-2xl" />
+          <span className="relative inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
+            <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> Shift open
           </span>
-          <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setClosingShift(true)}>
-            Close shift
-          </Button>
+          <span className="relative flex items-center gap-1.5 text-sm"><Store className="size-4 text-sun-300" />{branchName}</span>
+          <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Monitor className="size-4" />Register #{session.register_id}</span>
+          <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Clock className="size-4" /><ShiftTimer since={session.opened_at} /></span>
+          <button type="button" onClick={() => setClosingShift(true)} className="relative ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-semibold ring-1 ring-white/20 transition hover:bg-white/20">
+            <LogOut className="size-3.5" /> Close shift
+          </button>
         </div>
         <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />
       </div>
 
       {/* Cart */}
-      <Card className="flex min-h-0 w-full flex-col lg:w-[420px]" padded={false}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-800">Current sale</h2>
+      <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 lg:w-[440px]">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+          <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><ShoppingCart className="size-4" /></span>
+          <div className="flex-1">
+            <h2 className="font-display text-sm font-semibold text-slate-900">Current sale</h2>
+            <p className="text-xs text-slate-400">{cart.lines.length === 0 ? 'Empty' : `${cart.lines.length} ${cart.lines.length === 1 ? 'item' : 'items'}`}{cart.customer && <> · {cart.customer.name}</>}</p>
+          </div>
           {cart.lines.length > 0 && (
-            <button className="text-xs font-medium text-slate-500 hover:text-red-600" onClick={() => dispatch({ type: 'clear' })}>
-              Clear
+            <button className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600" onClick={() => dispatch({ type: 'clear' })}>
+              <Trash2 className="size-3.5" /> Clear
             </button>
           )}
         </div>
 
         <ul className="min-h-40 flex-1 divide-y divide-slate-100 overflow-y-auto">
-          {cart.lines.length === 0 && <li className="px-4 py-12 text-center text-sm text-slate-500">Scan a barcode or tap a product to start.</li>}
+          {cart.lines.length === 0 && (
+            <li className="flex flex-col items-center px-6 py-14 text-center">
+              <span className="relative grid size-16 place-items-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                <ScanBarcode className="size-7" />
+                <span aria-hidden className="absolute -right-1 -top-1 size-3.5 rounded-full bg-sun-400 ring-2 ring-white" />
+              </span>
+              <p className="mt-4 font-display font-semibold text-slate-900">Ready for the next customer</p>
+              <p className="mt-1 text-sm text-slate-500">Scan a barcode or tap a product to start.</p>
+            </li>
+          )}
           {cart.lines.map((line, i) => {
             const q = quoteFresh ? quoteLines.get(i) : undefined;
             const validQty = isValidQuantity(line);
             return (
-              <li key={line.key} className="px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+              <li key={line.key} className="auth-fade px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-[11px] font-bold text-white">{line.product.name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')}</span>
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900">{line.product.name}</p>
                     <p className="text-xs text-slate-500">
                       {formatMoney(line.product.price)} / {line.product.unit}
                       {line.discount && (
-                        <span className="ml-1 text-teal-700">
+                        <span className="ml-1 rounded bg-brand-50 px-1 font-medium text-brand-700">
                           · {line.discount.type === 'percent' ? `${line.discount.value}% off` : `${formatMoney(line.discount.value)} off`}
                         </span>
                       )}
@@ -134,22 +152,24 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
                       </p>
                     )}
                   </div>
-                  <p className="text-sm font-semibold tabular-nums text-slate-900">{q ? formatMoney(q.line_total) : '…'}</p>
+                  <p className="font-display text-sm font-semibold tabular-nums text-slate-900">{q ? formatMoney(q.line_total) : <span className="inline-block h-4 w-14 animate-pulse rounded bg-slate-100" />}</p>
                 </div>
-                <div className="mt-2 flex items-center gap-1">
-                  <Button variant="secondary" size="sm" aria-label="Decrease" onClick={() => dispatch({ type: 'increment', key: line.key, by: -1 })}>
+                <div className="mt-2 flex items-center gap-1 pl-12">
+                  <div className={cx('inline-flex items-center rounded-lg bg-slate-50 ring-1', validQty ? 'ring-slate-200' : 'ring-red-400')}>
+                  <button type="button" className="grid size-8 place-items-center rounded-l-lg text-slate-500 transition hover:bg-white hover:text-brand-700" aria-label="Decrease" onClick={() => dispatch({ type: 'increment', key: line.key, by: -1 })}>
                     <Minus className="size-3.5" />
-                  </Button>
-                  <Input
-                    className={cx('h-8 w-20 text-center tabular-nums', !validQty && 'border-red-500')}
+                  </button>
+                  <input
+                    className="h-8 w-14 bg-transparent text-center text-sm font-semibold tabular-nums outline-none"
                     inputMode={line.product.allow_decimal_quantity ? 'decimal' : 'numeric'}
                     value={line.quantity}
                     aria-label={`Quantity of ${line.product.name}`}
                     onChange={(e) => dispatch({ type: 'setQuantity', key: line.key, quantity: e.target.value })}
                   />
-                  <Button variant="secondary" size="sm" aria-label="Increase" onClick={() => dispatch({ type: 'increment', key: line.key, by: 1 })}>
+                  <button type="button" className="grid size-8 place-items-center rounded-r-lg text-slate-500 transition hover:bg-white hover:text-brand-700" aria-label="Increase" onClick={() => dispatch({ type: 'increment', key: line.key, by: 1 })}>
                     <Plus className="size-3.5" />
-                  </Button>
+                  </button>
+                  </div>
                   {can('sales.discount') && cart.saleDiscount.type === 'none' && (
                     <Button variant="ghost" size="sm" aria-label="Line discount" onClick={() => setDiscountLine(line)}>
                       <Percent className="size-3.5" />
@@ -166,24 +186,24 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
 
         <div className="space-y-3 border-t border-slate-100 px-4 py-3">
           <div className="flex flex-wrap gap-2">
-            <Select
-              className="h-9 w-auto flex-1"
-              aria-label="Statutory discount"
-              value={cart.saleDiscount.type}
-              onChange={(e) => dispatch({ type: 'setSaleDiscount', discount: { ...cart.saleDiscount, type: e.target.value as SaleDiscountType } })}
-            >
-              <option value="none">No SC/PWD discount</option>
-              <option value="senior_citizen">Senior Citizen (20% + VAT exempt)</option>
-              <option value="pwd">PWD (20% + VAT exempt)</option>
-            </Select>
+            <div role="radiogroup" aria-label="Statutory discount" className="inline-flex h-9 flex-1 items-center gap-0.5 rounded-xl bg-slate-100 p-1 text-xs font-medium">
+              {([['none', 'Regular'], ['senior_citizen', 'Senior'], ['pwd', 'PWD']] as [SaleDiscountType, string][]).map(([v, l]) => (
+                <button key={v} type="button" role="radio" aria-checked={cart.saleDiscount.type === v} title={v === 'none' ? 'No SC/PWD discount' : '20% off + VAT exempt'}
+                  onClick={() => dispatch({ type: 'setSaleDiscount', discount: { ...cart.saleDiscount, type: v } })}
+                  className={cx('h-full flex-1 rounded-lg transition', cart.saleDiscount.type === v ? (v === 'none' ? 'bg-white text-brand-800 shadow-sm' : 'bg-violet-600 text-white shadow-sm') : 'text-slate-500 hover:text-slate-800')}>
+                  {l}
+                </button>
+              ))}
+            </div>
             {can('customers.view') && (
-              <Button variant="secondary" size="sm" className="h-9" icon={<UserRound className="size-4" />} onClick={() => setCustomerPicker(true)}>
-                {cart.customer ? cart.customer.name : 'Customer'}
-              </Button>
+              <button type="button" onClick={() => setCustomerPicker(true)}
+                className={cx('inline-flex h-9 max-w-40 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ring-1 transition', cart.customer ? 'bg-brand-50 text-brand-800 ring-brand-200' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50')}>
+                <UserRound className="size-4 shrink-0" /><span className="truncate">{cart.customer ? cart.customer.name : 'Customer'}</span>
+              </button>
             )}
           </div>
           {cart.saleDiscount.type !== 'none' && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-violet-50/60 p-2 ring-1 ring-violet-100">
               <Input
                 className="h-9"
                 placeholder="ID number"
@@ -201,31 +221,32 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
 
           {quote.error && cart.lines.length > 0 && <ErrorBanner error={quote.error} />}
 
-          <dl className="space-y-1 text-sm">
+          <dl className="space-y-1 rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-100">
             <Row label="Subtotal" value={totals?.subtotal} />
             {totals && Number(totals.vat_exemption_amount) > 0 && <Row label="Less VAT (SC/PWD)" value={`-${totals.vat_exemption_amount}`} />}
             {totals && Number(totals.discount_total) > 0 && <Row label="Discount" value={`-${totals.discount_total}`} />}
             <Row label="VAT (12%) included" value={totals?.vat_amount} muted />
-            <div className="flex items-baseline justify-between pt-1">
+            <div className="mt-1 flex items-baseline justify-between border-t border-dashed border-slate-200 pt-2">
               <dt className="font-semibold text-slate-900">Total</dt>
-              <dd className="text-2xl font-semibold tabular-nums text-slate-900">{totals ? formatMoney(totals.total) : formatMoney('0.00')}</dd>
+              <dd className="font-display text-3xl font-bold tabular-nums text-brand-900">{totals ? formatMoney(totals.total) : formatMoney('0.00')}</dd>
             </div>
           </dl>
 
-          <Button
-            size="lg"
-            className="w-full"
+          <button
+            type="button"
+            className="group flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sun-300 to-sun-400 font-display text-lg font-bold text-brand-900 shadow-lg shadow-sun-500/30 transition hover:from-sun-300 hover:to-sun-300 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none"
             disabled={!totals || !quoteFresh || !quantitiesValid || !scPwdComplete || !!quote.error}
             onClick={() => {
               checkout.reset();
               setPaying(true);
             }}
           >
-            Charge {totals ? formatMoney(totals.total) : ''}
-          </Button>
+            <Wallet className="size-5" /> Charge {totals ? formatMoney(totals.total) : ''}
+            <ArrowRight className="size-5 transition group-hover:translate-x-1 group-disabled:hidden" />
+          </button>
           {outOfStock && <p className="text-center text-xs text-amber-700">Some items exceed available stock; checkout will be refused unless stock allows it.</p>}
         </div>
-      </Card>
+      </section>
 
       <PaymentModal
         open={paying}
@@ -239,18 +260,29 @@ function Terminal({ session, branchName }: { session: RegisterSession; branchNam
       <Modal
         open={!!completed}
         onClose={() => setCompleted(null)}
-        title={completed ? `Sale complete · Change ${formatMoney(completed.sale.change_due)}` : ''}
+        title="Sale complete"
+        icon={CheckCircle2}
+        description={completed ? <>Receipt {completed.sale.receipt_number}</> : undefined}
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => window.print()}>
+            <Button variant="secondary" icon={<Printer className="size-4" />} onClick={() => printDocument()}>
               Print receipt
             </Button>
-            <Button onClick={() => setCompleted(null)}>New sale</Button>
+            <Button icon={<Plus className="size-4" />} onClick={() => setCompleted(null)}>New sale</Button>
           </>
         }
       >
-        {completed && <ReceiptView receipt={completed.receipt} />}
+        {completed && (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-4 text-center text-white shadow-md">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-100">Change due</p>
+              <p className="font-display text-4xl font-bold tabular-nums text-sun-300">{formatMoney(completed.sale.change_due)}</p>
+              <p className="mt-1 text-xs text-brand-100/80">Total {formatMoney(completed.sale.total)}</p>
+            </div>
+            <ReceiptView receipt={completed.receipt} />
+          </div>
+        )}
       </Modal>
 
       <LineDiscountModal
@@ -293,7 +325,9 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
   const [term, setTerm] = useState('');
   const debounced = useDebounced(term, 250);
   const inputRef = useRef<HTMLInputElement>(null);
-  const results = useTenantQuery<Paginated<Product>>('/products', { q: debounced || undefined, with_stock: 1, per_page: 30 });
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const categories = useTenantQuery<{ data: Category[] }>('/categories');
+  const results = useTenantQuery<Paginated<Product>>('/products', { q: debounced || undefined, category_id: categoryId ?? undefined, with_stock: 1, per_page: 30 });
 
   useEffect(() => inputRef.current?.focus(), []);
 
@@ -326,13 +360,13 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
   }
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col" padded={false}>
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
       <form onSubmit={onSubmit} className="flex items-center gap-2 border-b border-slate-100 p-3">
         <div className="relative flex-1">
-          <ScanBarcode className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
+          <ScanBarcode className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-brand-600" />
           <Input
             ref={inputRef}
-            className="h-12 pl-11 text-base"
+            className="h-12 rounded-2xl bg-slate-50 pl-12 text-base focus:bg-white"
             placeholder="Scan barcode or search name / SKU"
             value={term}
             onChange={(e) => setTerm(e.target.value)}
@@ -344,19 +378,33 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
             </button>
           )}
         </div>
-        <Button type="submit" size="lg" variant="secondary" icon={<Search className="size-4" />}>
+        <Button type="submit" size="lg" icon={<Search className="size-4" />}>
           Add
         </Button>
       </form>
+      {(categories.data?.data.length ?? 0) > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto border-b border-slate-100 px-3 py-2 [scrollbar-width:none]">
+          {[{ id: null as number | null, name: 'All products' }, ...(categories.data?.data ?? []).filter((c) => c.is_active)].map((c) => (
+            <button key={c.id ?? 'all'} type="button" onClick={() => setCategoryId(c.id)}
+              className={cx('shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition', categoryId === c.id ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {results.isPending ? (
-          <Spinner />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <span key={i} className="h-28 animate-pulse rounded-xl bg-slate-100" />)}</div>
         ) : results.error ? (
           <ErrorBanner error={results.error} />
         ) : results.data?.data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-slate-500">No products found.</p>
+          <div className="flex flex-col items-center py-14 text-center">
+            <span className="grid size-14 place-items-center rounded-2xl bg-slate-100 text-slate-400"><PackageSearch className="size-6" /></span>
+            <p className="mt-3 font-medium text-slate-700">No products found</p>
+            <p className="text-sm text-slate-500">Try another name, SKU or category.</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {results.data?.data.map((p) => {
               const stock = p.stock?.find((s) => s.branch_id === branchId)?.quantity;
               const low = p.track_inventory && stock !== undefined && Number(stock) <= 0;
@@ -368,14 +416,18 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
                     onPick(p);
                     inputRef.current?.focus();
                   }}
-                  className="flex flex-col items-start rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-teal-600 hover:shadow-sm"
+                  className={cx('group relative flex flex-col items-start rounded-xl border bg-white p-3 text-left transition active:scale-[0.98]', low ? 'border-rose-100 bg-rose-50/30' : 'border-slate-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md')}
                 >
-                  <span className="line-clamp-2 text-sm font-medium text-slate-900">{p.name}</span>
-                  <span className="mt-0.5 text-xs text-slate-500">{p.sku}</span>
-                  <span className="mt-2 flex w-full items-end justify-between">
-                    <span className="font-semibold tabular-nums text-slate-900">{formatMoney(p.price)}</span>
+                  <span className="mb-2 flex w-full items-start justify-between gap-2">
+                    <span className={cx('grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br text-[11px] font-bold text-white', TILES[p.id % TILES.length])}>{p.name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')}</span>
+                    <span className="grid size-7 place-items-center rounded-full bg-brand-50 text-brand-600 opacity-0 transition group-hover:opacity-100"><Plus className="size-4" /></span>
+                  </span>
+                  <span className="line-clamp-2 text-sm font-medium leading-snug text-slate-900">{p.name}</span>
+                  <span className="mt-0.5 font-mono text-[10px] text-slate-400">{p.sku}</span>
+                  <span className="mt-auto flex w-full items-end justify-between pt-2">
+                    <span className="font-display font-bold tabular-nums text-brand-900">{formatMoney(p.price)}</span>
                     {p.track_inventory && (
-                      <span className={cx('text-xs', low ? 'text-red-600' : 'text-slate-500')}>{stock !== undefined ? `${formatQty(stock)} ${p.unit}` : '0'}</span>
+                      <span className={cx('rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums', low ? 'bg-rose-100 text-rose-700' : Number(stock ?? 0) <= Number(p.reorder_level) ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500')}>{stock !== undefined ? `${formatQty(stock)} ${p.unit}` : 'Out'}</span>
                     )}
                   </span>
                 </button>
@@ -384,8 +436,21 @@ function ProductPicker({ branchId, onPick }: { branchId: number; onPick: (p: Pro
           </div>
         )}
       </div>
-    </Card>
+    </section>
   );
+}
+
+const TILES = ['from-brand-400 to-brand-600', 'from-sky-400 to-sky-600', 'from-amber-400 to-orange-500', 'from-violet-400 to-violet-600', 'from-rose-400 to-rose-600', 'from-teal-400 to-emerald-600'];
+
+/** Live "2h 14m" since the shift opened. */
+function ShiftTimer({ since }: { since: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const mins = Math.max(0, Math.floor((now - new Date(since).getTime()) / 60000));
+  return <>{Math.floor(mins / 60)}h {String(mins % 60).padStart(2, '0')}m</>;
 }
 
 function LineDiscountModal({ line, onClose, onApply }: { line: CartLine | null; onClose: () => void; onApply: (d?: LineDiscount) => void }) {
@@ -403,7 +468,9 @@ function LineDiscountModal({ line, onClose, onApply }: { line: CartLine | null; 
     <Modal
       open={!!line}
       onClose={onClose}
-      title={`Discount — ${line?.product.name ?? ''}`}
+      title="Line discount"
+      icon={Percent}
+      description={line?.product.name}
       size="sm"
       footer={
         <>
@@ -418,18 +485,22 @@ function LineDiscountModal({ line, onClose, onApply }: { line: CartLine | null; 
         </>
       }
     >
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Type">
-          {(id) => (
-            <Select id={id} value={type} onChange={(e) => setType(e.target.value as LineDiscount['type'])}>
-              <option value="percent">Percent (%)</option>
-              <option value="fixed">Amount (₱)</option>
-            </Select>
-          )}
-        </Field>
-        <Field label="Value">
-          {(id) => <Input id={id} inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} />}
-        </Field>
+      <div className="space-y-4">
+        <div role="radiogroup" aria-label="Discount type" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm font-medium">
+          {([['percent', 'Percent (%)'], ['fixed', 'Amount (₱)']] as [LineDiscount['type'], string][]).map(([v, l]) => (
+            <button key={v} type="button" role="radio" aria-checked={type === v} onClick={() => setType(v)} className={cx('h-9 rounded-lg transition', type === v ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>{l}</button>
+          ))}
+        </div>
+        <div className="flex h-14 items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-100">
+          {type === 'fixed' && <span className="font-display text-2xl font-bold text-slate-400">₱</span>}
+          <input inputMode="decimal" autoFocus aria-label="Discount value" placeholder="0" value={value} onChange={(e) => setValue(e.target.value)} className="h-full w-full bg-transparent px-2 font-display text-2xl font-bold tabular-nums outline-none" />
+          {type === 'percent' && <span className="font-display text-2xl font-bold text-slate-400">%</span>}
+        </div>
+        {type === 'percent' && (
+          <div className="flex gap-2">
+            {['5', '10', '15', '20', '50'].map((v) => <button key={v} type="button" onClick={() => setValue(v)} className={cx('flex-1 rounded-lg py-1.5 text-xs font-semibold ring-1 transition', value === v ? 'bg-brand-50 text-brand-800 ring-brand-300' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50')}>{v}%</button>)}
+          </div>
+        )}
       </div>
       <p className="mt-3 text-xs text-slate-500">The server recalculates the discount and VAT; it cannot exceed the line amount.</p>
     </Modal>
@@ -442,14 +513,16 @@ function CustomerPicker({ open, onClose, onPick }: { open: boolean; onClose: () 
   const list = useTenantQuery<Paginated<Customer>>('/customers', { q: debounced || undefined, per_page: 10 }, { enabled: open });
 
   return (
-    <Modal open={open} onClose={onClose} title="Select customer" footer={<Button variant="ghost" onClick={() => onPick(null)}>No customer</Button>}>
-      <Input placeholder="Search name, phone or email" value={term} onChange={(e) => setTerm(e.target.value)} autoFocus />
-      <ul className="mt-3 divide-y divide-slate-100">
+    <Modal open={open} onClose={onClose} title="Select customer" icon={UserRound} description="Attach the sale to a customer record." footer={<Button variant="ghost" onClick={() => onPick(null)}>Walk-in (no customer)</Button>}>
+      <SearchField value={term} onChange={setTerm} placeholder="Search name, phone or email" />
+      <ul className="mt-3 space-y-1">
         {list.error && <ErrorBanner error={list.error} />}
         {list.data?.data.map((c) => (
           <li key={c.id}>
-            <button className="w-full px-1 py-2 text-left text-sm hover:bg-slate-50" onClick={() => onPick({ id: c.id, name: c.name })}>
-              <span className="font-medium text-slate-900">{c.name}</span> <span className="text-slate-500">{c.phone}</span>
+            <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-brand-50" onClick={() => onPick({ id: c.id, name: c.name })}>
+              <Avatar name={c.name} size="sm" />
+              <span className="min-w-0 flex-1"><span className="block truncate font-medium text-slate-900">{c.name}</span><span className="block truncate text-xs text-slate-500">{[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact details'}</span></span>
+              <ChevronRight className="size-4 text-slate-300" />
             </button>
           </li>
         ))}

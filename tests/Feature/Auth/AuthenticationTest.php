@@ -249,6 +249,22 @@ class AuthenticationTest extends TestCase
         $this->assertSame(0, AuditLog::query()->where('new_values', 'like', '%Another123%')->count());
     }
 
+    public function test_changing_email_requires_the_current_password(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create(['email' => 'owner@example.com', 'password' => 'Secret123'])->fresh();
+        $this->actingAsUser($user);
+
+        $this->patchJson('/api/v1/me', ['email' => 'new@example.com'])->assertUnprocessable()->assertJsonValidationErrors('current_password');
+        $this->patchJson('/api/v1/me', ['email' => 'new@example.com', 'current_password' => 'wrong'])->assertUnprocessable()->assertJsonValidationErrors('current_password');
+        // Re-sending the same address (any case) does not ask for the password.
+        $this->patchJson('/api/v1/me', ['email' => 'OWNER@example.com', 'name' => 'Owner'])->assertOk();
+
+        $this->patchJson('/api/v1/me', ['email' => 'New@Example.com', 'current_password' => 'Secret123'])
+            ->assertOk()->assertJsonPath('data.email', 'new@example.com')->assertJsonPath('data.email_verified', false);
+        Notification::assertSentTo($user->fresh(), VerifyEmail::class);
+    }
+
     public function test_memberships_lists_each_business_with_its_roles(): void
     {
         [$tenantA, $owner] = $this->createTenant();
