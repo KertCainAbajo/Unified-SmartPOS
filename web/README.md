@@ -20,6 +20,18 @@ npm run dev
 Open **http://localhost:5173** and sign in. Local demo accounts (password `DemoPass123`):
 `owner@`, `manager@`, `cashier@`, `cashier.makati@`, `inventory@demo.smartpos.test`.
 
+### Run the customer shop and staff app together
+
+The customer storefront and staff app use the same Vite server and Laravel API. After migrating the database,
+start Laravel and Vite in two terminals as above, then open both pages:
+
+- **Customer shop:** `http://localhost:5173/shop/aling-nena-mini-mart`
+- **Staff app:** `http://localhost:5173/login` (sign in as `owner@demo.smartpos.test`, password `DemoPass123`)
+
+In the staff app, choose the demo business and open **Online orders** from the Selling section. Orders appear there
+for confirmation and preparation; staff complete pickup through POS checkout. The customer needs to create a shop
+account at the customer URL. For another business, replace `aling-nena-mini-mart` with its business code (slug).
+
 ## How authentication works
 
 The app uses **Sanctum SPA (cookie) authentication**, not tokens in browser storage:

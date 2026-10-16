@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   ShoppingCart,
+  ShoppingBag,
   Tags,
   Truck,
   UserCog,
@@ -68,6 +69,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { to: 'refunds', label: 'Refunds', icon: RotateCcw, any: ['refunds.create', 'refunds.approve'], badge: 'refunds', keywords: 'returns' },
       { to: 'shifts', label: 'Shifts', icon: Clock, any: ['shifts.operate', 'shifts.view_all'], keywords: 'register sessions cash' },
       { to: 'customers', label: 'Customers', icon: UserRound, any: ['customers.view'], keywords: 'clients' },
+      { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all'], keywords: 'pickup shop customer orders' },
     ],
   },
   {

@@ -19,6 +19,7 @@ class DocumentNumberer
         'purchase_order' => 'PO',
         'goods_receipt' => 'GR',
         'stock_count' => 'SC',
+        'online_order' => 'ORD',
     ];
 
     public function next(int $tenantId, string $type, ?Branch $branch = null): string

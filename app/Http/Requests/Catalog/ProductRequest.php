@@ -42,6 +42,7 @@ class ProductRequest extends FormRequest
             'track_inventory' => ['sometimes', 'boolean'],
             'allow_decimal_quantity' => ['sometimes', 'boolean'],
             'reorder_level' => ['sometimes', 'numeric', 'decimal:0,3', 'min:0', 'max:999999999'],
+            'show_online' => ['sometimes', 'boolean'],
             'price' => $creating ? ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999'] : ['prohibited'],
             'cost_price' => $creating ? ['sometimes', 'numeric', 'decimal:0,4', 'min:0', 'max:999999999'] : ['prohibited'],
         ];

@@ -70,6 +70,7 @@ class TenantController extends Controller
             'refund_window_days' => ['sometimes', 'integer', 'min:0', 'max:3650'],
             // Hiring policy: may whoever recommended an applicant (manager interview) also give final approval?
             'recruitment_allow_self_approval' => ['sometimes', 'boolean'],
+            'shop_enabled' => ['sometimes', 'boolean'],
         ]);
 
         $original = $tenant->getOriginal();

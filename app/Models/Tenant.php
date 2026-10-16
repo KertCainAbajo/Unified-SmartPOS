@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'name', 'legal_name', 'tin', 'address', 'phone', 'email', 'staff_email_domain', 'timezone',
     'vat_registered', 'vat_rate', 'prices_include_vat', 'allow_negative_stock',
-    'refund_approval_threshold', 'refund_window_days', 'recruitment_allow_self_approval',
+    'refund_approval_threshold', 'refund_window_days', 'recruitment_allow_self_approval', 'shop_enabled',
 ])]
 class Tenant extends Model
 {
@@ -27,6 +27,7 @@ class Tenant extends Model
         'status' => 'active',
         'staff_email_domain' => null,
         'recruitment_allow_self_approval' => false,
+        'shop_enabled' => true,
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ class Tenant extends Model
             'refund_approval_threshold' => 'decimal:2',
             'refund_window_days' => 'integer',
             'recruitment_allow_self_approval' => 'boolean',
+            'shop_enabled' => 'boolean',
         ];
     }
 
@@ -132,6 +134,16 @@ class Tenant extends Model
     public function customers(): HasMany
     {
         return $this->hasMany(Customer::class);
+    }
+
+    public function customerAccounts(): HasMany
+    {
+        return $this->hasMany(CustomerAccount::class);
+    }
+
+    public function onlineOrders(): HasMany
+    {
+        return $this->hasMany(OnlineOrder::class);
     }
 
     public function registers(): HasMany

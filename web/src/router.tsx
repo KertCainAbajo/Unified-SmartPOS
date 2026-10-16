@@ -37,6 +37,7 @@ export const router = createBrowserRouter([
   { path: '/careers', element: <CareersIndexPage /> },
   { path: '/careers/:code', element: <CareersPage /> },
   { path: '/applications/status', element: <ApplicationStatusPage /> },
+  { path: '/shop/:business', lazy: page(() => import('./pages/shop/ShopPage'), 'ShopPage') },
   {
     element: <GuestOnly />,
     children: [
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([
           { path: 'transfers', lazy: page(() => import('./pages/inventory/TransfersPage'), 'TransfersPage') },
           { path: 'purchasing', lazy: page(() => import('./pages/purchasing/PurchasingPage'), 'PurchasingPage') },
           { path: 'customers', lazy: page(() => import('./pages/operations/CustomersPage'), 'CustomersPage') },
+          { path: 'online-orders', lazy: page(() => import('./pages/operations/OnlineOrdersPage'), 'OnlineOrdersPage') },
           { path: 'expenses', lazy: page(() => import('./pages/operations/ExpensesPage'), 'ExpensesPage') },
           { path: 'reports', lazy: page(() => import('./pages/reports/ReportsPage'), 'ReportsPage') },
           { path: 'audit', lazy: page(() => import('./pages/reports/AuditLogPage'), 'AuditLogPage') },

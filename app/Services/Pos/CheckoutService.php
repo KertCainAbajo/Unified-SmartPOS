@@ -3,6 +3,7 @@
 namespace App\Services\Pos;
 
 use App\Enums\LineDiscountType;
+use App\Enums\OnlineOrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\RegisterSessionStatus;
@@ -12,6 +13,7 @@ use App\Enums\StockMovementType;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Branch;
 use App\Models\Product;
+use App\Models\OnlineOrder;
 use App\Models\Register;
 use App\Models\RegisterSession;
 use App\Models\Sale;
@@ -110,6 +112,36 @@ class CheckoutService
             throw new BusinessRuleException('This branch is inactive.', 'BRANCH_INACTIVE');
         }
 
+        // A pickup order is completed only by the normal sale flow, so stock, tax, tender and receipt
+        // accounting remain identical to every other sale. Lock the order to prevent a duplicate pickup.
+        $onlineOrder = null;
+        if (isset($data['online_order_id'])) {
+            $onlineOrder = OnlineOrder::query()->where('tenant_id', $tenant->id)
+                ->lockForUpdate()->findOrFail($data['online_order_id']);
+            if ($onlineOrder->branch_id !== $branch->id || $onlineOrder->status !== OnlineOrderStatus::Ready) {
+                throw new BusinessRuleException('The pickup order is not ready at this branch.', 'ONLINE_ORDER_NOT_READY', status: 409);
+            }
+            if (($data['discount']['type'] ?? 'none') !== 'none') {
+                throw new BusinessRuleException('Pickup orders cannot be changed with a sale discount.', 'ONLINE_ORDER_DISCOUNT_NOT_ALLOWED', status: 409);
+            }
+            $expected = $onlineOrder->items()->get()->keyBy('product_id');
+            $actual = collect($data['items'])->keyBy(fn (array $line) => (int) $line['product_id']);
+            if ($expected->keys()->sort()->values()->all() !== $actual->keys()->sort()->values()->all()) {
+                throw new BusinessRuleException('The cart does not match the pickup order.', 'ONLINE_ORDER_ITEMS_MISMATCH', status: 409);
+            }
+            foreach ($expected as $productId => $orderedLine) {
+                $checkoutLine = $actual->get($productId);
+                if (Money::cmp((string) $orderedLine->quantity, (string) $checkoutLine['quantity']) !== 0 || isset($checkoutLine['discount'])) {
+                    throw new BusinessRuleException('The cart does not match the pickup order.', 'ONLINE_ORDER_ITEMS_MISMATCH', status: 409);
+                }
+            }
+            $accountCustomerId = $onlineOrder->account()->value('customer_id');
+            if (isset($data['customer_id']) && $accountCustomerId && (int) $data['customer_id'] !== (int) $accountCustomerId) {
+                throw new BusinessRuleException('The sale customer does not match the pickup order.', 'ONLINE_ORDER_CUSTOMER_MISMATCH', status: 409);
+            }
+            $data['customer_id'] = $accountCustomerId ?? ($data['customer_id'] ?? null);
+        }
+
         // 2. Products and discounts (authoritative prices from the database).
         ['products' => $products, 'calculation' => $calculation, 'sale_discount' => $saleDiscount] = $this->price($tenant, $data);
         $totals = $calculation['totals'];
@@ -186,6 +218,14 @@ class CheckoutService
         // 6. Payments and shift cash.
         foreach ($payments['lines'] as $payment) {
             $sale->payments()->create(['tenant_id' => $tenant->id, ...$payment, 'status' => 'completed']);
+        }
+        if ($onlineOrder) {
+            $onlineOrder->forceFill([
+                'status' => OnlineOrderStatus::Completed,
+                'completed_at' => now(),
+                'sale_id' => $sale->id,
+                'handled_by' => $cashier->id,
+            ])->save();
         }
         if (Money::isPositive($payments['cash_applied'])) {
             $session->cash_sales = Money::round(Money::add((string) $session->cash_sales, $payments['cash_applied']));

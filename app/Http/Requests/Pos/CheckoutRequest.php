@@ -40,6 +40,7 @@ class CheckoutRequest extends FormRequest
             'idempotency_key' => ['required', 'string', 'min:8', 'max:100', 'regex:/^[A-Za-z0-9_\-:.]+$/'],
             'register_id' => ['required', 'integer', Rule::exists('registers', 'id')->where('tenant_id', $tenantId)],
             'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->where('tenant_id', $tenantId)],
+            'online_order_id' => ['sometimes', 'integer', Rule::exists('online_orders', 'id')->where('tenant_id', $tenantId)],
             'notes' => ['nullable', 'string', 'max:500'],
 
             'items' => ['required', 'array', 'min:1', 'max:200'],

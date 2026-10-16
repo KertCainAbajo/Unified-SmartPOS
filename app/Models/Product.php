@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'category_id', 'sku', 'barcode', 'name', 'description', 'unit', 'tax_type',
-    'track_inventory', 'allow_decimal_quantity', 'reorder_level',
+    'track_inventory', 'allow_decimal_quantity', 'reorder_level', 'show_online',
 ])]
 class Product extends Model
 {
@@ -30,6 +30,7 @@ class Product extends Model
         'allow_decimal_quantity' => false,
         'reorder_level' => '0.000',
         'status' => 'active',
+        'show_online' => true,
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ class Product extends Model
             'track_inventory' => 'boolean',
             'allow_decimal_quantity' => 'boolean',
             'archived_at' => 'datetime',
+            'show_online' => 'boolean',
         ];
     }
 

@@ -30,6 +30,7 @@ class ProductResource extends JsonResource
             'track_inventory' => $this->track_inventory,
             'allow_decimal_quantity' => $this->allow_decimal_quantity,
             'reorder_level' => $this->reorder_level,
+            'show_online' => $this->show_online,
             'status' => $this->status,
             'archived_at' => $this->archived_at,
             'stock' => $this->whenLoaded('inventory', fn () => $this->inventory->map(fn ($row) => [

@@ -30,6 +30,8 @@ use App\Http\Controllers\Api\V1\Staff\StaffController;
 use App\Http\Controllers\Api\V1\Tenancy\BranchController;
 use App\Http\Controllers\Api\V1\Tenancy\RoleController;
 use App\Http\Controllers\Api\V1\Tenancy\TenantController;
+use App\Http\Controllers\Api\V1\Shop\CustomerShopController;
+use App\Http\Controllers\Api\V1\Shop\StaffOnlineOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -62,6 +64,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('applications/withdraw', [PublicCareerController::class, 'withdraw'])->name('withdraw');
         Route::post('applications/offer-response', [PublicCareerController::class, 'offerResponse'])->name('offer-response');
         Route::post('applications/reschedule-request', [PublicCareerController::class, 'rescheduleRequest'])->name('reschedule-request');
+    });
+
+    // ---- Customer online shop ---------------------------------------------------------------
+    Route::prefix('shop/{business}')->name('shop.')->middleware('throttle:api')->group(function () {
+        Route::get('/', [CustomerShopController::class, 'catalog'])->name('catalog');
+        Route::post('register', [CustomerShopController::class, 'register'])->middleware('throttle:auth')->name('register');
+        Route::post('login', [CustomerShopController::class, 'login'])->middleware('throttle:login')->name('login');
+        Route::middleware('auth:customer')->group(function () {
+            Route::post('logout', [CustomerShopController::class, 'logout'])->name('logout');
+            Route::get('me', [CustomerShopController::class, 'me'])->name('me');
+            Route::get('orders', [CustomerShopController::class, 'orders'])->name('orders.index');
+            Route::post('orders', [CustomerShopController::class, 'placeOrder'])->middleware('throttle:checkout')->name('orders.store');
+            Route::post('orders/{order}/cancel', [CustomerShopController::class, 'cancelOrder'])->whereNumber('order')->name('orders.cancel');
+        });
     });
 
     // ---- Authenticated ---------------------------------------------------------------------
@@ -215,6 +231,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
                 // Customers and expenses
                 Route::apiResource('customers', CustomerController::class)->except('destroy');
+                Route::get('online-orders', [StaffOnlineOrderController::class, 'index'])->name('online-orders.index');
+                Route::post('online-orders/{order}/status', [StaffOnlineOrderController::class, 'updateStatus'])->name('online-orders.status');
                 Route::get('expense-categories', [ExpenseController::class, 'categories'])->name('expense-categories.index');
                 Route::post('expense-categories', [ExpenseController::class, 'storeCategory'])->name('expense-categories.store');
                 Route::patch('expense-categories/{expenseCategory}', [ExpenseController::class, 'updateCategory'])->name('expense-categories.update');
