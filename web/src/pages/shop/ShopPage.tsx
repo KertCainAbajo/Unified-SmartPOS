@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Clock3, Cookie, CupSoda, Droplets, LayoutGrid, Lock, LogOut,
-  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, Soup, SprayCan, Store, Trash2, Wallet, Wheat, X,
+  Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
+  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Store, Trash2, Wheat, X,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { CustomerAuthDialog } from './CustomerAuthDialog';
+import { ShopHero } from './ShopVisuals';
 
 interface Branch { id: number; code: string; name: string; address: string | null }
-interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null }
+interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null }
 interface Catalog { business: { name: string; code: string }; branches: Branch[]; data: ShopProduct[] }
 interface Account { id: number; name: string; email: string; phone: string }
 interface Order { id: number; order_number: string; status: string; estimated_total: string; placed_at: string; branch: { name: string }; items: { id: number; name: string; quantity: string; unit: string; line_total: string }[] }
@@ -21,6 +22,7 @@ const peso = (value: string | number) => new Intl.NumberFormat('en-PH', { style:
 const statusNames: Record<string, string> = { pending: 'Waiting for store confirmation', confirmed: 'Being prepared', ready: 'Ready for pickup', completed: 'Picked up', cancelled: 'Cancelled' };
 const statusFlow = ['pending', 'confirmed', 'ready', 'completed'];
 const ALL = 'All products';
+const SAVED = 'Saved';
 
 /** Category look: an icon picked from the category name, and a colour that stays the same for that category. */
 const tones = [
@@ -52,6 +54,13 @@ export function ShopPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL);
   const [sort, setSort] = useState<Sort>('featured');
+  const savedKey = `shop-saved:${business}`;
+  const [saved, setSaved] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem(savedKey) ?? '[]') as number[]; } catch { return []; } });
+  const toggleSaved = (id: number) => setSaved((old) => {
+    const next = old.includes(id) ? old.filter((x) => x !== id) : [...old, id];
+    try { localStorage.setItem(savedKey, JSON.stringify(next)); } catch { /* storage unavailable: keep it for this visit */ }
+    return next;
+  });
   const catalog = useQuery({ queryKey: ['shop-catalog', business], queryFn: () => api<Catalog>(base) });
   const account = useQuery({
     queryKey: ['shop-account', business],
@@ -99,10 +108,11 @@ export function ShopPage() {
   const categories = [ALL, ...new Set(shop.data.map((product) => product.category).filter((value): value is string => !!value))];
   const toneFor = (category: string | null) => tones[Math.max(0, categories.indexOf(category ?? '') - 1) % tones.length];
   const countFor = (category: string) => category === ALL ? shop.data.length : shop.data.filter((product) => product.category === category).length;
+  const savedCount = shop.data.filter((product) => saved.includes(product.id)).length;
   const term = search.trim().toLowerCase();
   const visibleProducts = shop.data
     .filter((product) =>
-      (selectedCategory === ALL || product.category === selectedCategory) &&
+      (selectedCategory === ALL || (selectedCategory === SAVED ? saved.includes(product.id) : product.category === selectedCategory)) &&
       `${product.name} ${product.description ?? ''} ${product.category ?? ''}`.toLowerCase().includes(term))
     .sort((a, b) => sort === 'price-asc' ? Number(a.price) - Number(b.price) : sort === 'price-desc' ? Number(b.price) - Number(a.price) : sort === 'name' ? a.name.localeCompare(b.name) : 0);
   const setQuantity = (product: ShopProduct, quantity: number) => setCart((old) => {
@@ -166,44 +176,16 @@ export function ShopPage() {
               <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{countFor(category)}</span>
             </button>;
           })}
+          {(savedCount > 0 || selectedCategory === SAVED) && <button onClick={() => setSelectedCategory(SAVED)} aria-pressed={selectedCategory === SAVED} className={`ml-auto inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold transition ${selectedCategory === SAVED ? 'bg-rose-500 text-white shadow-sm' : 'text-rose-600 hover:bg-rose-50'}`}>
+            <Heart size={15} className={selectedCategory === SAVED ? 'fill-white' : 'fill-rose-500 text-rose-500'} /> Saved
+            <span className={`rounded-full px-1.5 text-[10px] font-bold ${selectedCategory === SAVED ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-600'}`}>{savedCount}</span>
+          </button>}
         </div>
       </nav>
     </header>
 
     <div id="top" className="mx-auto max-w-[1560px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-      {/* ───────── Hero ───────── */}
-      <section className="relative isolate overflow-hidden rounded-[32px] bg-[#0a3d2c] text-white shadow-xl shadow-emerald-950/10">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,#13724f_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,#0f5a40_0%,transparent_60%)]" />
-        <div className="absolute -right-24 -top-32 -z-10 size-[420px] rounded-full bg-amber-400/15 blur-3xl" />
-        <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:22px_22px]" />
-        <div className="grid gap-8 p-6 sm:p-10 lg:grid-cols-[1.25fr_1fr] lg:items-center lg:gap-12 lg:p-12">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.18em] text-emerald-100 ring-1 ring-white/15"><Store size={13} className="text-amber-300" /> Your neighborhood store, online</span>
-            <h2 className="mt-5 max-w-2xl font-display text-[34px] font-bold leading-[1.06] tracking-tight sm:text-5xl lg:text-[56px]">
-              Shop online.<br /><span className="bg-gradient-to-r from-amber-200 via-amber-300 to-amber-400 bg-clip-text text-transparent">Pick up in minutes.</span>
-            </h2>
-            <p className="mt-4 max-w-lg text-sm leading-6 text-emerald-50/80 sm:text-base sm:leading-7">Fill your basket with everyday essentials, choose the branch nearest you, and collect your order when the store has it ready.</p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <a href="#products" className="inline-flex h-12 items-center gap-2 rounded-full bg-amber-400 px-6 text-sm font-bold text-emerald-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300">Start shopping <ArrowRight size={16} /></a>
-              {!signedIn && <button onClick={() => openAuth('register')} className="inline-flex h-12 items-center rounded-full px-6 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
-            </div>
-            <dl className="mt-9 grid max-w-lg grid-cols-3 divide-x divide-white/10 rounded-2xl bg-white/[.06] ring-1 ring-white/10">
-              <HeroStat value={String(shop.data.length)} label="Products" />
-              <HeroStat value={String(shop.branches.length)} label={shop.branches.length === 1 ? 'Pickup branch' : 'Pickup branches'} />
-              <HeroStat value="₱0" label="Paid online" />
-            </dl>
-          </div>
-
-          <div className="hidden rounded-3xl bg-white/[.07] p-5 ring-1 ring-white/15 backdrop-blur sm:block sm:p-6">
-            <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">How pickup works</p>
-            <ol className="mt-4 space-y-3">
-              <HowStep n={1} icon={ShoppingBasket} title="Fill your basket" text="Browse by category or search for what you need." />
-              <HowStep n={2} icon={Clock3} title="The store prepares it" text="Track your order from Waiting to Ready for pickup." />
-              <HowStep n={3} icon={Wallet} title="Collect and pay in store" text="Prices are confirmed and paid at the counter." />
-            </ol>
-          </div>
-        </div>
-      </section>
+      <ShopHero photos={shop.data} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
       <main className="mt-8 grid gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
@@ -237,8 +219,8 @@ export function ShopPage() {
             ? <EmptyState title="No products yet" text="This store hasn't listed anything online yet. Please check back soon." />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
-              : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-3 2xl:grid-cols-4">
-                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} quantity={cart[product.id]?.quantity ?? 0} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} />)}
+              : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
               </div>}
         </section>
 
@@ -264,7 +246,9 @@ export function ShopPage() {
                   const Icon = iconFor(product.category);
                   const tone = toneFor(product.category);
                   return <li key={product.id} className="flex items-center gap-3 rounded-xl py-2">
-                    <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${tone.bg} ${tone.fg}`}><Icon size={18} /></span>
+                    {product.image_url
+                      ? <img src={product.image_url} alt="" className="size-11 shrink-0 rounded-xl bg-white object-cover ring-1 ring-slate-200" />
+                      : <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${tone.bg} ${tone.fg}`}><Icon size={18} /></span>}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{product.name}</p>
                       <p className="text-xs text-slate-500">{peso(product.price)} / {product.unit}</p>
@@ -350,7 +334,10 @@ export function ShopPage() {
           <ul className="mt-4 space-y-2.5 text-sm">{statusFlow.map((status) => <li key={status} className="flex items-center gap-2"><PackageCheck size={15} className="text-emerald-300" />{statusNames[status]}</li>)}</ul>
         </div>
       </div>
-      <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-emerald-50/50">{shop.business.name} · Online pickup powered by SmartPOS</div>
+      <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-emerald-50/50">
+        {shop.business.name} · Online pickup powered by SmartPOS
+        <span className="mt-1 block text-[11px] text-emerald-50/35">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
+      </div>
     </footer>
 
     {/* Mobile basket bar */}
@@ -371,30 +358,41 @@ export function ShopPage() {
       error={error}
       basketCount={basketCount}
       basketTotal={peso(total)}
+      photos={[...lines.map(({ product }) => product), ...shop.data.filter((product) => !cart[product.id])]}
     />
   </div>;
 }
 
 function cartLines(cart: Record<number, CartLine>): CartLine[] { return Object.values(cart); }
 
-function ProductCard({ product, quantity, tone, Icon, onChange }: { product: ShopProduct; quantity: number; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void }) {
-  return <article className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_44px_-22px_rgba(6,60,40,.4)] ${quantity ? 'ring-2 ring-emerald-600' : 'shadow-[0_1px_3px_rgba(15,23,42,.05)] ring-1 ring-slate-200/80'}`}>
-    <div className={`relative grid h-32 place-items-center overflow-hidden sm:h-40 ${tone.bg}`}>
-      <div className="absolute inset-0 opacity-50 [background-image:radial-gradient(rgba(255,255,255,.9)_1.2px,transparent_1.2px)] [background-size:14px_14px]" />
-      <div className={`absolute -bottom-10 -right-10 size-32 rounded-full bg-white/50 transition duration-500 group-hover:scale-125`} />
-      <span className={`relative grid size-16 place-items-center rounded-2xl bg-white shadow-[0_8px_20px_-8px_rgba(15,23,42,.25)] transition duration-300 group-hover:-rotate-6 group-hover:scale-110 sm:size-20 ${tone.fg}`}><Icon className="size-8 sm:size-9" strokeWidth={1.6} /></span>
-      {quantity > 0 && <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-2 py-1 text-[10px] font-bold text-white shadow-sm"><Check size={11} strokeWidth={3} /> {quantity} in basket</span>}
+function ProductCard({ product, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {
+  return <article className={`group relative flex flex-col rounded-2xl bg-white p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(6,60,40,.35)] sm:p-4 ${quantity ? 'ring-2 ring-emerald-600' : 'shadow-[0_1px_2px_rgba(15,23,42,.05)] ring-1 ring-slate-200'}`}>
+    <div className="flex items-start justify-between gap-2">
+      <span className="truncate rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{product.category ?? 'Essentials'}</span>
+      <button onClick={onToggleSaved} aria-pressed={saved} aria-label={saved ? `Remove ${product.name} from saved` : `Save ${product.name}`} className={`-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-full transition ${saved ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:bg-slate-100 hover:text-rose-500'}`}>
+        <Heart size={18} className={saved ? 'fill-rose-500' : ''} />
+      </button>
     </div>
-    <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-      <p className={`text-[10px] font-bold uppercase tracking-[.14em] ${tone.label}`}>{product.category ?? 'Essentials'}</p>
-      <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-900 sm:text-[15px]">{product.name}</h3>
-      {product.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{product.description}</p>}
-      <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-4">
-        <p className="leading-none"><span className="font-display text-lg font-bold tracking-tight sm:text-xl">{peso(product.price)}</span><span className="ml-1 text-[11px] font-medium text-slate-400">/ {product.unit}</span></p>
-        {quantity
-          ? <Stepper name={product.name} quantity={quantity} onChange={onChange} />
-          : <button onClick={() => onChange(1)} aria-label={`Add ${product.name}`} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-800 pl-3 pr-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-900 active:scale-95"><Plus size={14} strokeWidth={2.6} /> Add</button>}
-      </div>
+
+    {/* Fixed-height frame that clips: the photo always fits inside and never covers the text below. */}
+    <div className="relative mt-1 grid h-36 shrink-0 place-items-center overflow-hidden rounded-xl sm:h-44">
+      {product.image_url
+        ? <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 size-full object-contain p-1 mix-blend-multiply transition duration-500 group-hover:scale-105" />
+        : <span className={`grid size-20 place-items-center rounded-full ${tone.bg} ${tone.fg}`}><Icon className="size-9" strokeWidth={1.6} /></span>}
+    </div>
+
+    <h3 className="relative mt-3 line-clamp-1 text-[15px] font-bold leading-snug text-slate-900" title={product.name}>{product.name}</h3>
+    <p className="mt-0.5 line-clamp-2 min-h-10 text-[13px] leading-5 text-slate-500" title={product.description ?? undefined}>{product.description || `Sold per ${product.unit}`}</p>
+    <p className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900">{peso(product.price)}<span className="ml-1 text-xs font-medium text-slate-400">/ {product.unit}</span></p>
+
+    <div className="mt-3">
+      {quantity
+        ? <div className="flex h-10 items-center justify-between rounded-xl bg-emerald-50 px-1 ring-1 ring-emerald-600/30">
+          <button aria-label={`Remove one ${product.name}`} onClick={() => onChange(quantity - 1)} className="grid size-8 place-items-center rounded-lg bg-white text-emerald-800 shadow-sm transition hover:bg-red-50 hover:text-red-600"><Minus size={15} strokeWidth={2.6} /></button>
+          <span className="text-sm font-bold text-emerald-900">{quantity} in basket</span>
+          <button aria-label={`Add one ${product.name}`} onClick={() => onChange(quantity + 1)} className="grid size-8 place-items-center rounded-lg bg-emerald-800 text-white shadow-sm transition hover:bg-emerald-900"><Plus size={15} strokeWidth={2.6} /></button>
+        </div>
+        : <button onClick={() => onChange(1)} aria-label={`Add ${product.name}`} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 active:scale-[.98]"><ShoppingCart size={16} /> Add to basket</button>}
     </div>
   </article>;
 }
@@ -423,17 +421,6 @@ function OrderCard({ order, cancelling, onCancel }: { order: Order; cancelling: 
       <span className="font-display text-base font-bold">{peso(order.estimated_total)}</span>
       {['pending', 'confirmed'].includes(order.status) && <button disabled={cancelling} onClick={onCancel} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"><X size={13} /> {cancelling ? 'Cancelling…' : 'Cancel order'}</button>}
     </div>
-  </li>;
-}
-
-function HeroStat({ value, label }: { value: string; label: string }) {
-  return <div className="px-4 py-3.5"><dt className="sr-only">{label}</dt><dd className="font-display text-2xl font-bold text-white">{value}</dd><dd className="mt-0.5 text-[11px] font-medium text-emerald-100/70">{label}</dd></div>;
-}
-
-function HowStep({ n, icon: Icon, title, text }: { n: number; icon: LucideIcon; title: string; text: string }) {
-  return <li className="flex items-start gap-4 rounded-2xl bg-white/[.06] p-4 ring-1 ring-white/10">
-    <span className="relative grid size-11 shrink-0 place-items-center rounded-xl bg-amber-400 text-emerald-950"><Icon size={19} /><span className="absolute -left-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-emerald-950 text-[10px] font-bold text-amber-300 ring-2 ring-[#0d4532]">{n}</span></span>
-    <div><p className="text-sm font-semibold text-white">{title}</p><p className="mt-0.5 text-xs leading-5 text-emerald-100/70">{text}</p></div>
   </li>;
 }
 

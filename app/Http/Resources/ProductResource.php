@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Product;
+use App\Services\Catalog\ProductImageService;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -21,6 +22,7 @@ class ProductResource extends JsonResource
             'barcode' => $this->barcode,
             'name' => $this->name,
             'description' => $this->description,
+            'image_url' => $this->image_path ? route('api.v1.tenants.products.image', [$this->tenant_id, $this->id, 'v' => ProductImageService::version($this->resource)], false) : null,
             'category_id' => $this->category_id,
             'category' => $this->whenLoaded('category', fn () => $this->category ? ['id' => $this->category->id, 'name' => $this->category->name] : null),
             'unit' => $this->unit,

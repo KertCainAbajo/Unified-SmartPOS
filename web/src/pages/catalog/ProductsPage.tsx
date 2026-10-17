@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   Barcode,
   Download,
+  ImagePlus,
   Layers,
   Package,
   PackageX,
@@ -229,9 +230,13 @@ export function ProductsPage() {
                     <tr key={p.id} className={cx('group transition-colors hover:bg-brand-50/40', archived && 'opacity-60')}>
                       <td className="py-3.5 pl-5 pr-3">
                         <span className="flex items-center gap-3">
-                          <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold ring-1', tileFor(p.category_id))}>
-                            {p.name.charAt(0).toUpperCase()}
-                          </span>
+                          {p.image_url ? (
+                            <img src={p.image_url} alt="" loading="lazy" className="size-10 shrink-0 rounded-xl bg-white object-cover ring-1 ring-slate-200" />
+                          ) : (
+                            <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl font-display text-sm font-bold ring-1', tileFor(p.category_id))}>
+                              {p.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-slate-900">{p.name}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -462,6 +467,12 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
     >
       {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} className="mb-4" />}
 
+      <FormSection title="Photo" hint="Shown in the online shop and in this list.">
+        {isNew ? (
+          <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 sm:col-span-2">Save the product first, then edit it to add a photo.</p>
+        ) : product && <ProductPhoto product={product} />}
+      </FormSection>
+
       <FormSection title="Basics">
         <Field label="Name" error={err('name')} className="sm:col-span-2">{(id) => <Input id={id} value={form.name} autoFocus placeholder="e.g. Coca-Cola 1L" onChange={(e) => set('name')(e.target.value)} />}</Field>
         <Field label="SKU" error={err('sku')} hint="Letters, digits, - _ . / (stored in upper case)">{(id) => <Input id={id} value={form.sku} placeholder="BEV-COKE-1L" onChange={(e) => set('sku')(e.target.value)} />}</Field>
@@ -496,6 +507,50 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
         </div>
       </FormSection>
     </Modal>
+  );
+}
+
+/** Upload, replace or remove a product photo. Saves immediately; the server resizes it for the shop. */
+function ProductPhoto({ product }: { product: Product }) {
+  const [imageUrl, setImageUrl] = useState(product.image_url);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => setImageUrl(product.image_url), [product.image_url]);
+  const upload = useTenantMutation<FormData, { data: Product }>('POST', `/products/${product.id}/image`, {
+    success: 'Photo saved.', toastErrors: false, onSuccess: (r) => setImageUrl(r.data.image_url),
+  });
+  const remove = useTenantMutation<void, { data: Product }>('DELETE', `/products/${product.id}/image`, {
+    success: 'Photo removed.', onSuccess: () => setImageUrl(null),
+  });
+  const send = (file: File | undefined) => {
+    if (!file) return;
+    const body = new FormData();
+    body.append('image', file);
+    upload.mutate(body);
+  };
+  const error = upload.error instanceof ApiError ? upload.error.field('image') ?? upload.error.message : undefined;
+
+  return (
+    <div className="flex flex-col gap-4 sm:col-span-2 sm:flex-row sm:items-center">
+      <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200">
+        {imageUrl ? <img src={imageUrl} alt={product.name} className="size-full object-cover" /> : <ImagePlus className="size-8 text-slate-300" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); send(e.dataTransfer.files[0]); }}
+          className={cx('flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-5 text-center transition', dragging ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50')}
+        >
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={upload.isPending} onChange={(e) => { send(e.target.files?.[0]); e.target.value = ''; }} />
+          <span className="text-sm font-semibold text-slate-800">{upload.isPending ? 'Uploading…' : imageUrl ? 'Replace photo' : 'Upload a photo'}</span>
+          <span className="mt-0.5 text-xs text-slate-500">Click or drop a JPG, PNG or WebP (up to 5 MB)</span>
+        </label>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {error ? <p className="text-xs font-medium text-red-600">{error}</p> : <span />}
+          {imageUrl && <button type="button" onClick={() => remove.mutate()} disabled={remove.isPending} className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50">Remove photo</button>}
+        </div>
+      </div>
+    </div>
   );
 }
 

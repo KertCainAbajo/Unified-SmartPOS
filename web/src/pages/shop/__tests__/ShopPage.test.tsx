@@ -44,6 +44,18 @@ it('lets a guest fill a basket and asks them to sign in before ordering', async 
   expect(screen.getByText('Your basket is saved')).toBeTruthy();
 });
 
+it('saves products with the heart and filters to them', async () => {
+  const store = new Map<string, string>();
+  vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
+  serve(false);
+  fireEvent.click(await screen.findByRole('button', { name: 'Save Cola 1L' }));
+
+  fireEvent.click(screen.getByRole('button', { name: /^Saved/ }));
+  expect(screen.getByRole('heading', { name: 'Cola 1L' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Bath Soap' })).toBeNull();
+  expect(JSON.parse(store.get('shop-saved:test-mart') ?? '[]')).toEqual([2]);
+});
+
 it('places a pickup order for a signed-in customer and shows it in their orders', async () => {
   const fetchMock = serve(true);
   fireEvent.click(await screen.findByRole('button', { name: 'Add Bath Soap' }));

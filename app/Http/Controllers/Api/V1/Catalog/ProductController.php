@@ -8,17 +8,19 @@ use App\Http\Requests\Catalog\ProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Services\Catalog\ProductImageService;
 use App\Services\Catalog\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @tags Products
  */
 class ProductController extends Controller
 {
-    public function __construct(private readonly ProductService $products) {}
+    public function __construct(private readonly ProductService $products, private readonly ProductImageService $images) {}
 
     /**
      * Search and list products.
@@ -130,5 +132,31 @@ class ProductController extends Controller
         $this->authorize('archive', $product);
 
         return new ProductResource($product->status === ProductStatus::Active ? $product : $this->products->restore($product));
+    }
+    /** The product photo. Requires `products.view`. */
+    public function image(Tenant $tenant, Product $product): Response
+    {
+        $this->authorize('view', $product);
+
+        return $this->images->response($product);
+    }
+
+    /** Upload or replace the product photo (JPG, PNG or WebP, up to 5 MB). Requires `products.manage`. */
+    public function uploadImage(Request $request, Tenant $tenant, Product $product): ProductResource
+    {
+        $this->authorize('update', $product);
+        $data = $request->validate([
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+        ]);
+
+        return new ProductResource($this->images->store($product, $data['image'])->load('category'));
+    }
+
+    /** Remove the product photo. Requires `products.manage`. */
+    public function removeImage(Tenant $tenant, Product $product): ProductResource
+    {
+        $this->authorize('update', $product);
+
+        return new ProductResource($this->images->remove($product)->load('category'));
     }
 }

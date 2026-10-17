@@ -9,6 +9,7 @@ use App\Models\CustomerAccount;
 use App\Models\OnlineOrder;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Services\Catalog\ProductImageService;
 use App\Services\DocumentNumberer;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
@@ -32,9 +33,19 @@ class CustomerShopController extends Controller
                 'id' => $product->id, 'sku' => $product->sku, 'name' => $product->name,
                 'description' => $product->description, 'unit' => $product->unit,
                 'price' => $product->price, 'category' => $product->category?->name,
+                'image_url' => $product->image_path ? route('api.v1.shop.products.image', [$tenant->slug, $product->id, 'v' => ProductImageService::version($product)], false) : null,
             ]);
 
         return response()->json(['business' => ['name' => $tenant->name, 'code' => $tenant->slug], 'branches' => $branches, 'data' => $products]);
+    }
+
+    /** A product photo for the shop. Only products listed online are served. */
+    public function productImage(string $business, int $product, ProductImageService $images): \Symfony\Component\HttpFoundation\Response
+    {
+        $tenant = $this->shopTenant($business);
+        $listed = $tenant->products()->where('show_online', true)->where('status', 'active')->findOrFail($product);
+
+        return $images->response($listed);
     }
 
     public function register(Request $request, string $business): JsonResponse

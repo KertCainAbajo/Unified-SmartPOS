@@ -37,10 +37,10 @@ class StaffOnlineOrderController extends Controller
     }
 
     /** Advance preparation state. Completion is reserved for POS checkout so it always has a recorded sale. */
-    public function updateStatus(Request $request, Tenant $tenant, OnlineOrder $order)
+    public function updateStatus(Request $request, Tenant $tenant, OnlineOrder $onlineOrder)
     {
         $this->authorizePermission(Permissions::SALES_CREATE);
-        if ((int) $order->tenant_id !== (int) $tenant->id || ! $this->context->canAccessBranch($order->branch_id)) {
+        if ((int) $onlineOrder->tenant_id !== (int) $tenant->id || ! $this->context->canAccessBranch($onlineOrder->branch_id)) {
             abort(404);
         }
         $data = $request->validate([
@@ -52,8 +52,8 @@ class StaffOnlineOrderController extends Controller
             'cancel_reason' => ['required_if:status,cancelled', 'nullable', 'string', 'max:255'],
         ]);
 
-        DB::transaction(function () use ($order, $data, $request) {
-            $locked = OnlineOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+        DB::transaction(function () use ($onlineOrder, $data, $request) {
+            $locked = OnlineOrder::query()->whereKey($onlineOrder->id)->lockForUpdate()->firstOrFail();
             $target = OnlineOrderStatus::from($data['status']);
             if (! in_array($target, $locked->status->nextStaffStatuses(), true)) {
                 throw new AuthorizationException('This order cannot move to the requested status.');
@@ -69,10 +69,10 @@ class StaffOnlineOrderController extends Controller
             $this->audit->log('online_order.status_changed', $locked, ['status' => $old], ['status' => $target->value, 'order_number' => $locked->order_number]);
         });
 
-        return response()->json(['data' => $order->fresh(['branch:id,name', 'account:id,name,email,phone', 'items'])]);
+        return response()->json(['data' => $onlineOrder->fresh(['branch:id,name', 'account:id,name,email,phone', 'items'])]);
     }
 
-    private function authorizePermission(string $permission): void
+    protected function authorizePermission(string $permission): void
     {
         if (! $this->context->can($permission)) {
             throw new AuthorizationException('You do not have permission to manage online orders.');

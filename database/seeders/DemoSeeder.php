@@ -73,6 +73,7 @@ class DemoSeeder extends Seeder
         $context->set($tenant, $tenant->memberships()->where('user_id', $owner->id)->firstOrFail());
 
         $products = $this->catalog($tenant, $owner);
+        $this->call(DemoProductContentSeeder::class);
         $this->openingStock($main, $makati, $products, $owner);
         $this->suppliers($tenant, $main, $products, $owner);
         $this->sampleSales($tenant, $main, $products, $cashier, $owner);

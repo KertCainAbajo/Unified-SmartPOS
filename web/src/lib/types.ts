@@ -136,6 +136,7 @@ export interface Product {
   barcode: string | null;
   name: string;
   description: string | null;
+  image_url: string | null;
   category_id: number | null;
   category?: { id: number; name: string } | null;
   unit: string;

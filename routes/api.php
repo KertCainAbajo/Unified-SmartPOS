@@ -69,6 +69,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // ---- Customer online shop ---------------------------------------------------------------
     Route::prefix('shop/{business}')->name('shop.')->middleware('throttle:api')->group(function () {
         Route::get('/', [CustomerShopController::class, 'catalog'])->name('catalog');
+        Route::get('products/{product}/image', [CustomerShopController::class, 'productImage'])->whereNumber('product')->name('products.image');
         Route::post('register', [CustomerShopController::class, 'register'])->middleware('throttle:auth')->name('register');
         Route::post('login', [CustomerShopController::class, 'login'])->middleware('throttle:login')->name('login');
         Route::middleware('auth:customer')->group(function () {
@@ -171,6 +172,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::get('products/{product}/price-history', [ProductController::class, 'priceHistory'])->name('products.price-history');
                 Route::post('products/{product}/archive', [ProductController::class, 'archive'])->name('products.archive');
                 Route::post('products/{product}/restore', [ProductController::class, 'restore'])->name('products.restore');
+                Route::get('products/{product}/image', [ProductController::class, 'image'])->name('products.image');
+                Route::post('products/{product}/image', [ProductController::class, 'uploadImage'])->name('products.image.store');
+                Route::delete('products/{product}/image', [ProductController::class, 'removeImage'])->name('products.image.destroy');
 
                 // Inventory
                 Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
@@ -232,7 +236,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 // Customers and expenses
                 Route::apiResource('customers', CustomerController::class)->except('destroy');
                 Route::get('online-orders', [StaffOnlineOrderController::class, 'index'])->name('online-orders.index');
-                Route::post('online-orders/{order}/status', [StaffOnlineOrderController::class, 'updateStatus'])->name('online-orders.status');
+                Route::post('online-orders/{onlineOrder}/status', [StaffOnlineOrderController::class, 'updateStatus'])->name('online-orders.status');
                 Route::get('expense-categories', [ExpenseController::class, 'categories'])->name('expense-categories.index');
                 Route::post('expense-categories', [ExpenseController::class, 'storeCategory'])->name('expense-categories.store');
                 Route::patch('expense-categories/{expenseCategory}', [ExpenseController::class, 'updateCategory'])->name('expense-categories.update');
