@@ -5,40 +5,15 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, ErrorBanner, Field, Input, Modal, Spinner, cx } from '../../components/ui';
+import { Button, DateRange, ErrorBanner, Field, Input, Modal, Spinner, cx } from '../../components/ui';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Paginated } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
+import { OrderHistory } from './OnlineOrderHistory';
+import { daysAgo, money, qty, type OnlineOrder, type OrderKind as Kind, type OrderStatus as Status, type OrderView as View } from './onlineOrders';
 
-type Status = 'pending' | 'confirmed' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
-interface OnlineOrder {
-  id: number;
-  order_number: string;
-  status: Status;
-  fulfilment: 'pickup' | 'delivery';
-  delivery_address: string | null;
-  cash_amount: string | null;
-  change_due: string | null;
-  rider_name: string | null;
-  rider_phone: string | null;
-  contact_name: string;
-  contact_phone: string;
-  note: string | null;
-  estimated_total: string;
-  placed_at: string;
-  cancel_reason?: string | null;
-  branch: { id: number; name: string };
-  account: { name: string; email: string; phone: string };
-  items: { id: number; name: string; sku: string; unit: string; quantity: string; line_total: string }[];
-}
 interface StatusChange { id: number; status: string; cancel_reason?: string; rider_name?: string; rider_phone?: string }
-
-type View = 'active' | 'completed' | 'cancelled';
 type Stage = 'all' | 'pending' | 'confirmed' | 'ready' | 'out_for_delivery';
-type Kind = 'all' | 'pickup' | 'delivery';
-
-const money = (v: string | number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(v));
-const qty = (v: string) => String(Number(v));
 
 /** Look of each status, used by the stage cards, card accents and badges. */
 const STATUS: Record<Status, { label: string; icon: LucideIcon; badge: string; accent: string; tile: string }> = {
@@ -73,10 +48,11 @@ export function OnlineOrdersPage() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(t); }, []);
 
+  const [range, setRange] = useState(() => ({ from: daysAgo(29), to: daysAgo(0) }));
   const list = useTenantQuery<Paginated<OnlineOrder>>(
     '/online-orders',
-    view === 'active' ? { branch_id: scopeBranchId, open: true, per_page: 100 } : { branch_id: scopeBranchId, status: view, per_page: 50 },
-    { refetchInterval: view === 'active' ? 30000 : undefined },
+    { branch_id: scopeBranchId, open: true, per_page: 100 },
+    { refetchInterval: 30000, enabled: view === 'active' },
   );
   const status = useTenantMutation<StatusChange, { data: OnlineOrder }>('POST', (body) => `/online-orders/${body.id}/status`, {
     success: (r) => `${r.data.order_number}: ${STATUS[r.data.status].label}.`,
@@ -110,7 +86,7 @@ export function OnlineOrdersPage() {
             {view === 'active' ? 'Live · refreshes every 30 s' : 'History'}
           </span>
           <a href={`/shop/${tenant.slug}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 transition hover:bg-white hover:text-brand-700"><ExternalLink className="size-4" /> Open shop</a>
-          <Button variant="secondary" icon={<RefreshCw className={cx('size-4', list.isFetching && 'animate-spin')} />} onClick={() => list.refetch()}>Refresh</Button>
+          <Button variant="secondary" icon={<RefreshCw className={cx('size-4', list.isFetching && 'animate-spin')} />} onClick={() => queryClient.invalidateQueries({ queryKey: ['t', tenantId, '/online-orders'] })}>Refresh</Button>
         </div>
       </div>
 
@@ -136,6 +112,7 @@ export function OnlineOrdersPage() {
             </button>
           ))}
         </div>
+        {view !== 'active' && <DateRange from={range.from} to={range.to} onChange={setRange} className="lg:w-[280px]" />}
         <label className="relative flex-1 lg:max-w-sm lg:ml-auto">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Order no., customer, phone or address" aria-label="Search orders" className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100" />
@@ -146,7 +123,16 @@ export function OnlineOrdersPage() {
       </div>
 
       {/* Orders */}
-      {list.isPending ? <Spinner label="Loading online orders…" />
+      {view !== 'active' ? (
+        <OrderHistory
+          view={view}
+          kind={kind}
+          search={search}
+          range={range}
+          onRange={setRange}
+          onClearFilters={() => { setKind('all'); setSearch(''); }}
+        />
+      ) : list.isPending ? <Spinner label="Loading online orders…" />
         : list.isError ? <ErrorBanner error={list.error} />
           : !shown.length ? <EmptyOrders view={view} filtered={!!term || kind !== 'all' || stage !== 'all'} shopUrl={`/shop/${tenant.slug}`} />
             : (

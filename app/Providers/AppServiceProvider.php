@@ -64,6 +64,12 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         // Public careers pages: applications, status checks and applicant actions.
+        // Shop forgot-password codes: separate from sign-in so a few wrong passwords do not block a reset.
+        RateLimiter::for('customer-codes', fn (Request $request) => [
+            Limit::perMinute(10)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute(30)->by($request->ip()),
+        ]);
+
         RateLimiter::for('public-applications', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
 
         RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(60)

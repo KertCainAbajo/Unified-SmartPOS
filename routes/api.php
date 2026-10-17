@@ -72,6 +72,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('products/{product}/image', [CustomerShopController::class, 'productImage'])->whereNumber('product')->name('products.image');
         Route::post('register', [CustomerShopController::class, 'register'])->middleware('throttle:auth')->name('register');
         Route::post('login', [CustomerShopController::class, 'login'])->middleware('throttle:login')->name('login');
+        Route::post('password/forgot', [CustomerShopController::class, 'forgotPassword'])->middleware('throttle:auth')->name('password.forgot');
+        Route::post('password/verify', [CustomerShopController::class, 'verifyResetCode'])->middleware('throttle:customer-codes')->name('password.verify');
+        Route::post('password/reset', [CustomerShopController::class, 'resetPassword'])->middleware('throttle:customer-codes')->name('password.reset');
         Route::middleware('auth:customer')->group(function () {
             Route::post('logout', [CustomerShopController::class, 'logout'])->name('logout');
             Route::get('me', [CustomerShopController::class, 'me'])->name('me');

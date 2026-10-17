@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Catalog\ProductImageService;
 use App\Services\DocumentNumberer;
+use App\Services\Shop\CustomerPasswordResetService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +58,43 @@ class CustomerShopController extends Controller
         $listed = $tenant->products()->where('show_online', true)->where('status', 'active')->findOrFail($product);
 
         return $images->response($listed);
+    }
+
+    /** Email a 6-digit reset code. Always answers the same way, so it never reveals whether an email has an account. */
+    public function forgotPassword(Request $request, string $business, CustomerPasswordResetService $reset): JsonResponse
+    {
+        $tenant = $this->shopTenant($business);
+        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255']]);
+        $reset->request($tenant, $data['email']);
+
+        return response()->json([
+            'message' => 'If an account uses this email, we sent it a 6-digit code.',
+            'expires_in_minutes' => CustomerPasswordResetService::CODE_MINUTES,
+            'resend_after_seconds' => CustomerPasswordResetService::RESEND_SECONDS,
+        ]);
+    }
+
+    /** Check a reset code before the customer types a new password. Wrong guesses count against the code. */
+    public function verifyResetCode(Request $request, string $business, CustomerPasswordResetService $reset): JsonResponse
+    {
+        $tenant = $this->shopTenant($business);
+        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255'], 'code' => ['required', 'digits:6']]);
+        $reset->check($tenant, $data['email'], $data['code']);
+
+        return response()->json(['message' => 'Code accepted.']);
+    }
+
+    /** Set a new password with a valid code. The customer then signs in with it. */
+    public function resetPassword(Request $request, string $business, CustomerPasswordResetService $reset): JsonResponse
+    {
+        $tenant = $this->shopTenant($business);
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'], 'code' => ['required', 'digits:6'],
+            'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed'],
+        ]);
+        $reset->reset($tenant, $data['email'], $data['code'], $data['password']);
+
+        return response()->json(['message' => 'Your password was changed. Sign in with your new password.']);
     }
 
     public function register(Request $request, string $business): JsonResponse

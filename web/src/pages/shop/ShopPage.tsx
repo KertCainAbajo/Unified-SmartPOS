@@ -382,6 +382,7 @@ export function ShopPage() {
       error={error}
       basketCount={basketCount}
       basketTotal={peso(total)}
+      apiBase={base}
       photos={[...lines.map(({ product }) => product), ...shop.data.filter((product) => !cart[product.id])]}
     />
   </div>;

@@ -1,6 +1,7 @@
-import { ArrowRight, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShoppingBasket, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShieldCheck, ShoppingBasket, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { BasketVisual, type PhotoItem } from './ShopVisuals';
+import { ApiError, api, errorMessage } from '../../lib/api';
 
 type Mode = 'login' | 'register';
 
@@ -8,8 +9,10 @@ type Mode = 'login' | 'register';
  * Full-screen customer sign-in / sign-up for the online shop. It opens over the shop so the basket survives.
  * Field names match the shop API (name, phone, email, password, password_confirmation); the parent posts the form as-is.
  */
-export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, photos }: {
+export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, photos, apiBase }: {
   open: boolean;
+  /** Shop API base, e.g. `/shop/aling-nena-mini-mart`, used by the forgot-password steps. */
+  apiBase: string;
   onClose: () => void;
   storeName: string;
   mode: Mode;
@@ -25,7 +28,11 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [password, setPassword] = useState('');
+  const [recovering, setRecovering] = useState(false);
+  const [prefillEmail, setPrefillEmail] = useState('');
+  const [notice, setNotice] = useState('');
   const register = mode === 'register';
+  useEffect(() => { if (!open) { setRecovering(false); setNotice(''); } }, [open]);
   const trackCaps = (e: KeyboardEvent<HTMLInputElement>) => setCapsLock(e.getModifierState('CapsLock'));
   const switchTo = (next: Mode) => {
     setPassword('');
@@ -120,6 +127,19 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
             </div>
 
             <div className="my-auto w-full max-w-[410px] self-center lg:self-auto">
+              {recovering ? (
+                <PasswordRecovery
+                  apiBase={apiBase}
+                  initialEmail={prefillEmail}
+                  onBack={() => setRecovering(false)}
+                  onDone={(email) => {
+                    setPrefillEmail(email);
+                    setNotice('Your password was changed. Sign in with your new password.');
+                    setRecovering(false);
+                    switchTo('login');
+                  }}
+                />
+              ) : <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-800 ring-1 ring-emerald-700/15">
                 <span className="size-1.5 rounded-full bg-emerald-500" /> Customer account
               </span>
@@ -149,7 +169,12 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 ))}
               </div>
 
-              <form key={`form-${mode}`} onSubmit={onSubmit} className="auth-fade mt-6 space-y-4">
+              <form key={`form-${mode}`} onSubmit={(e) => { setNotice(''); onSubmit(e); }} className="auth-fade mt-6 space-y-4">
+                {notice && !error && (
+                  <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> {notice}
+                  </p>
+                )}
                 {error && (
                   <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
@@ -168,13 +193,27 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 )}
 
                 <Field id="shop-email" label="Email address" icon={<Mail />}>
-                  {(cls) => <input id="shop-email" name="email" type="email" required autoComplete="email" placeholder="you@email.com" className={cls} autoFocus={!register} />}
+                  {(cls) => <input id="shop-email" name="email" type="email" required autoComplete="email" placeholder="you@email.com" className={cls} defaultValue={register ? undefined : prefillEmail} autoFocus={!register && !prefillEmail} />}
                 </Field>
 
                 <Field
                   id="shop-password"
                   label="Password"
                   icon={<KeyRound />}
+                  aside={register ? undefined : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const typed = (document.getElementById('shop-email') as HTMLInputElement | null)?.value.trim() ?? '';
+                        setPrefillEmail(typed);
+                        setNotice('');
+                        setRecovering(true);
+                      }}
+                      className="text-xs font-semibold text-emerald-700 underline-offset-4 hover:text-emerald-800 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                   hint={register ? (password.length > 0 && password.length < 10 ? `${10 - password.length} more characters needed` : 'Use at least 10 characters.') : undefined}
                   hintTone={register && password.length > 0 && password.length < 10 ? 'warn' : 'muted'}
                   trailing={
@@ -191,6 +230,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                       required
                       minLength={register ? 10 : 1}
                       autoComplete={register ? 'new-password' : 'current-password'}
+                      autoFocus={!register && !!prefillEmail}
                       placeholder={register ? 'Create a password' : 'Enter your password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -234,6 +274,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 <Lock className="mt-px size-3.5 shrink-0" />
                 Your account is only used for {storeName}’s online pickup orders.
               </p>
+              </>}
             </div>
           </div>
         </div>
@@ -263,19 +304,24 @@ function StrengthBar({ length }: { length: number }) {
   );
 }
 
-function Field({ id, label, icon, trailing, hint, hintTone = 'muted', children }: {
+function Field({ id, label, icon, trailing, hint, hintTone = 'muted', aside, children }: {
   id: string;
   label: string;
   icon: ReactNode;
   trailing?: ReactNode;
   hint?: string;
   hintTone?: 'muted' | 'warn';
+  /** Shown at the right end of the label row, e.g. a "Forgot password?" link. */
+  aside?: ReactNode;
   children: (inputClass: string) => ReactNode;
 }) {
   const inputClass = `peer h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-11 ${trailing ? 'pr-12' : 'pr-3.5'} text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10`;
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label htmlFor={id} className="block text-xs font-semibold text-slate-700">{label}</label>
+        {aside}
+      </div>
       <div className="relative">
         {children(inputClass)}
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition peer-focus:text-emerald-600 [&>svg]:size-4">{icon}</span>
@@ -284,4 +330,205 @@ function Field({ id, label, icon, trailing, hint, hintTone = 'muted', children }
       {hint && <p className={`mt-1.5 text-[11px] ${hintTone === 'warn' ? 'font-medium text-amber-700' : 'text-slate-500'}`}>{hint}</p>}
     </div>
   );
+}
+
+type RecoveryStep = 'email' | 'code' | 'password';
+
+/** Forgot password: email → 6-digit code from the inbox → new password. */
+function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
+  apiBase: string;
+  initialEmail: string;
+  onBack: () => void;
+  onDone: (email: string) => void;
+}) {
+  const [step, setStep] = useState<RecoveryStep>('email');
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError('');
+    try { await action(); } catch (e) { setError(e instanceof ApiError ? e.field('code') ?? e.field('password') ?? e.field('email') ?? e.message : errorMessage(e)); } finally { setBusy(false); }
+  }
+  const sendCode = () => run(async () => {
+    const result = await api<{ resend_after_seconds: number }>(`${apiBase}/password/forgot`, { method: 'POST', body: { email: email.trim() } });
+    setCode('');
+    setResendIn(result.resend_after_seconds ?? 60);
+    setStep('code');
+  });
+  const verify = () => run(async () => {
+    await api(`${apiBase}/password/verify`, { method: 'POST', body: { email: email.trim(), code } });
+    setStep('password');
+  });
+  const save = () => run(async () => {
+    await api(`${apiBase}/password/reset`, { method: 'POST', body: { email: email.trim(), code, password, password_confirmation: confirm } });
+    onDone(email.trim());
+  });
+
+  const index = { email: 0, code: 1, password: 2 }[step];
+  const titles: Record<RecoveryStep, [string, ReactNode]> = {
+    email: ['Forgot your password?', 'Enter the email you shop with and we will send you a 6-digit code.'],
+    code: ['Check your email', <>We sent a 6-digit code to <b className="text-slate-700">{maskEmail(email.trim())}</b>. It expires in 15 minutes.</>],
+    password: ['Create a new password', 'Use at least 10 characters. You will sign in with it next time.'],
+  };
+  const tooShort = password.length > 0 && password.length < 10;
+  const mismatch = confirm.length > 0 && confirm !== password;
+
+  return (
+    <div>
+      <button type="button" onClick={step === 'email' ? onBack : () => { setError(''); setStep(step === 'password' ? 'code' : 'email'); }} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-800">
+        <ArrowLeft className="size-4" /> {step === 'email' ? 'Back to sign in' : 'Back'}
+      </button>
+
+      <ol className="mt-5 flex items-center gap-2" aria-label={`Step ${index + 1} of 3`}>
+        {['Email', 'Code', 'New password'].map((label, i) => (
+          <li key={label} className="flex flex-1 items-center gap-2">
+            <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold transition ${i < index ? 'bg-emerald-600 text-white' : i === index ? 'bg-emerald-800 text-white ring-4 ring-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
+              {i < index ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+            </span>
+            <span className={`hidden text-xs font-semibold sm:block ${i <= index ? 'text-slate-800' : 'text-slate-400'}`}>{label}</span>
+            {i < 2 && <span className={`h-0.5 flex-1 rounded-full ${i < index ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
+          </li>
+        ))}
+      </ol>
+
+      <div key={step} className="auth-fade">
+        <span className="mt-6 grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
+          {step === 'email' ? <Mail className="size-5" /> : step === 'code' ? <ShieldCheck className="size-5" /> : <KeyRound className="size-5" />}
+        </span>
+        <h2 id="shop-auth-title" className="mt-4 font-display text-[28px] font-extrabold leading-tight tracking-tight text-[#0b3b2c]">{titles[step][0]}</h2>
+        <p className="mt-1.5 text-sm leading-6 text-slate-500">{titles[step][1]}</p>
+
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={(e) => { e.preventDefault(); if (step === 'email') void sendCode(); else if (step === 'code') void verify(); else void save(); }}
+        >
+          {error && (
+            <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
+            </p>
+          )}
+
+          {step === 'email' && (
+            <Field id="reset-email" label="Email address" icon={<Mail />}>
+              {(cls) => <input id="reset-email" type="email" required autoFocus autoComplete="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className={cls} />}
+            </Field>
+          )}
+
+          {step === 'code' && (
+            <>
+              <CodeInput value={code} onChange={(v) => { setCode(v); setError(''); }} disabled={busy} />
+              <p className="text-center text-sm text-slate-500">
+                Didn&apos;t get it?{' '}
+                {resendIn > 0
+                  ? <span className="font-medium text-slate-400">Resend in {resendIn}s</span>
+                  : <button type="button" disabled={busy} onClick={() => void sendCode()} className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">Resend code</button>}
+                <span className="mx-1.5 text-slate-300">·</span>
+                <button type="button" onClick={() => { setError(''); setStep('email'); }} className="font-semibold text-emerald-700 hover:underline">Use another email</button>
+              </p>
+              <p className="text-center text-[11px] text-slate-400">Check your spam folder too.</p>
+            </>
+          )}
+
+          {step === 'password' && (
+            <>
+              <Field
+                id="reset-password"
+                label="New password"
+                icon={<KeyRound />}
+                hint={tooShort ? `${10 - password.length} more characters needed` : undefined}
+                hintTone="warn"
+                trailing={
+                  <button type="button" onClick={() => setShow((v) => !v)} className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label={show ? 'Hide password' : 'Show password'}>
+                    {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                }
+              >
+                {(cls) => <input id="reset-password" type={show ? 'text' : 'password'} required minLength={10} autoFocus autoComplete="new-password" placeholder="Create a new password" value={password} onChange={(e) => setPassword(e.target.value)} className={cls} />}
+              </Field>
+              {password.length > 0 && <StrengthBar length={password.length} />}
+              <Field id="reset-password2" label="Confirm new password" icon={<KeyRound />} hint={mismatch ? 'The passwords do not match yet.' : undefined} hintTone="warn">
+                {(cls) => <input id="reset-password2" type={show ? 'text' : 'password'} required minLength={10} autoComplete="new-password" placeholder="Repeat the new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={cls} />}
+              </Field>
+            </>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy || (step === 'email' && !email.trim()) || (step === 'code' && code.length !== 6) || (step === 'password' && (password.length < 10 || confirm !== password))}
+            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy
+              ? <><Loader2 className="size-5 animate-spin" /> Please wait…</>
+              : <>{step === 'email' ? 'Send code' : step === 'code' ? 'Verify code' : 'Save new password'} <ArrowRight className="size-4 transition group-hover:translate-x-0.5" /></>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** Six boxes for a one-time code: typing moves forward, Backspace moves back, pasting fills them all. */
+function CodeInput({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const boxes = Array.from({ length: 6 }, (_, i) => value[i] ?? '');
+  const focus = (i: number) => (document.getElementById(`reset-code-${Math.max(0, Math.min(5, i))}`) as HTMLInputElement | null)?.focus();
+  const setAt = (i: number, digit: string) => {
+    const next = boxes.slice();
+    next[i] = digit;
+    onChange(next.join('').slice(0, 6));
+  };
+
+  return (
+    <div className="flex justify-between gap-2" role="group" aria-label="6-digit code">
+      {boxes.map((digit, i) => (
+        <input
+          key={i}
+          id={`reset-code-${i}`}
+          value={digit}
+          disabled={disabled}
+          inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          autoFocus={i === 0}
+          maxLength={1}
+          aria-label={`Digit ${i + 1}`}
+          onChange={(e) => {
+            const d = e.target.value.replace(/\D/g, '').slice(-1);
+            setAt(i, d);
+            if (d) focus(i + 1);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && !digit) { e.preventDefault(); setAt(i - 1, ''); focus(i - 1); }
+            if (e.key === 'ArrowLeft') focus(i - 1);
+            if (e.key === 'ArrowRight') focus(i + 1);
+          }}
+          onPaste={(e) => {
+            const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+            if (!digits) return;
+            e.preventDefault();
+            onChange(digits);
+            focus(digits.length);
+          }}
+          className={`h-14 w-full min-w-0 rounded-xl border text-center font-display text-2xl font-bold text-slate-900 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 disabled:opacity-60 ${digit ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 bg-slate-50/70'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** a••••@gmail.com — enough for the customer to recognise the address without spelling it out. */
+function maskEmail(email: string) {
+  const [name, domain] = email.split('@');
+  if (!domain) return email;
+  return `${name.slice(0, 1)}${'•'.repeat(Math.max(2, Math.min(6, name.length - 1)))}@${domain}`;
 }

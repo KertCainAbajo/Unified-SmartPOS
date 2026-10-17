@@ -50,4 +50,9 @@ class CustomerAccount extends Authenticatable
     {
         return $this->hasMany(OnlineOrder::class);
     }
+
+    public function passwordCodes(): HasMany
+    {
+        return $this->hasMany(CustomerPasswordCode::class);
+    }
 }

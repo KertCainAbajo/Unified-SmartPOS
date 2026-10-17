@@ -8,10 +8,13 @@ use App\Http\Controllers\Controller;
 use App\Models\OnlineOrder;
 use App\Models\Tenant;
 use App\Services\AuditLogger;
+use App\Support\Money;
 use App\Support\Permissions;
 use App\Support\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -33,17 +36,47 @@ class StaffOnlineOrderController extends Controller
             'status' => ['sometimes', Rule::enum(OnlineOrderStatus::class)],
             'fulfilment' => ['sometimes', Rule::in(['pickup', 'delivery'])],
             'open' => ['sometimes', 'boolean'],
+            'date_from' => ['sometimes', 'date_format:Y-m-d'],
+            'date_to' => ['sometimes', 'date_format:Y-m-d'],
+            'q' => ['sometimes', 'string', 'max:100'],
         ]);
+        $tz = $tenant->timezone;
         $query = $tenant->onlineOrders()
             ->when(! $this->context->hasAllBranches(), fn ($q) => $q->whereIn('branch_id', $this->context->branchIds() ?? []))
             ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('fulfilment'), fn ($q) => $q->where('fulfilment', $request->string('fulfilment')))
             ->when($request->boolean('open'), fn ($q) => $q->whereIn('status', array_map(fn (OnlineOrderStatus $s) => $s->value, array_filter(OnlineOrderStatus::cases(), fn (OnlineOrderStatus $s) => $s->isOpen()))))
-            ->with(self::RELATIONS)
-            ->latest('id');
+            ->when($request->filled('date_from'), fn ($q) => $q->where('placed_at', '>=', Carbon::parse($request->string('date_from'), $tz)->startOfDay()->utc()))
+            ->when($request->filled('date_to'), fn ($q) => $q->where('placed_at', '<=', Carbon::parse($request->string('date_to'), $tz)->endOfDay()->utc()))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
+                $q->where(fn ($w) => $w->where('order_number', 'like', $term)->orWhere('contact_name', 'like', $term)
+                    ->orWhere('contact_phone', 'like', $term)->orWhere('delivery_address', 'like', $term));
+            });
 
-        return response()->json($query->paginate(min(max($request->integer('per_page', 20), 1), 100)));
+        $summary = $this->summarize((clone $query)->get(['id', 'fulfilment', 'status', 'estimated_total', 'placed_at', 'completed_at', 'cancelled_by', 'cancel_reason']));
+        $page = $query->with(self::RELATIONS)->latest('id')->paginate(min(max($request->integer('per_page', 20), 1), 100));
+
+        return response()->json([...$page->toArray(), 'summary' => $summary]);
+    }
+
+    /** Figures for every order matching the filters (not just this page), shown above the order history. */
+    private function summarize(Collection $orders): array
+    {
+        $completed = $orders->filter(fn (OnlineOrder $o) => $o->status === OnlineOrderStatus::Completed && $o->completed_at);
+        $minutes = $completed->map(fn (OnlineOrder $o) => $o->placed_at->diffInMinutes($o->completed_at));
+
+        return [
+            'orders' => $orders->count(),
+            'value' => Money::round(Money::add('0', ...$orders->map(fn (OnlineOrder $o) => (string) $o->estimated_total)->all())),
+            'delivery' => $orders->where('fulfilment', 'delivery')->count(),
+            'pickup' => $orders->where('fulfilment', 'pickup')->count(),
+            'average_minutes' => $minutes->isEmpty() ? null : (int) round($minutes->avg()),
+            'cancelled_by_customer' => $orders->where('cancelled_by', 'customer')->count(),
+            'cancelled_by_store' => $orders->where('cancelled_by', 'staff')->count(),
+            'top_cancel_reason' => $orders->pluck('cancel_reason')->filter()->countBy()->sortDesc()->keys()->first(),
+        ];
     }
 
     /** One order, e.g. to load it into the POS for checkout. */
