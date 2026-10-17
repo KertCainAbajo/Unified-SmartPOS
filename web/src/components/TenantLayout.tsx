@@ -65,11 +65,11 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { to: '', label: 'Dashboard', icon: LayoutDashboard, any: [], keywords: 'home overview' },
       { to: 'pos', label: 'Point of Sale', icon: ShoppingCart, any: ['sales.create'], badge: 'shift', keywords: 'register checkout sell cashier' },
+      { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all', 'sales.create'], keywords: 'pickup delivery shop customer orders' },
       { to: 'sales', label: 'Sales', icon: Receipt, any: ['sales.view', 'sales.view_all'], keywords: 'receipts transactions' },
       { to: 'refunds', label: 'Refunds', icon: RotateCcw, any: ['refunds.create', 'refunds.approve'], badge: 'refunds', keywords: 'returns' },
       { to: 'shifts', label: 'Shifts', icon: Clock, any: ['shifts.operate', 'shifts.view_all'], keywords: 'register sessions cash' },
       { to: 'customers', label: 'Customers', icon: UserRound, any: ['customers.view'], keywords: 'clients' },
-      { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all', 'sales.create'], keywords: 'pickup delivery shop customer orders' },
     ],
   },
   {

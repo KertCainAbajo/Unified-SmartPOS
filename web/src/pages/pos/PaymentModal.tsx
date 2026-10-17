@@ -41,6 +41,7 @@ export function PaymentModal({
   error,
   onClose,
   onSubmit,
+  defaultCashAmount,
 }: {
   open: boolean;
   total: string;
@@ -48,13 +49,14 @@ export function PaymentModal({
   error: unknown;
   onClose: () => void;
   onSubmit: (payments: PaymentLine[]) => void;
+  defaultCashAmount?: string | null;
 }) {
   const [lines, setLines] = useState<PaymentLine[]>([{ method: 'cash', amount: '', reference_number: '' }]);
 
   useEffect(() => {
     // Cash starts empty: the cashier types what the customer handed over (or taps a bill / Exact).
-    if (open) setLines([{ method: 'cash', amount: '', reference_number: '' }]);
-  }, [open, total]);
+    if (open) setLines([{ method: 'cash', amount: defaultCashAmount ?? '', reference_number: '' }]);
+  }, [open, total, defaultCashAmount]);
 
   const totalCents = toCents(total);
   const tenderedCents = lines.reduce((sum, l) => sum + (Number.isNaN(toCents(l.amount)) ? 0 : toCents(l.amount)), 0);

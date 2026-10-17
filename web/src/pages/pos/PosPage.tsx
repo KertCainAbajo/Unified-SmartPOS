@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, LogOut, Minus, Monitor, PackageSearch, Percent, Plus, Printer, ScanBarcode, Search, ShoppingCart, Store, Trash2, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ReceiptView } from '../../components/ReceiptView';
 import { useToast } from '../../components/Toast';
 import { Avatar, Button, ErrorBanner, Input, Modal, SearchField, Spinner, cx } from '../../components/ui';
@@ -17,6 +18,8 @@ import { PaymentModal, type PaymentLine } from './PaymentModal';
 
 export function PosPage() {
   const { can, branch, branches } = useTenant();
+  const [searchParams] = useSearchParams();
+  const onlineOrderId = searchParams.get('online_order_id');
   const current = useTenantQuery<{ data: RegisterSession | null }>('/register-sessions/current');
   const registers = useTenantQuery<{ data: Register[] }>('/registers', { branch_id: branch?.id }, { enabled: !!branch });
   const [zReading, setZReading] = useState<RegisterSession | null>(null);
@@ -40,14 +43,15 @@ export function PosPage() {
   const sessionBranch = branches.find((b) => b.id === session.branch_id);
   return (
     <>
-      <Terminal session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} onShiftClosed={setZReading} />
+      <Terminal session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} onShiftClosed={setZReading} onlineOrderId={onlineOrderId} />
       {zModal}
     </>
   );
 }
 
-function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSession; branchName: string; onShiftClosed: (s: RegisterSession) => void }) {
+function Terminal({ session, branchName, onShiftClosed, onlineOrderId }: { session: RegisterSession; branchName: string; onShiftClosed: (s: RegisterSession) => void; onlineOrderId: string | null }) {
   const { can, path, tenantId } = useTenant();
+  const navigate = useNavigate();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [cart, dispatch] = useReducer(cartReducer, emptyCart);
@@ -60,6 +64,34 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
   const [discountLine, setDiscountLine] = useState<CartLine | null>(null);
   const [customerPicker, setCustomerPicker] = useState(false);
   const lastAttempt = useRef<{ body: string; key: string } | null>(null);
+  const loadedOrderId = useRef<string | null>(null);
+  const onlineOrder = useQuery({
+    queryKey: ['t', tenantId, 'online-order-checkout', onlineOrderId],
+    queryFn: () => api<{ data: { id: number; status: string; fulfilment: string; cash_amount: string | null; branch_id: number; order_number: string; items: { product_id: number; sku: string; name: string; unit: string; unit_price: string; quantity: string }[] } }>(path(`/online-orders/${onlineOrderId}`)),
+    enabled: !!onlineOrderId,
+    retry: false,
+  });
+
+  useEffect(() => {
+    const order = onlineOrder.data?.data;
+    if (!order || !onlineOrderId || loadedOrderId.current === onlineOrderId) return;
+    loadedOrderId.current = onlineOrderId;
+    if (order.branch_id !== session.branch_id) {
+      toast.error(`Order ${order.order_number} belongs to another branch. Open a shift at that branch to check it out.`);
+      return;
+    }
+    if (!['ready', 'out_for_delivery'].includes(order.status)) {
+      toast.error('This order is not ready for checkout.');
+      return;
+    }
+    dispatch({ type: 'clear' });
+    for (const item of order.items) {
+      dispatch({ type: 'add', quantity: item.quantity, product: {
+        id: item.product_id, sku: item.sku, name: item.name, unit: item.unit, price: item.unit_price,
+        allow_decimal_quantity: true, track_inventory: true,
+      } });
+    }
+  }, [onlineOrder.data, onlineOrderId, session.branch_id, toast]);
 
   // --- Server quote (authoritative totals), refreshed as the cart changes.
   const quantitiesValid = cart.lines.every(isValidQuantity);
@@ -81,7 +113,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
   // --- Checkout with an idempotency key reused only for an identical retry.
   const checkout = useMutation({
     mutationFn: (payments: PaymentLine[]) => {
-      const body = { ...payload, payments: payments.map((p) => ({ method: p.method, amount: p.amount, reference_number: p.reference_number || null })) };
+      const body = { ...payload, ...(onlineOrderId ? { online_order_id: Number(onlineOrderId) } : {}), payments: payments.map((p) => ({ method: p.method, amount: p.amount, reference_number: p.reference_number || null })) };
       const serialized = JSON.stringify(body);
       if (lastAttempt.current?.body !== serialized) lastAttempt.current = { body: serialized, key: newIdempotencyKey() };
       return api<{ data: Sale; receipt: Receipt }>(path('/sales'), {
@@ -95,6 +127,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
       setPaying(false);
       setCompleted({ sale: result.data, receipt: result.receipt });
       dispatch({ type: 'clear' });
+      if (onlineOrderId) navigate(`/t/${tenantId}/pos`, { replace: true });
       void queryClient.invalidateQueries({ queryKey: ['t', tenantId] });
     },
   });
@@ -115,7 +148,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
             <LogOut className="size-3.5" /> Close shift
           </button>
         </div>
-        <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />
+        {onlineOrderId ? <div className="space-y-2">{onlineOrder.isError && <ErrorBanner error={onlineOrder.error} />}{onlineOrder.isPending ? <Spinner label="Loading online order…" /> : <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200">Checking out online order {onlineOrder.data?.data.order_number ?? `#${onlineOrderId}`}. Confirm its payment below.</div>}</div> : <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />}
       </div>
 
       {/* Cart */}
@@ -126,7 +159,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
             <h2 className="font-display text-sm font-semibold text-slate-900">Current sale</h2>
             <p className="text-xs text-slate-400">{cart.lines.length === 0 ? 'Empty' : `${cart.lines.length} ${cart.lines.length === 1 ? 'item' : 'items'}`}{cart.customer && <> · {cart.customer.name}</>}</p>
           </div>
-          {cart.lines.length > 0 && (
+          {cart.lines.length > 0 && !onlineOrderId && (
             <button className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600" onClick={() => dispatch({ type: 'clear' })}>
               <Trash2 className="size-3.5" /> Clear
             </button>
@@ -171,28 +204,29 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
                 </div>
                 <div className="mt-2 flex items-center gap-1 pl-12">
                   <div className={cx('inline-flex items-center rounded-lg bg-slate-50 ring-1', validQty ? 'ring-slate-200' : 'ring-red-400')}>
-                  <button type="button" className="grid size-8 place-items-center rounded-l-lg text-slate-500 transition hover:bg-white hover:text-brand-700" aria-label="Decrease" onClick={() => dispatch({ type: 'increment', key: line.key, by: -1 })}>
+                  <button type="button" disabled={!!onlineOrderId} className="grid size-8 place-items-center rounded-l-lg text-slate-500 transition hover:bg-white hover:text-brand-700 disabled:opacity-40" aria-label="Decrease" onClick={() => dispatch({ type: 'increment', key: line.key, by: -1 })}>
                     <Minus className="size-3.5" />
                   </button>
                   <input
                     className="h-8 w-14 bg-transparent text-center text-sm font-semibold tabular-nums outline-none"
                     inputMode={line.product.allow_decimal_quantity ? 'decimal' : 'numeric'}
                     value={line.quantity}
+                    disabled={!!onlineOrderId}
                     aria-label={`Quantity of ${line.product.name}`}
                     onChange={(e) => dispatch({ type: 'setQuantity', key: line.key, quantity: e.target.value })}
                   />
-                  <button type="button" className="grid size-8 place-items-center rounded-r-lg text-slate-500 transition hover:bg-white hover:text-brand-700" aria-label="Increase" onClick={() => dispatch({ type: 'increment', key: line.key, by: 1 })}>
+                  <button type="button" disabled={!!onlineOrderId} className="grid size-8 place-items-center rounded-r-lg text-slate-500 transition hover:bg-white hover:text-brand-700 disabled:opacity-40" aria-label="Increase" onClick={() => dispatch({ type: 'increment', key: line.key, by: 1 })}>
                     <Plus className="size-3.5" />
                   </button>
                   </div>
-                  {can('sales.discount') && cart.saleDiscount.type === 'none' && (
+                  {!onlineOrderId && can('sales.discount') && cart.saleDiscount.type === 'none' && (
                     <Button variant="ghost" size="sm" aria-label="Line discount" onClick={() => setDiscountLine(line)}>
                       <Percent className="size-3.5" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="ml-auto text-slate-400 hover:text-red-600" aria-label="Remove" onClick={() => dispatch({ type: 'remove', key: line.key })}>
+                  {!onlineOrderId && <Button variant="ghost" size="sm" className="ml-auto text-slate-400 hover:text-red-600" aria-label="Remove" onClick={() => dispatch({ type: 'remove', key: line.key })}>
                     <Trash2 className="size-4" />
-                  </Button>
+                  </Button>}
                 </div>
               </li>
             );
@@ -201,7 +235,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
 
         <div className="space-y-3 border-t border-slate-100 px-4 py-3">
           <div className="flex flex-wrap gap-2">
-            <div role="radiogroup" aria-label="Statutory discount" className="inline-flex h-9 flex-1 items-center gap-0.5 rounded-xl bg-slate-100 p-1 text-xs font-medium">
+            {!onlineOrderId && <div role="radiogroup" aria-label="Statutory discount" className="inline-flex h-9 flex-1 items-center gap-0.5 rounded-xl bg-slate-100 p-1 text-xs font-medium">
               {([['none', 'Regular'], ['senior_citizen', 'Senior'], ['pwd', 'PWD']] as [SaleDiscountType, string][]).map(([v, l]) => (
                 <button key={v} type="button" role="radio" aria-checked={cart.saleDiscount.type === v} title={v === 'none' ? 'No SC/PWD discount' : '20% off + VAT exempt'}
                   onClick={() => dispatch({ type: 'setSaleDiscount', discount: { ...cart.saleDiscount, type: v } })}
@@ -209,8 +243,8 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
                   {l}
                 </button>
               ))}
-            </div>
-            {can('customers.view') && (
+            </div>}
+            {!onlineOrderId && can('customers.view') && (
               <button type="button" onClick={() => setCustomerPicker(true)}
                 className={cx('inline-flex h-9 max-w-40 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold ring-1 transition', cart.customer ? 'bg-brand-50 text-brand-800 ring-brand-200' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50')}>
                 <UserRound className="size-4 shrink-0" /><span className="truncate">{cart.customer ? cart.customer.name : 'Customer'}</span>
@@ -270,6 +304,7 @@ function Terminal({ session, branchName, onShiftClosed }: { session: RegisterSes
         error={checkout.error}
         onClose={() => setPaying(false)}
         onSubmit={(payments) => checkout.mutate(payments)}
+        defaultCashAmount={onlineOrder.data?.data.fulfilment === 'delivery' ? onlineOrder.data.data.cash_amount : null}
       />
 
       <Modal
