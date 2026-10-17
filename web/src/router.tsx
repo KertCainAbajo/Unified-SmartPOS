@@ -37,6 +37,7 @@ export const router = createBrowserRouter([
   { path: '/careers', element: <CareersIndexPage /> },
   { path: '/careers/:code', element: <CareersPage /> },
   { path: '/applications/status', element: <ApplicationStatusPage /> },
+  { path: '/shop', lazy: page(() => import('./pages/shop/ShopDirectory'), 'ShopIndexPage') },
   { path: '/shop/:business', lazy: page(() => import('./pages/shop/ShopPage'), 'ShopPage') },
   {
     element: <GuestOnly />,

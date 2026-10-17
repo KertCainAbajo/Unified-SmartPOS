@@ -7,12 +7,13 @@ import { api, errorMessage } from './api';
 type Query = Record<string, string | number | boolean | null | undefined>;
 
 /** GET a tenant-scoped endpoint. The path is relative to /tenants/{tenant}. */
-export function useTenantQuery<T>(relativePath: string, query?: Query, options: { enabled?: boolean } = {}) {
+export function useTenantQuery<T>(relativePath: string, query?: Query, options: { enabled?: boolean; refetchInterval?: number } = {}) {
   const { tenantId, path } = useTenant();
   return useQuery({
     queryKey: ['t', tenantId, relativePath, query ?? {}],
     queryFn: () => api<T>(path(relativePath), { query }),
     enabled: options.enabled ?? true,
+    refetchInterval: options.refetchInterval,
     placeholderData: keepPreviousData,
   });
 }

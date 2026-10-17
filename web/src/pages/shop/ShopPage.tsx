@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
-  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Store, Trash2, Wheat, X,
+  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { CustomerAuthDialog } from './CustomerAuthDialog';
+import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
 
 interface Branch { id: number; code: string; name: string; address: string | null }
@@ -105,8 +106,11 @@ export function ShopPage() {
   function openAuth(next: 'login' | 'register' = 'login') { setMode(next); setError(''); setAuthOpen(true); }
   const closeAuth = useCallback(() => { setAuthOpen(false); setError(''); }, []);
 
+  // Forgive a pasted link that picked up a trailing full stop, comma or space: /shop/aling-nena-mini-mart. → /shop/aling-nena-mini-mart
+  const cleanBusiness = business.trim().toLowerCase().replace(/[^a-z0-9]+$/, '');
+  if (cleanBusiness && cleanBusiness !== business) return <Navigate to={`/shop/${cleanBusiness}`} replace />;
   if (catalog.isPending) return <ShopLoading />;
-  if (catalog.isError) return <div className="grid min-h-screen place-items-center bg-[#f5f7f4] p-4"><div className="max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-red-50 text-red-600"><Store /></span><h1 className="mt-4 font-display text-xl font-bold">Shop unavailable</h1><p className="mt-2 text-sm text-slate-600">{errorMessage(catalog.error)}</p></div></div>;
+  if (catalog.isError) return <ShopDirectory missing={catalog.error instanceof ApiError && catalog.error.status === 404 ? business : undefined} error={catalog.error} onRetry={() => catalog.refetch()} />;
 
   const shop = catalog.data;
   const categories = [ALL, ...new Set(shop.data.map((product) => product.category).filter((value): value is string => !!value))];

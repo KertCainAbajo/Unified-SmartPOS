@@ -60,7 +60,7 @@ it('places a pickup order for a signed-in customer and shows it in their orders'
   const fetchMock = serve(true);
   fireEvent.click(await screen.findByRole('button', { name: 'Add Bath Soap' }));
   fireEvent.click(screen.getAllByRole('button', { name: 'Add one Bath Soap' })[0]); // product card and basket both have a stepper
-  expect((await screen.findByRole('button', { name: 'Choose a pickup branch' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((await screen.findByRole('button', { name: 'Choose a branch' }) as HTMLButtonElement).disabled).toBe(true);
 
   fireEvent.click(screen.getByRole('radio', { name: /Main Branch/ }));
   fireEvent.click(await screen.findByRole('button', { name: /Place pickup order/ }));
