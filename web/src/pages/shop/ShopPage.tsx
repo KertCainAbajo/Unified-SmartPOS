@@ -14,12 +14,12 @@ interface Branch { id: number; code: string; name: string; address: string | nul
 interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null }
 interface Catalog { business: { name: string; code: string }; branches: Branch[]; data: ShopProduct[] }
 interface Account { id: number; name: string; email: string; phone: string }
-interface Order { id: number; order_number: string; status: string; estimated_total: string; placed_at: string; branch: { name: string }; items: { id: number; name: string; quantity: string; unit: string; line_total: string }[] }
+interface Order { id: number; order_number: string; status: string; fulfilment?: 'pickup' | 'delivery'; delivery_address?: string | null; cash_amount?: string | null; change_due?: string | null; rider_name?: string | null; estimated_total: string; placed_at: string; branch: { name: string }; items: { id: number; name: string; quantity: string; unit: string; line_total: string }[] }
 interface CartLine { product: ShopProduct; quantity: number }
 type Sort = 'featured' | 'price-asc' | 'price-desc' | 'name';
 
 const peso = (value: string | number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(value));
-const statusNames: Record<string, string> = { pending: 'Waiting for store confirmation', confirmed: 'Being prepared', ready: 'Ready for pickup', completed: 'Picked up', cancelled: 'Cancelled' };
+const statusNames: Record<string, string> = { pending: 'Waiting for store confirmation', confirmed: 'Being prepared', ready: 'Ready', out_for_delivery: 'On the way', completed: 'Completed', cancelled: 'Cancelled' };
 const statusFlow = ['pending', 'confirmed', 'ready', 'completed'];
 const ALL = 'All products';
 const SAVED = 'Saved';
@@ -48,6 +48,9 @@ export function ShopPage() {
   const queryClient = useQueryClient();
   const [cart, setCart] = useState<Record<number, CartLine>>({});
   const [branchId, setBranchId] = useState<number | ''>('');
+  const [fulfilment, setFulfilment] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [cashAmount, setCashAmount] = useState('');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [authOpen, setAuthOpen] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +81,8 @@ export function ShopPage() {
   const logoutMutation = useMutation({ mutationFn: () => api(`${base}/logout`, { method: 'POST' }), onSuccess: async () => { setCart({}); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); } });
   const placeOrder = useMutation({
     mutationFn: () => api<{ data: Order }>(`${base}/orders`, { method: 'POST', body: {
-      branch_id: branchId,
+      branch_id: branchId, fulfilment,
+      ...(fulfilment === 'delivery' ? { delivery_address: deliveryAddress, cash_amount: cashAmount } : {}),
       contact_name: account.data?.name,
       contact_phone: account.data?.phone,
       items: Object.values(cart).map(({ product, quantity }) => ({ product_id: product.id, quantity })),
@@ -124,7 +128,7 @@ export function ShopPage() {
   const basketCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   const signedIn = !!account.data;
   const firstName = account.data?.name.split(' ')[0] ?? '';
-  const orderBlocker = !lines.length ? 'Add products to your basket' : !branchId ? 'Choose a pickup branch' : '';
+  const orderBlocker = !lines.length ? 'Add products to your basket' : !branchId ? 'Choose a branch' : fulfilment === 'delivery' && !deliveryAddress.trim() ? 'Enter a delivery address' : fulfilment === 'delivery' && (!cashAmount || Number(cashAmount) < total) ? 'Enter enough cash to cover the total' : '';
   const justPlaced = placeOrder.isSuccess && !lines.length ? placeOrder.data.data : null;
   const openOrders = orders.data?.data.filter((order) => !['completed', 'cancelled'].includes(order.status)).length ?? 0;
 
@@ -135,7 +139,7 @@ export function ShopPage() {
         <a href="#top" className="flex min-w-0 items-center gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-700">Online pickup</p>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-700">Pickup and delivery</p>
             <h1 className="truncate font-display text-base font-bold leading-tight sm:text-lg">{shop.business.name}</h1>
           </div>
         </a>
@@ -230,7 +234,7 @@ export function ShopPage() {
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="grid size-10 place-items-center rounded-xl bg-emerald-900 text-amber-300"><ShoppingBasket size={19} /></span>
-                <div><h2 className="font-display text-lg font-bold leading-tight">Your basket</h2><p className="text-xs text-slate-500">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : 'Pickup order'}</p></div>
+              <div><h2 className="font-display text-lg font-bold leading-tight">Your basket</h2><p className="text-xs text-slate-500">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : `${fulfilment === 'pickup' ? 'Pickup' : 'Delivery'} order`}</p></div>
               </div>
               {lines.length > 0 && <button onClick={() => setCart({})} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Clear</button>}
             </div>
@@ -266,7 +270,13 @@ export function ShopPage() {
               </div>}
 
               <fieldset className="mt-4">
-                <legend className="mb-2 flex w-full items-center justify-between text-xs font-bold uppercase tracking-[.14em] text-slate-500">Pickup branch {branchId && <span className="inline-flex items-center gap-1 normal-case tracking-normal text-emerald-700"><Check size={13} /> Selected</span>}</legend>
+                <legend className="mb-2 text-xs font-bold uppercase tracking-[.14em] text-slate-500">How would you like your order?</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['pickup', 'delivery'] as const).map((value) => <button key={value} type="button" aria-pressed={fulfilment === value} onClick={() => setFulfilment(value)} className={`rounded-xl border px-3 py-2.5 text-sm font-semibold capitalize ${fulfilment === value ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-600/10' : 'border-slate-200 text-slate-600'}`}>{value}</button>)}
+                </div>
+              </fieldset>
+              <fieldset className="mt-4">
+                <legend className="mb-2 flex w-full items-center justify-between text-xs font-bold uppercase tracking-[.14em] text-slate-500">{fulfilment === 'pickup' ? 'Pickup branch' : 'Delivery branch'} {branchId && <span className="inline-flex items-center gap-1 normal-case tracking-normal text-emerald-700"><Check size={13} /> Selected</span>}</legend>
                 <div className="space-y-2">
                   {shop.branches.map((branch) => {
                     const active = branchId === branch.id;
@@ -281,23 +291,33 @@ export function ShopPage() {
                   })}
                 </div>
               </fieldset>
+              {fulfilment === 'delivery' && <div className="mt-4 space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-[.14em] text-slate-500">Delivery address<textarea value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} maxLength={500} rows={3} placeholder="House/building, street, barangay, city" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal normal-case tracking-normal outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" /></label>
+                <label className="block text-sm font-bold text-slate-800">Cash to pay rider with
+                  <span className="mt-2 flex h-14 items-center overflow-hidden rounded-xl border-2 border-emerald-300 bg-emerald-50 shadow-sm transition focus-within:border-emerald-700 focus-within:ring-4 focus-within:ring-emerald-600/15">
+                    <span aria-hidden="true" className="grid h-full min-w-14 place-items-center border-r border-emerald-200 bg-emerald-100 font-display text-2xl font-bold text-emerald-900">₱</span>
+                    <input type="number" min={total} step="0.01" value={cashAmount} onChange={(event) => setCashAmount(event.target.value)} placeholder={total.toFixed(2)} aria-label="Cash amount in Philippine pesos" className="h-full min-w-0 flex-1 bg-transparent px-4 font-display text-xl font-bold text-emerald-950 outline-none placeholder:font-medium placeholder:text-emerald-800/45" />
+                  </span>
+                </label>
+                {Number(cashAmount) >= total && total > 0 && <p className="text-xs text-slate-600">Rider should bring <b>{peso(Number(cashAmount) - total)}</b> change.</p>}
+              </div>}
 
               <dl className="mt-4 space-y-1.5 rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                 <div className="flex justify-between text-slate-600"><dt>Items</dt><dd className="font-semibold text-slate-800">{basketCount}</dd></div>
-                <div className="flex justify-between text-slate-600"><dt>Payment</dt><dd className="font-semibold text-slate-800">In store at pickup</dd></div>
+                <div className="flex justify-between text-slate-600"><dt>Payment</dt><dd className="font-semibold text-slate-800">{fulfilment === 'pickup' ? 'In store at pickup' : 'Cash on delivery'}</dd></div>
                 <div className="flex items-end justify-between border-t border-slate-200 pt-2.5"><dt className="font-semibold">Estimated total</dt><dd className="font-display text-2xl font-bold tracking-tight">{peso(total)}</dd></div>
               </dl>
 
               {signedIn
                 ? <button disabled={!!orderBlocker || placeOrder.isPending} onClick={() => { setError(''); placeOrder.mutate(); }} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 font-bold text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none">
-                  {placeOrder.isPending ? 'Placing order…' : orderBlocker || <>Place pickup order <ArrowRight size={16} /></>}
+                  {placeOrder.isPending ? 'Placing order…' : orderBlocker || <>Place {fulfilment} order <ArrowRight size={16} /></>}
                 </button>
                 : <>
                   <button onClick={() => openAuth('login')} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 font-bold text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-900"><Lock size={16} /> Sign in to place order</button>
                   <p className="mt-2.5 text-center text-xs text-slate-500">New customer? <button onClick={() => openAuth('register')} className="font-semibold text-emerald-800 hover:underline">Create an account</button></p>
                 </>}
               {error && !authOpen && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
-              <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">Prices are estimates and are confirmed at the counter.</p>
+              <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">Prices are estimates and are confirmed at the {fulfilment === 'pickup' ? 'store' : 'store before dispatch'}.</p>
             </div>
           </section>
 
@@ -335,7 +355,7 @@ export function ShopPage() {
         </div>
       </div>
       <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-emerald-50/50">
-        {shop.business.name} · Online pickup powered by SmartPOS
+        {shop.business.name} · Online orders powered by SmartPOS
         <span className="mt-1 block text-[11px] text-emerald-50/35">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
       </div>
     </footer>
@@ -408,14 +428,16 @@ function Stepper({ name, quantity, onChange, size = 'md' }: { name: string; quan
 
 function OrderCard({ order, cancelling, onCancel }: { order: Order; cancelling: boolean; onCancel: () => void }) {
   const cancelled = order.status === 'cancelled';
-  const step = statusFlow.indexOf(order.status);
-  const tone = cancelled ? 'bg-red-50 text-red-700 ring-red-200' : order.status === 'ready' ? 'bg-amber-50 text-amber-800 ring-amber-200' : order.status === 'completed' ? 'bg-slate-100 text-slate-600 ring-slate-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200';
+  const flow = order.fulfilment === 'delivery' ? ['pending', 'confirmed', 'ready', 'out_for_delivery', 'completed'] : ['pending', 'confirmed', 'ready', 'completed'];
+  const step = flow.indexOf(order.status);
+  const tone = cancelled ? 'bg-red-50 text-red-700 ring-red-200' : ['ready', 'out_for_delivery'].includes(order.status) ? 'bg-amber-50 text-amber-800 ring-amber-200' : order.status === 'completed' ? 'bg-slate-100 text-slate-600 ring-slate-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200';
   return <li className="rounded-2xl border border-slate-200 p-4">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0"><p className="font-display text-sm font-bold">{order.order_number}</p><p className="mt-0.5 truncate text-xs text-slate-500">{order.branch.name} · {new Date(order.placed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p></div>
       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${tone}`}>{statusNames[order.status] ?? order.status}</span>
     </div>
-    {!cancelled && <div className="mt-3 grid grid-cols-4 gap-1" aria-hidden>{statusFlow.map((status, i) => <span key={status} className={`h-1.5 rounded-full ${i <= step ? (order.status === 'ready' ? 'bg-amber-400' : 'bg-emerald-600') : 'bg-slate-200'}`} />)}</div>}
+    {!cancelled && <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${flow.length}, minmax(0, 1fr))` }} aria-hidden>{flow.map((status, i) => <span key={status} className={`h-1.5 rounded-full ${i <= step ? (['ready', 'out_for_delivery'].includes(order.status) ? 'bg-amber-400' : 'bg-emerald-600') : 'bg-slate-200'}`} />)}</div>}
+    {order.fulfilment === 'delivery' && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><p><b>Delivery</b> · {order.delivery_address}</p><p className="mt-1">Cash: {peso(order.cash_amount ?? '0')} · Change: {peso(order.change_due ?? '0')}</p>{order.rider_name && <p className="mt-1">Rider: {order.rider_name}</p>}</div>}
     <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">{order.items.map((item) => `${Number(item.quantity)} ${item.unit} ${item.name}`).join(' · ')}</p>
     <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
       <span className="font-display text-base font-bold">{peso(order.estimated_total)}</span>

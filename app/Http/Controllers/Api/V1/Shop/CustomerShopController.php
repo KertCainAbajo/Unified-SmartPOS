@@ -122,10 +122,18 @@ class CustomerShopController extends Controller
             'note' => ['nullable', 'string', 'max:1000'], 'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.product_id' => ['required', 'integer', 'distinct', Rule::exists('products', 'id')->where('tenant_id', $tenant->id)->where('show_online', true)->where('status', 'active')],
             'items.*.quantity' => ['required', 'numeric', 'decimal:0,3', 'gt:0', 'max:99999'],
+            'fulfilment' => ['sometimes', Rule::in(['pickup', 'delivery'])],
+            'delivery_address' => ['required_if:fulfilment,delivery', 'nullable', 'string', 'min:10', 'max:500'],
+            // Cash the customer will hand the rider, so the right change can be sent along.
+            'cash_amount' => ['required_if:fulfilment,delivery', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:1000000'],
+        ], [
+            'delivery_address.required_if' => 'Enter the delivery address.',
+            'cash_amount.required_if' => 'Enter how much cash you will pay the rider with.',
         ]);
+        $delivery = ($data['fulfilment'] ?? 'pickup') === 'delivery';
         $branch = Branch::query()->where('tenant_id', $tenant->id)->where('is_active', true)->findOrFail($data['branch_id']);
 
-        $order = DB::transaction(function () use ($account, $tenant, $branch, $data, $numberer) {
+        $order = DB::transaction(function () use ($account, $tenant, $branch, $data, $numberer, $delivery) {
             $products = $tenant->products()->whereIn('id', collect($data['items'])->pluck('product_id'))->where('show_online', true)
                 ->where('status', 'active')->whereNull('archived_at')->get()->keyBy('id');
             $total = '0.00';
@@ -146,11 +154,19 @@ class CustomerShopController extends Controller
                 $lines[] = ['product' => $product, 'quantity' => $quantity, 'line_total' => $lineTotal];
             }
 
+            $total = Money::round($total);
+            $cash = $delivery ? Money::normalize((string) $data['cash_amount']) : null;
+            if ($cash !== null && Money::cmp($cash, $total) < 0) {
+                throw ValidationException::withMessages(['cash_amount' => ["The cash amount must cover the order total of ₱{$total}."]]);
+            }
+
             $order = OnlineOrder::query()->create([
                 'tenant_id' => $tenant->id, 'branch_id' => $branch->id, 'customer_account_id' => $account->id,
                 'order_number' => $numberer->next($tenant->id, 'online_order', $branch), 'contact_name' => trim($data['contact_name']),
                 'contact_phone' => trim($data['contact_phone']), 'note' => $data['note'] ?? null,
-                'estimated_total' => Money::round($total), 'placed_at' => now(),
+                'fulfilment' => $delivery ? 'delivery' : 'pickup',
+                'delivery_address' => $delivery ? trim($data['delivery_address']) : null,
+                'estimated_total' => $total, 'cash_amount' => $cash, 'placed_at' => now(),
             ]);
             foreach ($lines as $line) {
                 $product = $line['product'];

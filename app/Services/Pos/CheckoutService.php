@@ -118,8 +118,10 @@ class CheckoutService
         if (isset($data['online_order_id'])) {
             $onlineOrder = OnlineOrder::query()->where('tenant_id', $tenant->id)
                 ->lockForUpdate()->findOrFail($data['online_order_id']);
-            if ($onlineOrder->branch_id !== $branch->id || $onlineOrder->status !== OnlineOrderStatus::Ready) {
-                throw new BusinessRuleException('The pickup order is not ready at this branch.', 'ONLINE_ORDER_NOT_READY', status: 409);
+            // Pickup: ring up when ready. Delivery: ring up when the rider hands over the customer's cash
+            // (out for delivery), or before dispatch if the store prefers (ready).
+            if ($onlineOrder->branch_id !== $branch->id || ! $onlineOrder->status->payableAtCheckout($onlineOrder->isDelivery())) {
+                throw new BusinessRuleException('The online order is not ready to be paid at this branch.', 'ONLINE_ORDER_NOT_READY', status: 409);
             }
             if (($data['discount']['type'] ?? 'none') !== 'none') {
                 throw new BusinessRuleException('Pickup orders cannot be changed with a sale discount.', 'ONLINE_ORDER_DISCOUNT_NOT_ALLOWED', status: 409);

@@ -236,6 +236,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 // Customers and expenses
                 Route::apiResource('customers', CustomerController::class)->except('destroy');
                 Route::get('online-orders', [StaffOnlineOrderController::class, 'index'])->name('online-orders.index');
+                Route::get('online-orders/{onlineOrder}', [StaffOnlineOrderController::class, 'show'])->name('online-orders.show');
                 Route::post('online-orders/{onlineOrder}/status', [StaffOnlineOrderController::class, 'updateStatus'])->name('online-orders.status');
                 Route::get('expense-categories', [ExpenseController::class, 'categories'])->name('expense-categories.index');
                 Route::post('expense-categories', [ExpenseController::class, 'storeCategory'])->name('expense-categories.store');
