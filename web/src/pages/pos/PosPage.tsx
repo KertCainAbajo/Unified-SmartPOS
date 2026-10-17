@@ -148,7 +148,7 @@ function Terminal({ session, branchName, onShiftClosed, onlineOrderId }: { sessi
             <LogOut className="size-3.5" /> Close shift
           </button>
         </div>
-        {onlineOrderId ? <div className="space-y-2">{onlineOrder.isError && <ErrorBanner error={onlineOrder.error} />}{onlineOrder.isPending ? <Spinner label="Loading online order…" /> : <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200">Checking out online order {onlineOrder.data?.data.order_number ?? `#${onlineOrderId}`}. Confirm its payment below.</div>}</div> : <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />}
+        {onlineOrderId ? <div className="space-y-2">{onlineOrder.isError && <ErrorBanner error={onlineOrder.error} />}{onlineOrder.isPending ? <Spinner label="Loading online order…" /> : <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200"><span>Checking out online order {onlineOrder.data?.data.order_number ?? `#${onlineOrderId}`}. Confirm its payment below.</span><Button type="button" variant="secondary" size="sm" icon={<X className="size-4" />} onClick={() => navigate(`/t/${tenantId}/online-orders`)}>Cancel checkout</Button></div>}</div> : <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />}
       </div>
 
       {/* Cart */}

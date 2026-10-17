@@ -11,7 +11,7 @@ import { CustomerAuthDialog } from './CustomerAuthDialog';
 import { ShopHero } from './ShopVisuals';
 
 interface Branch { id: number; code: string; name: string; address: string | null }
-interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null }
+interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null; track_inventory: boolean; reorder_level: string; stock_by_branch: Record<number, { quantity: string; reorder_level: string | null }> }
 interface Catalog { business: { name: string; code: string }; branches: Branch[]; data: ShopProduct[] }
 interface Account { id: number; name: string; email: string; phone: string }
 interface Order { id: number; order_number: string; status: string; fulfilment?: 'pickup' | 'delivery'; delivery_address?: string | null; cash_amount?: string | null; change_due?: string | null; rider_name?: string | null; estimated_total: string; placed_at: string; branch: { name: string }; items: { id: number; name: string; quantity: string; unit: string; line_total: string }[] }
@@ -224,7 +224,7 @@ export function ShopPage() {
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
               : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
+                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
               </div>}
         </section>
 
@@ -385,7 +385,22 @@ export function ShopPage() {
 
 function cartLines(cart: Record<number, CartLine>): CartLine[] { return Object.values(cart); }
 
-function ProductCard({ product, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {
+type ProductStock = { label: string; level: 'available' | 'low' | 'none' | 'untracked' };
+
+function productStock(product: ShopProduct, selectedBranch: number | '', branches: Branch[]): ProductStock {
+  if (!product.track_inventory) return { label: 'Stock not tracked', level: 'untracked' };
+  const entries = selectedBranch ? [product.stock_by_branch[selectedBranch] ?? { quantity: '0', reorder_level: null }] : Object.values(product.stock_by_branch);
+  const quantity = entries.reduce((sum, stock) => sum + Number(stock.quantity), 0);
+  const defaultLowAt = Number(product.reorder_level) > 0 ? Number(product.reorder_level) : 5;
+  const lowAt = entries.reduce((sum, stock) => sum + Number(stock.reorder_level ?? defaultLowAt), 0);
+  const amount = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 3 }).format(quantity);
+  const branch = branches.find((item) => item.id === selectedBranch);
+  const place = branch ? `${branch.name}: ` : '';
+  const suffix = branch ? ' in stock' : ' available across branches';
+  return { label: `${place}${amount}${suffix}`, level: quantity <= 0 ? 'none' : quantity <= lowAt ? 'low' : 'available' };
+}
+
+function ProductCard({ product, stock, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; stock: ProductStock; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {
   return <article className={`group relative flex flex-col rounded-2xl bg-white p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(6,60,40,.35)] sm:p-4 ${quantity ? 'ring-2 ring-emerald-600' : 'shadow-[0_1px_2px_rgba(15,23,42,.05)] ring-1 ring-slate-200'}`}>
     <div className="flex items-start justify-between gap-2">
       <span className="truncate rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{product.category ?? 'Essentials'}</span>
@@ -404,6 +419,9 @@ function ProductCard({ product, quantity, saved, tone, Icon, onChange, onToggleS
     <h3 className="relative mt-3 line-clamp-1 text-[15px] font-bold leading-snug text-slate-900" title={product.name}>{product.name}</h3>
     <p className="mt-0.5 line-clamp-2 min-h-10 text-[13px] leading-5 text-slate-500" title={product.description ?? undefined}>{product.description || `Sold per ${product.unit}`}</p>
     <p className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900">{peso(product.price)}<span className="ml-1 text-xs font-medium text-slate-400">/ {product.unit}</span></p>
+    <p className={`mt-2 inline-flex min-h-7 w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${stock.level === 'available' ? 'bg-emerald-100 text-emerald-800' : stock.level === 'low' ? 'bg-amber-100 text-amber-900' : stock.level === 'none' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
+      <span aria-hidden className={`size-2 rounded-full ${stock.level === 'available' ? 'bg-emerald-600' : stock.level === 'low' ? 'bg-amber-500' : stock.level === 'none' ? 'bg-red-600' : 'bg-slate-400'}`} />{stock.label}
+    </p>
 
     <div className="mt-3">
       {quantity

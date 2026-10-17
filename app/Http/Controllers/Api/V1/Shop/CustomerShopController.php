@@ -6,6 +6,7 @@ use App\Enums\OnlineOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CustomerAccount;
+use App\Models\Inventory;
 use App\Models\OnlineOrder;
 use App\Models\Product;
 use App\Models\Tenant;
@@ -28,11 +29,21 @@ class CustomerShopController extends Controller
         $tenant = $this->shopTenant($business);
         $branches = $tenant->branches()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'address']);
         $products = $tenant->products()->where('show_online', true)->where('status', 'active')->whereNull('archived_at')
-            ->with('category:id,name')->orderBy('name')->get()
+            ->with('category:id,name')->orderBy('name')->get();
+        $stockByProduct = Inventory::query()->where('tenant_id', $tenant->id)
+            ->whereIn('branch_id', $branches->pluck('id'))->whereIn('product_id', $products->pluck('id'))
+            ->get(['branch_id', 'product_id', 'quantity', 'reorder_level'])->groupBy('product_id');
+        $products = $products
             ->map(fn (Product $product) => [
                 'id' => $product->id, 'sku' => $product->sku, 'name' => $product->name,
                 'description' => $product->description, 'unit' => $product->unit,
                 'price' => $product->price, 'category' => $product->category?->name,
+                'track_inventory' => $product->track_inventory,
+                'reorder_level' => $product->reorder_level,
+                'stock_by_branch' => $branches->mapWithKeys(function (Branch $branch) use ($product, $stockByProduct) {
+                    $stock = $stockByProduct->get($product->id, collect())->firstWhere('branch_id', $branch->id);
+                    return [$branch->id => ['quantity' => $stock?->quantity ?? '0.000', 'reorder_level' => $stock?->reorder_level]];
+                }),
                 'image_url' => $product->image_path ? route('api.v1.shop.products.image', [$tenant->slug, $product->id, 'v' => ProductImageService::version($product)], false) : null,
             ]);
 
