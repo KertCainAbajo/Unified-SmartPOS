@@ -17,7 +17,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
+import { isRiderOnly } from '../components/TenantLayout';
 import { useAuth } from '../auth/AuthProvider';
 import { Badge } from '../components/ui';
 import { firstOfMonthManila, formatDateTime, formatMoney, formatQty, titleCase, todayManila } from '../lib/format';
@@ -38,8 +39,15 @@ function greeting(): string {
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-/** Store overview: today's numbers, what sells, what is running low and the latest sales. */
+/** Riders only deliver, so they land on their deliveries; everyone else gets the store overview. */
 export function DashboardPage() {
+  const { can, tenantId } = useTenant();
+  if (isRiderOnly(can)) return <Navigate to={`/t/${tenantId}/deliveries`} replace />;
+  return <StoreDashboard />;
+}
+
+/** Store overview: today's numbers, what sells, what is running low and the latest sales. */
+function StoreDashboard() {
   const { can, branch, viewAll, scopeBranchId, branches, tenant, tenantId } = useTenant();
   const { user } = useAuth();
   const today = todayManila();

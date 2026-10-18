@@ -17,6 +17,8 @@ class TenantMembership extends Model
     /** Mirrors database defaults so freshly created instances are complete. */
     protected $attributes = [
         'status' => 'active',
+        'on_duty' => true,
+        'duty_changed_at' => null,
         'all_branches' => false,
         'employee_code' => null,
         'status_reason' => null,
@@ -30,6 +32,8 @@ class TenantMembership extends Model
     {
         return [
             'all_branches' => 'boolean',
+            'on_duty' => 'boolean',
+            'duty_changed_at' => 'datetime',
             'joined_at' => 'datetime',
             'suspended_at' => 'datetime',
             'offboarded_at' => 'datetime',

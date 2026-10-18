@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
+  Bike,
   ArrowLeftRight,
   BarChart3,
   Bell,
@@ -57,13 +58,20 @@ interface NavItem {
   badge?: BadgeKey;
   /** Extra words the menu search matches. */
   keywords?: string;
+  /** Further rule on top of `any`, e.g. hide rider screens from owners who hold every permission. */
+  show?: (has: (permission: string) => boolean) => boolean;
 }
+
+/** Riders sign in only to deliver: they skip the store dashboard and go straight to their deliveries. */
+export const isRiderOnly = (has: (permission: string) => boolean) =>
+  has('deliveries.ride') && !has('sales.create') && !has('sales.view') && !has('sales.view_all') && !has('products.view');
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: 'Selling',
     items: [
-      { to: '', label: 'Dashboard', icon: LayoutDashboard, any: [], keywords: 'home overview' },
+      { to: '', label: 'Dashboard', icon: LayoutDashboard, any: [], keywords: 'home overview', show: (has) => !isRiderOnly(has) },
+      { to: 'deliveries', label: 'My deliveries', icon: Bike, any: ['deliveries.ride'], keywords: 'rider delivery map route', show: (has) => !has('tenant.manage') && !has('branches.manage') },
       { to: 'pos', label: 'Point of Sale', icon: ShoppingCart, any: ['sales.create'], badge: 'shift', keywords: 'register checkout sell cashier' },
       { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all', 'sales.create'], keywords: 'pickup delivery shop customer orders' },
       { to: 'sales', label: 'Sales', icon: Receipt, any: ['sales.view', 'sales.view_all'], keywords: 'receipts transactions' },
@@ -223,7 +231,7 @@ function Shell() {
     setMenuOpen(false);
   }, [location.pathname]);
 
-  const allowed = NAV.map((s) => ({ ...s, items: s.items.filter((i) => i.any.length === 0 || i.any.some((p) => permissions.has(p))) })).filter((s) => s.items.length > 0);
+  const allowed = NAV.map((s) => ({ ...s, items: s.items.filter((i) => (i.any.length === 0 || i.any.some((p) => permissions.has(p))) && (!i.show || i.show((p) => permissions.has(p)))) })).filter((s) => s.items.length > 0);
   const needle = filter.trim().toLowerCase();
   const visible = needle
     ? allowed.map((s) => ({ ...s, items: s.items.filter((i) => `${i.label} ${i.keywords ?? ''}`.toLowerCase().includes(needle)) })).filter((s) => s.items.length > 0)

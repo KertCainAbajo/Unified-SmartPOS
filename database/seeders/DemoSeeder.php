@@ -74,6 +74,7 @@ class DemoSeeder extends Seeder
 
         $products = $this->catalog($tenant, $owner);
         $this->call(DemoProductContentSeeder::class);
+        $this->call(DemoBranchLocationSeeder::class);
         $this->openingStock($main, $makati, $products, $owner);
         $this->suppliers($tenant, $main, $products, $owner);
         $this->sampleSales($tenant, $main, $products, $cashier, $owner);

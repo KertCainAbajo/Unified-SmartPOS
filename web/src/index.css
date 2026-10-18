@@ -98,3 +98,34 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .auth-fade { animation: none; }
 }
+
+/* Map markers drawn by components/maps.tsx */
+.smartpos-pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50% 50% 50% 6px;
+  transform: rotate(-45deg);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.35);
+}
+.smartpos-pin > svg { transform: rotate(45deg); }
+.smartpos-pin--rider { border-radius: 50%; transform: none; }
+.smartpos-pin--rider > svg { transform: none; }
+.smartpos-pin--rider::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 3px solid rgba(225, 29, 72, 0.45);
+  animation: smartpos-ping 1.6s ease-out infinite;
+}
+@keyframes smartpos-ping {
+  from { transform: scale(0.7); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .smartpos-pin--rider::after { animation: none; }
+}

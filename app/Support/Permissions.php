@@ -76,6 +76,9 @@ final class Permissions
 
     public const SALES_VIEW_ALL = 'sales.view_all';
 
+    /** Deliver online orders: see assigned deliveries, share location while delivering, confirm cash collected. */
+    public const DELIVERIES_RIDE = 'deliveries.ride';
+
     public const SALES_DISCOUNT = 'sales.discount';
 
     public const SALES_VOID = 'sales.void';
@@ -162,6 +165,7 @@ final class Permissions
             self::SALES_CREATE => ['name' => 'Process sales (checkout)', 'group' => 'pos'],
             self::SALES_VIEW => ['name' => 'View own sales', 'group' => 'pos'],
             self::SALES_VIEW_ALL => ['name' => 'View all sales in authorized branches', 'group' => 'pos'],
+            self::DELIVERIES_RIDE => ['name' => 'Deliver online orders (rider)', 'group' => 'pos'],
             self::SALES_DISCOUNT => ['name' => 'Apply manual line discounts', 'group' => 'pos'],
             self::SALES_VOID => ['name' => 'Void sales', 'group' => 'pos'],
             self::REFUNDS_CREATE => ['name' => 'Request refunds', 'group' => 'pos'],
@@ -196,6 +200,8 @@ final class Permissions
     public const ROLE_AUDITOR = 'auditor';
 
     public const ROLE_CUSTOMER_SERVICE = 'customer_service';
+
+    public const ROLE_RIDER = 'delivery_rider';
 
     /**
      * Owners, managers and HR (User & Access Manager) sign in with their email address, never with a username or
@@ -313,6 +319,11 @@ final class Permissions
                     self::AUDIT_VIEW,
                     self::STAFF_VIEW,
                 ],
+            ],
+            self::ROLE_RIDER => [
+                'name' => 'Delivery Rider',
+                'description' => 'Delivers online orders: sees only their assigned deliveries, shares location while delivering and confirms cash collected.',
+                'permissions' => [self::DELIVERIES_RIDE],
             ],
             self::ROLE_CUSTOMER_SERVICE => [
                 'name' => 'Customer Service',

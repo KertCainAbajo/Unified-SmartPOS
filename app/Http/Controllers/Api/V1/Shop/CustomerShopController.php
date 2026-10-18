@@ -28,7 +28,7 @@ class CustomerShopController extends Controller
     public function catalog(string $business): JsonResponse
     {
         $tenant = $this->shopTenant($business);
-        $branches = $tenant->branches()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'address']);
+        $branches = $tenant->branches()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'address', 'latitude', 'longitude']);
         $products = $tenant->products()->where('show_online', true)->where('status', 'active')->whereNull('archived_at')
             ->with('category:id,name')->orderBy('name')->get();
         $stockByProduct = Inventory::query()->where('tenant_id', $tenant->id)
@@ -117,7 +117,8 @@ class CustomerShopController extends Controller
             ]);
         });
 
-        Auth::guard('customer')->login($account);
+        // Shoppers stay signed in on their own device unless they untick "Keep me signed in".
+        Auth::guard('customer')->login($account, $request->boolean('remember', true));
         $request->session()->regenerate();
 
         return response()->json(['data' => $this->accountView($account)], 201)->header('Cache-Control', 'no-store');
@@ -131,7 +132,7 @@ class CustomerShopController extends Controller
         if (! $account || ! $account->isActive() || ! Hash::check($data['password'], $account->password)) {
             return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
         }
-        Auth::guard('customer')->login($account, (bool) $request->input('remember', false));
+        Auth::guard('customer')->login($account, $request->boolean('remember', true));
         $request->session()->regenerate();
         $account->forceFill(['last_login_at' => now()])->save();
 
@@ -156,9 +157,33 @@ class CustomerShopController extends Controller
     public function orders(string $business): JsonResponse
     {
         $account = $this->accountFor($business);
-        $orders = $account->orders()->with(['branch:id,name', 'items:id,online_order_id,name,sku,unit,unit_price,quantity,line_total'])
-            ->latest('id')->paginate(20);
+        $orders = $account->orders()->with(['branch:id,name,address,latitude,longitude', 'items:id,online_order_id,name,sku,unit,unit_price,quantity,line_total'])
+            ->latest('id')->paginate(20)->through(fn (OnlineOrder $order) => $order->customerView());
         return response()->json($orders);
+    }
+
+    /**
+     * The customer's in-store purchases at this business (sales rung up for their customer record), so their
+     * counter and online history read as one.
+     */
+    public function purchases(string $business): JsonResponse
+    {
+        $account = $this->accountFor($business);
+        if (! $account->customer_id) {
+            return response()->json(['data' => [], 'total' => 0]);
+        }
+        $sales = $account->tenant->sales()->where('customer_id', $account->customer_id)->where('status', 'completed')
+            ->with(['branch:id,name', 'items:id,sale_id,name,unit,quantity,line_total'])
+            ->latest('id')->paginate(20)
+            ->through(fn ($sale) => [
+                'id' => $sale->id, 'receipt_number' => $sale->receipt_number, 'total' => $sale->total,
+                'business_date' => $sale->business_date?->format('Y-m-d'), 'created_at' => $sale->created_at,
+                'branch' => ['name' => $sale->branch?->name],
+                'online_order_number' => OnlineOrder::query()->where('sale_id', $sale->id)->value('order_number'),
+                'items' => $sale->items->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit, 'quantity' => $i->quantity, 'line_total' => $i->line_total])->values(),
+            ]);
+
+        return response()->json($sales);
     }
 
     public function placeOrder(Request $request, string $business, DocumentNumberer $numberer): JsonResponse
@@ -173,6 +198,9 @@ class CustomerShopController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'decimal:0,3', 'gt:0', 'max:99999'],
             'fulfilment' => ['sometimes', Rule::in(['pickup', 'delivery'])],
             'delivery_address' => ['required_if:fulfilment,delivery', 'nullable', 'string', 'min:10', 'max:500'],
+            // Optional exact spot pinned on the map; both or neither.
+            'delivery_lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:delivery_lng'],
+            'delivery_lng' => ['nullable', 'numeric', 'between:-180,180', 'required_with:delivery_lat'],
             // Cash the customer will hand the rider, so the right change can be sent along.
             'cash_amount' => ['required_if:fulfilment,delivery', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:1000000'],
         ], [
@@ -215,6 +243,8 @@ class CustomerShopController extends Controller
                 'contact_phone' => trim($data['contact_phone']), 'note' => $data['note'] ?? null,
                 'fulfilment' => $delivery ? 'delivery' : 'pickup',
                 'delivery_address' => $delivery ? trim($data['delivery_address']) : null,
+                'delivery_lat' => $delivery && isset($data['delivery_lat']) ? round((float) $data['delivery_lat'], 7) : null,
+                'delivery_lng' => $delivery && isset($data['delivery_lng']) ? round((float) $data['delivery_lng'], 7) : null,
                 'estimated_total' => $total, 'cash_amount' => $cash, 'placed_at' => now(),
             ]);
             foreach ($lines as $line) {
@@ -227,7 +257,7 @@ class CustomerShopController extends Controller
             return $order;
         });
 
-        return response()->json(['data' => $order->load(['branch:id,name', 'items'])], 201);
+        return response()->json(['data' => $order->load(['branch:id,name,address,latitude,longitude', 'items'])->customerView()], 201);
     }
 
     public function cancelOrder(string $business, int $order): JsonResponse
@@ -244,7 +274,7 @@ class CustomerShopController extends Controller
             }
             $locked->forceFill(['status' => OnlineOrderStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'customer'])->save();
         });
-        return response()->json(['data' => $order->fresh(['branch:id,name', 'items'])]);
+        return response()->json(['data' => $order->fresh(['branch:id,name,address,latitude,longitude', 'items'])->customerView()]);
     }
 
     private function shopTenant(string $business): Tenant

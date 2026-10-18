@@ -251,6 +251,13 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
 
                 {capsLock && <p className="-mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-700"><TriangleAlert className="size-3.5" /> Caps Lock is on</p>}
 
+                {/* The hidden "0" is sent when the box is unticked; a ticked box's "1" comes later and wins. */}
+                <input type="hidden" name="remember" value="0" />
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
+                  <input type="checkbox" name="remember" value="1" defaultChecked className="mt-0.5 size-4 rounded border-slate-300 accent-emerald-700" />
+                  <span><span className="font-semibold">Keep me signed in</span><span className="block text-xs text-slate-500">Untick on a shared or public computer.</span></span>
+                </label>
+
                 <button
                   type="submit"
                   disabled={busy}

@@ -16,6 +16,8 @@ class BranchResource extends JsonResource
             'code' => $this->code,
             'name' => $this->name,
             'address' => $this->address,
+            'latitude' => $this->latitude === null ? null : (float) $this->latitude,
+            'longitude' => $this->longitude === null ? null : (float) $this->longitude,
             'phone' => $this->phone,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at,

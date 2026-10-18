@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'address', 'phone', 'is_active'])]
+#[Fillable(['code', 'name', 'address', 'latitude', 'longitude', 'phone', 'is_active'])]
 class Branch extends Model
 {
     use HasFactory;
@@ -20,7 +20,7 @@ class Branch extends Model
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'latitude' => 'float', 'longitude' => 'float'];
     }
 
     public function tenant(): BelongsTo

@@ -9,10 +9,13 @@ import { Button, DateRange, ErrorBanner, Field, Input, Modal, Spinner, cx } from
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Paginated } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
+import { DeliveryMap, directionsUrl, distanceKm, etaMinutes, formatKm, toLatLng } from '../../components/maps';
 import { OrderHistory } from './OnlineOrderHistory';
 import { daysAgo, money, qty, type OnlineOrder, type OrderKind as Kind, type OrderStatus as Status, type OrderView as View } from './onlineOrders';
 
-interface StatusChange { id: number; status: string; cancel_reason?: string; rider_name?: string; rider_phone?: string }
+interface StatusChange { id: number; status: string; cancel_reason?: string; rider_user_id?: number; rider_name?: string; rider_phone?: string }
+interface Rider { user_id: number; name: string; phone: string | null; active_deliveries: number; on_duty?: boolean }
+type Dispatch = { rider_user_id: number } | { rider_name: string; rider_phone: string };
 type Stage = 'all' | 'pending' | 'confirmed' | 'ready' | 'out_for_delivery';
 
 /** Look of each status, used by the stage cards, card accents and badges. */
@@ -45,6 +48,7 @@ export function OnlineOrdersPage() {
   const [search, setSearch] = useState('');
   const [dispatching, setDispatching] = useState<OnlineOrder | null>(null);
   const [cancelling, setCancelling] = useState<OnlineOrder | null>(null);
+  const [mapOrder, setMapOrder] = useState<OnlineOrder | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(t); }, []);
 
@@ -149,12 +153,14 @@ export function OnlineOrdersPage() {
                     onDispatch={() => setDispatching(order)}
                     onRingUp={() => ringUp(order)}
                     onCancel={() => setCancelling(order)}
+                    onMap={() => setMapOrder(order)}
                   />
                 ))}
               </div>
             )}
 
-      <DispatchModal order={dispatching} busy={status.isPending} onClose={() => setDispatching(null)} onSubmit={(rider_name, rider_phone) => dispatching && status.mutate({ id: dispatching.id, status: 'out_for_delivery', rider_name, rider_phone })} />
+      <DispatchModal order={dispatching} busy={status.isPending} onClose={() => setDispatching(null)} onSubmit={(rider) => dispatching && status.mutate({ id: dispatching.id, status: 'out_for_delivery', ...rider })} />
+      {mapOrder && <LiveMapModal order={list.data?.data.find((o) => o.id === mapOrder.id) ?? mapOrder} onClose={() => setMapOrder(null)} />}
       <CancelModal order={cancelling} busy={status.isPending} onClose={() => setCancelling(null)} onSubmit={(cancel_reason) => cancelling && status.mutate({ id: cancelling.id, status: 'cancelled', cancel_reason })} />
     </div>
   );
@@ -175,9 +181,9 @@ function StageCard({ label, count, icon: Icon, tile, active, onClick, pulse }: {
   );
 }
 
-function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, onRingUp, onCancel }: {
+function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, onRingUp, onCancel, onMap }: {
   order: OnlineOrder; now: number; busy: boolean; canAct: boolean;
-  onConfirm: () => void; onReady: () => void; onDispatch: () => void; onRingUp: () => void; onCancel: () => void;
+  onConfirm: () => void; onReady: () => void; onDispatch: () => void; onRingUp: () => void; onCancel: () => void; onMap: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const look = STATUS[order.status];
@@ -246,9 +252,17 @@ function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, o
               </div>
             </div>
             {order.rider_name && <p className="mt-2.5 flex items-center gap-2 text-xs text-slate-600"><Bike className="size-3.5 text-orange-600" /> Rider: <b className="text-slate-800">{order.rider_name}</b>{order.rider_phone && <> · <a className="text-brand-700 hover:underline" href={`tel:${order.rider_phone}`}>{order.rider_phone}</a></>}</p>}
+            {order.status === 'out_for_delivery' && (
+              <button onClick={onMap} className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200 transition hover:bg-orange-50">
+                <MapPin className="size-3.5" /> {order.delivered_at ? 'View delivery spot' : order.rider_lat != null ? 'Live map' : 'Map'}
+                {order.rider_location_at && !order.delivered_at && <span className="font-normal text-slate-500">· {ago(order.rider_location_at, now)}</span>}
+              </button>
+            )}
           </div>
         )}
 
+        {order.delivered_at && order.status === 'out_for_delivery' && <p className="flex gap-2 rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-900 ring-1 ring-brand-200"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-600" /> <span>Delivered {ago(order.delivered_at, now)}. Collect <b>{money(order.cash_amount ?? order.estimated_total)}</b> from {order.rider_name ?? 'the rider'} and record the payment.</span></p>}
+        {order.delivery_issue && order.status === 'ready' && <p className="flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200"><Bike className="mt-0.5 size-4 shrink-0" /> <span>Rider brought it back: <b>{order.delivery_issue}</b>. Send it out again or cancel.</span></p>}
         {order.note && <p className="flex gap-2 rounded-xl bg-yellow-50 px-3 py-2 text-sm text-yellow-900 ring-1 ring-yellow-200"><StickyNote className="mt-0.5 size-4 shrink-0" /> {order.note}</p>}
         {order.status === 'cancelled' && order.cancel_reason && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800 ring-1 ring-red-200">Cancelled: {order.cancel_reason}</p>}
 
@@ -283,7 +297,7 @@ function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, o
             {order.status === 'confirmed' && <Button loading={busy} icon={<PackageCheck className="size-4" />} onClick={onReady}>{delivery ? 'Packed, ready to send' : 'Ready for pickup'}</Button>}
             {order.status === 'ready' && delivery && <Button loading={busy} icon={<Bike className="size-4" />} onClick={onDispatch}>Send out for delivery</Button>}
             {order.status === 'ready' && !delivery && <Button icon={<Wallet className="size-4" />} onClick={onRingUp}>Customer is here · ring up</Button>}
-            {order.status === 'out_for_delivery' && <Button icon={<Wallet className="size-4" />} onClick={onRingUp}>Delivered · record payment</Button>}
+            {order.status === 'out_for_delivery' && <Button icon={<Wallet className="size-4" />} onClick={onRingUp}>{order.delivered_at ? 'Record payment' : 'Delivered · record payment'}</Button>}
           </div>
         </div>
       )}
@@ -306,10 +320,17 @@ function EmptyOrders({ view, filtered, shopUrl }: { view: View; filtered: boolea
   );
 }
 
-function DispatchModal({ order, busy, onClose, onSubmit }: { order: OnlineOrder | null; busy: boolean; onClose: () => void; onSubmit: (name: string, phone: string) => void }) {
+function DispatchModal({ order, busy, onClose, onSubmit }: { order: OnlineOrder | null; busy: boolean; onClose: () => void; onSubmit: (rider: Dispatch) => void }) {
+  const [choice, setChoice] = useState<number | 'other' | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  useEffect(() => { if (order) { setName(''); setPhone(''); } }, [order]);
+  const riders = useTenantQuery<{ data: Rider[] }>('/online-orders/riders', { branch_id: order?.branch.id }, { enabled: order !== null });
+  const list = riders.data?.data;
+  useEffect(() => { if (order) { setChoice(null); setName(''); setPhone(''); } }, [order]);
+  // Pre-select the least busy rider once the list arrives.
+  useEffect(() => { if (order && choice === null && list) setChoice(list[0]?.user_id ?? 'other'); }, [order, choice, list]);
+  const ready = typeof choice === 'number' || (choice === 'other' && !!name.trim());
+
   return (
     <Modal
       open={order !== null}
@@ -317,7 +338,8 @@ function DispatchModal({ order, busy, onClose, onSubmit }: { order: OnlineOrder 
       title="Send out for delivery"
       description={order ? `${order.order_number} · ${order.contact_name}` : undefined}
       icon={Bike}
-      footer={<><Button variant="secondary" onClick={onClose}>Back</Button><Button loading={busy} disabled={!name.trim()} icon={<Bike className="size-4" />} onClick={() => onSubmit(name.trim(), phone.trim())}>Send out</Button></>}
+      size="lg"
+      footer={<><Button variant="secondary" onClick={onClose}>Back</Button><Button loading={busy} disabled={!ready} icon={<Bike className="size-4" />} onClick={() => onSubmit(typeof choice === 'number' ? { rider_user_id: choice } : { rider_name: name.trim(), rider_phone: phone.trim() })}>Send out</Button></>}
     >
       {order && (
         <div className="space-y-4">
@@ -326,11 +348,64 @@ function DispatchModal({ order, busy, onClose, onSubmit }: { order: OnlineOrder 
             <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer pays</p><p className="mt-0.5 font-display font-bold">{money(order.cash_amount ?? order.estimated_total)}</p></div>
             <div className="rounded-xl bg-amber-100 p-3 ring-1 ring-amber-300"><p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Bring change</p><p className="mt-0.5 font-display font-bold text-amber-900">{money(order.change_due ?? 0)}</p></div>
           </div>
-          <p className="flex gap-2 rounded-xl bg-orange-50 px-3 py-2.5 text-sm text-slate-800 ring-1 ring-orange-200"><MapPin className="mt-0.5 size-4 shrink-0 text-orange-600" /> {order.delivery_address}</p>
-          <Field label="Rider name">{(id) => <Input id={id} value={name} autoFocus placeholder="Who is delivering?" onChange={(e) => setName(e.target.value)} />}</Field>
-          <Field label="Rider phone" hint="Optional. Shown to the customer so they can reach the rider.">{(id) => <Input id={id} value={phone} inputMode="tel" placeholder="09XX XXX XXXX" onChange={(e) => setPhone(e.target.value)} />}</Field>
+          <p className="flex gap-2 rounded-xl bg-orange-50 px-3 py-2.5 text-sm text-slate-800 ring-1 ring-orange-200"><MapPin className="mt-0.5 size-4 shrink-0 text-orange-600" /> <span className="flex-1">{order.delivery_address}</span>{order.delivery_lat == null && <span className="shrink-0 text-xs text-slate-500">no map pin</span>}</p>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-slate-700">Who is delivering?</legend>
+            {riders.isPending ? <div className="h-16 animate-pulse rounded-xl bg-slate-100" /> : (
+              <div className="space-y-2">
+                {(list ?? []).map((r) => (
+                  <label key={r.user_id} className={cx('flex cursor-pointer items-center gap-3 rounded-xl p-3 ring-1 transition', choice === r.user_id ? 'bg-brand-50 ring-2 ring-brand-600' : 'ring-slate-200 hover:bg-slate-50')}>
+                    <input type="radio" name="rider" className="sr-only" checked={choice === r.user_id} onChange={() => setChoice(r.user_id)} />
+                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-rose-100 font-display font-bold text-rose-700">{r.name.charAt(0)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-slate-900">{r.name}</span>
+                      <span className="block text-xs text-slate-500">{r.phone ?? 'No phone on file'}</span>
+                    </span>
+                    <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold', r.on_duty === false ? 'bg-slate-100 text-slate-500' : r.active_deliveries ? 'bg-amber-50 text-amber-800' : 'bg-brand-50 text-brand-700')}>{r.on_duty === false ? 'Off duty' : r.active_deliveries ? `${r.active_deliveries} on the road` : 'Available'}</span>
+                  </label>
+                ))}
+                {!list?.length && <p className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500 ring-1 ring-slate-200">No rider accounts for this branch yet. Add one in Team with the <b>Delivery Rider</b> role so riders can share their location, or enter an outside courier below.</p>}
+                <label className={cx('flex cursor-pointer items-center gap-3 rounded-xl p-3 ring-1 transition', choice === 'other' ? 'bg-brand-50 ring-2 ring-brand-600' : 'ring-slate-200 hover:bg-slate-50')}>
+                  <input type="radio" name="rider" className="sr-only" checked={choice === 'other'} onChange={() => setChoice('other')} />
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500"><Bike className="size-5" /></span>
+                  <span><span className="block font-semibold text-slate-900">Someone else</span><span className="block text-xs text-slate-500">Outside courier or helper. No live map.</span></span>
+                </label>
+              </div>
+            )}
+          </fieldset>
+          {choice === 'other' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Rider name">{(id) => <Input id={id} value={name} autoFocus placeholder="Who is delivering?" onChange={(e) => setName(e.target.value)} />}</Field>
+              <Field label="Rider phone" hint="Optional. Shown to the customer.">{(id) => <Input id={id} value={phone} inputMode="tel" placeholder="09XX XXX XXXX" onChange={(e) => setPhone(e.target.value)} />}</Field>
+            </div>
+          )}
         </div>
       )}
+    </Modal>
+  );
+}
+
+/** Where a delivery is: store, customer's pin and (while on the way) the rider's last reported position. */
+function LiveMapModal({ order, onClose }: { order: OnlineOrder; onClose: () => void }) {
+  const store = toLatLng(order.branch.latitude, order.branch.longitude);
+  const home = toLatLng(order.delivery_lat, order.delivery_lng);
+  const rider = order.delivered_at ? null : toLatLng(order.rider_lat, order.rider_lng);
+  const km = rider && home ? distanceKm(rider, home) : null;
+  return (
+    <Modal open onClose={onClose} title={`${order.order_number} · ${order.contact_name}`} description={order.delivery_address ?? undefined} icon={MapPin} size="xl">
+      <div className="space-y-3">
+        {store || home || rider
+          ? <DeliveryMap store={store} home={home} rider={rider} height="min(62vh, 560px)" interactive />
+          : <p className="rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">No locations yet. Set the branch location in Settings → Branches, and ask customers to pin their spot.</p>}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-emerald-800" /> {order.branch.name}</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-orange-600" /> Customer{!home && ' (no pin)'}</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-rose-600" /> {order.rider_name ?? 'Rider'}{!rider && !order.delivered_at && ' (not sharing location yet)'}</span>
+          {km != null && <span className="ml-auto font-semibold text-slate-800">{formatKm(km)} away · about {etaMinutes(km)} min</span>}
+        </div>
+        {home && <a href={directionsUrl(home)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline"><ExternalLink className="size-4" /> Open directions in Google Maps</a>}
+      </div>
     </Modal>
   );
 }

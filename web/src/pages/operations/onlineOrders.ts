@@ -14,6 +14,14 @@ export interface OnlineOrder {
   change_due: string | null;
   rider_name: string | null;
   rider_phone: string | null;
+  rider_user_id?: number | null;
+  rider_lat?: number | null;
+  rider_lng?: number | null;
+  rider_location_at?: string | null;
+  delivery_lat?: number | null;
+  delivery_lng?: number | null;
+  delivered_at?: string | null;
+  delivery_issue?: string | null;
   contact_name: string;
   contact_phone: string;
   note: string | null;
@@ -27,7 +35,7 @@ export interface OnlineOrder {
   cancelled_by?: 'customer' | 'staff' | null;
   cancel_reason?: string | null;
   sale_id?: number | null;
-  branch: { id: number; name: string };
+  branch: { id: number; name: string; address?: string | null; latitude?: number | null; longitude?: number | null };
   account: { name: string; email: string; phone: string };
   items: { id: number; name: string; sku: string; unit: string; quantity: string; line_total: string }[];
 }

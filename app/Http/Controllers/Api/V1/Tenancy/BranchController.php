@@ -48,6 +48,8 @@ class BranchController extends Controller
             'code' => ['required', 'string', 'max:20', 'alpha_dash', Rule::unique('branches')->where('tenant_id', $tenant->id)],
             'name' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
         $data['code'] = strtoupper($data['code']);
@@ -84,6 +86,8 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

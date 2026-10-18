@@ -27,6 +27,7 @@ import { formatMoney } from '../../lib/format';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Branch, Register, Tenant } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
+import { LocationPicker, toLatLng, type LatLng } from '../../components/maps';
 
 type Tab = 'profile' | 'tax' | 'policies' | 'branches' | 'registers' | 'account';
 const BUSINESS_TABS: Tab[] = ['profile', 'tax', 'policies'];
@@ -268,9 +269,11 @@ function BranchesPanel() {
   const registers = useTenantQuery<{ data: Register[] }>('/registers');
   const [editing, setEditing] = useState<Branch | 'new' | null>(null);
   const [form, setForm] = useState({ code: '', name: '', address: '', phone: '', is_active: true });
+  const [pin, setPin] = useState<LatLng | null>(null);
   useEffect(() => {
     const b = editing && editing !== 'new' ? editing : null;
     setForm({ code: b?.code ?? '', name: b?.name ?? '', address: b?.address ?? '', phone: b?.phone ?? '', is_active: b?.is_active ?? true });
+    setPin(toLatLng(b?.latitude, b?.longitude));
   }, [editing]);
   const isNew = editing === 'new';
   const save = useTenantMutation<Record<string, unknown>>(isNew ? 'POST' : 'PATCH', isNew ? '/branches' : `/branches/${(editing as Branch | null)?.id}`, {
@@ -307,6 +310,7 @@ function BranchesPanel() {
                 <div className="mt-4 space-y-1.5 text-sm text-slate-600">
                   <p className="flex items-start gap-2"><MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" /><span className={cx(!b.address && 'text-slate-300')}>{b.address ?? 'No address'}</span></p>
                   <p className="flex items-center gap-2"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className={cx(!b.phone && 'text-slate-300')}>{b.phone ?? 'No phone'}</span></p>
+                  <p className={cx('flex items-center gap-2 text-xs', b.latitude != null ? 'text-emerald-700' : 'text-amber-700')}><MapPin className="size-3.5 shrink-0" />{b.latitude != null ? 'On the delivery map' : 'Not on the map yet'}</p>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
                   <span className="inline-flex items-center gap-1.5 text-slate-500"><Monitor className="size-3.5" />{regs.length} {regs.length === 1 ? 'register' : 'registers'}</span>
@@ -319,7 +323,7 @@ function BranchesPanel() {
       )}
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={isNew ? 'Add branch' : 'Edit branch'} icon={Building2}
         description={isNew ? 'The code is printed on receipts and cannot be changed later.' : `Code ${form.code}`}
-        footer={<><Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button disabled={!form.name.trim() || (isNew && !form.code.trim())} loading={save.isPending} onClick={() => save.mutate(isNew ? { code: form.code, name: form.name, address: form.address || null, phone: form.phone || null } : { name: form.name, address: form.address || null, phone: form.phone || null, is_active: form.is_active })}>{isNew ? 'Add branch' : 'Save changes'}</Button></>}>
+        footer={<><Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button disabled={!form.name.trim() || (isNew && !form.code.trim())} loading={save.isPending} onClick={() => save.mutate(isNew ? { code: form.code, name: form.name, address: form.address || null, phone: form.phone || null, latitude: pin?.lat ?? null, longitude: pin?.lng ?? null } : { name: form.name, address: form.address || null, phone: form.phone || null, is_active: form.is_active, latitude: pin?.lat ?? null, longitude: pin?.lng ?? null })}>{isNew ? 'Add branch' : 'Save changes'}</Button></>}>
         <div className="space-y-5">
           {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} />}
           <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
@@ -328,6 +332,12 @@ function BranchesPanel() {
           </div>
           <Field label="Address">{(id) => <Input id={id} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />}</Field>
           <Field label="Phone">{(id) => <Input id={id} type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />}</Field>
+          <div>
+            <p className="text-sm font-medium text-slate-700">Location on the map</p>
+            <p className="mb-2 text-xs text-slate-500">Used for delivery maps: customers and riders see the store here. Drag the map so the pin sits on the store entrance.</p>
+            {editing !== null && <LocationPicker key={isNew ? 'new' : (editing as Branch).id} value={pin} onChange={setPin} start={isNew ? null : toLatLng((editing as Branch).latitude, (editing as Branch).longitude)} height={220} />}
+            {pin && <p className="mt-1.5 flex items-center justify-between text-xs text-slate-500"><span>{pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}</span><button type="button" onClick={() => setPin(null)} className="font-semibold text-red-600 hover:underline">Clear location</button></p>}
+          </div>
           {!isNew && <Switch label="Active" description="Inactive branches are hidden from the branch switcher and cannot sell." checked={form.is_active} onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />}
         </div>
       </Modal>

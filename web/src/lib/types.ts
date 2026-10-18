@@ -24,6 +24,8 @@ export interface Branch {
   code: string;
   name: string;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   phone: string | null;
   is_active: boolean;
 }

@@ -37,16 +37,19 @@ class DemoStaffSeeder extends Seeder
             ['Rosa Villanueva', 'access.all01', Permissions::ROLE_ACCESS_MANAGER, null, 'EMP-101', 'hr@demo.smartpos.test'],
             ['Liza Marquez', 'cashier.main01', Permissions::ROLE_CASHIER, $main, 'EMP-102', null],
             ['Nestor Aquino', 'accountant.all01', Permissions::ROLE_ACCOUNTANT, null, 'EMP-103', null],
+            // Delivery rider for every branch: signs in on a phone and sees only assigned deliveries.
+            ['Ben Santos', 'rider.all01', Permissions::ROLE_RIDER, null, 'EMP-104', null, '09181112222'],
         ];
 
-        foreach ($accounts as [$name, $username, $role, $branch, $code, $email]) {
-            $this->account($tenant, $name, $username, $role, $branch, $code, $email);
+        foreach ($accounts as $row) {
+            [$name, $username, $role, $branch, $code, $email] = $row;
+            $this->account($tenant, $name, $username, $role, $branch, $code, $email, $row[6] ?? null);
         }
 
-        $this->command?->info("Demo staff (business code: {$tenant->slug}, password: ".DemoSeeder::DEMO_PASSWORD.'): cashier.main01 (EMP-102), accountant.all01 (EMP-103); HR signs in with hr@demo.smartpos.test');
+        $this->command?->info("Demo staff (business code: {$tenant->slug}, password: ".DemoSeeder::DEMO_PASSWORD.'): cashier.main01 (EMP-102), accountant.all01 (EMP-103), rider.all01 (EMP-104); HR signs in with hr@demo.smartpos.test');
     }
 
-    private function account(Tenant $tenant, string $name, string $username, string $role, ?Branch $branch, string $employeeCode, ?string $email): void
+    private function account(Tenant $tenant, string $name, string $username, string $role, ?Branch $branch, string $employeeCode, ?string $email, ?string $phone = null): void
     {
         if (User::query()->where('managed_by_tenant_id', $tenant->id)->where('username', $username)->exists()) {
             return;
@@ -56,6 +59,7 @@ class DemoStaffSeeder extends Seeder
             'name' => $name,
             'username' => $username,
             'email' => $email,
+            'phone' => $phone,
             'email_verified_at' => $email ? now() : null,
             'managed_by_tenant_id' => $tenant->id,
             'password' => DemoSeeder::DEMO_PASSWORD,

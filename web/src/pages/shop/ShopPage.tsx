@@ -7,15 +7,18 @@ import {
 import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
+import { DeliveryMap, toLatLng } from '../../components/maps';
 import { CustomerAuthDialog } from './CustomerAuthDialog';
+import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './CustomerOrders';
+import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
 
-interface Branch { id: number; code: string; name: string; address: string | null }
+interface Branch { id: number; code: string; name: string; address: string | null; latitude?: number | null; longitude?: number | null }
 interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null; track_inventory: boolean; reorder_level: string; stock_by_branch: Record<number, { quantity: string; reorder_level: string | null }> }
 interface Catalog { business: { name: string; code: string }; branches: Branch[]; data: ShopProduct[] }
 interface Account { id: number; name: string; email: string; phone: string }
-interface Order { id: number; order_number: string; status: string; fulfilment?: 'pickup' | 'delivery'; delivery_address?: string | null; cash_amount?: string | null; change_due?: string | null; rider_name?: string | null; estimated_total: string; placed_at: string; branch: { name: string }; items: { id: number; name: string; quantity: string; unit: string; line_total: string }[] }
+type Order = ShopOrder;
 interface CartLine { product: ShopProduct; quantity: number }
 type Sort = 'featured' | 'price-asc' | 'price-desc' | 'name';
 
@@ -50,8 +53,19 @@ export function ShopPage() {
   const [cart, setCart] = useState<Record<number, CartLine>>({});
   const [branchId, setBranchId] = useState<number | ''>('');
   const [fulfilment, setFulfilment] = useState<'pickup' | 'delivery'>('pickup');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [cashAmount, setCashAmount] = useState('');
+  const locationKey = `shop-delivery:${business}`;
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation>(() => { try { return loadLocation(localStorage.getItem(locationKey)); } catch { return emptyLocation; } });
+  const [pickingLocation, setPickingLocation] = useState(false);
+  const saveLocation = (location: DeliveryLocation) => {
+    setDeliveryLocation(location);
+    setPickingLocation(false);
+    try { localStorage.setItem(locationKey, JSON.stringify(location)); } catch { /* remembered for this visit only */ }
+  };
+  const deliveryAddress = composeAddress(deliveryLocation);
+  const deliveryPin = deliveryLocation.pin;
+  const [trackingId, setTrackingId] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [authOpen, setAuthOpen] = useState(false);
   const [error, setError] = useState('');
@@ -73,7 +87,13 @@ export function ShopPage() {
       catch (e) { if (e instanceof ApiError && (e.status === 401 || e.status === 403)) return null; throw e; }
     },
   });
-  const orders = useQuery({ queryKey: ['shop-orders', business], queryFn: () => api<{ data: Order[] }>(`${base}/orders`), enabled: !!account.data });
+  // Poll faster while a rider is on the way so the map follows them.
+  const orders = useQuery({
+    queryKey: ['shop-orders', business],
+    queryFn: () => api<{ data: Order[] }>(`${base}/orders`),
+    enabled: !!account.data,
+    refetchInterval: (q) => (q.state.data?.data.some((o) => o.status === 'out_for_delivery' && !o.delivered_at) ? 10000 : 30000),
+  });
   const authMutation = useMutation({
     mutationFn: (payload: Record<string, string>) => api(`${base}/${mode}`, { method: 'POST', body: payload }),
     onSuccess: async () => { setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); setAuthOpen(false); },
@@ -83,12 +103,12 @@ export function ShopPage() {
   const placeOrder = useMutation({
     mutationFn: () => api<{ data: Order }>(`${base}/orders`, { method: 'POST', body: {
       branch_id: branchId, fulfilment,
-      ...(fulfilment === 'delivery' ? { delivery_address: deliveryAddress, cash_amount: cashAmount } : {}),
+      ...(fulfilment === 'delivery' ? { delivery_address: deliveryAddress, cash_amount: cashAmount, note: deliveryLocation.note || null, ...(deliveryPin ? { delivery_lat: deliveryPin.lat, delivery_lng: deliveryPin.lng } : {}) } : {}),
       contact_name: account.data?.name,
       contact_phone: account.data?.phone,
       items: Object.values(cart).map(({ product, quantity }) => ({ product_id: product.id, quantity })),
     } }),
-    onSuccess: async () => { setCart({}); setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }); },
+    onSuccess: async (result) => { setCart({}); setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }); if (result.data.fulfilment === 'delivery') setTrackingId(result.data.id); },
     onError: (e) => setError(errorMessage(e)),
   });
   const cancelOrder = useMutation({
@@ -135,11 +155,24 @@ export function ShopPage() {
   const orderBlocker = !lines.length ? 'Add products to your basket' : !branchId ? 'Choose a branch' : fulfilment === 'delivery' && !deliveryAddress.trim() ? 'Enter a delivery address' : fulfilment === 'delivery' && (!cashAmount || Number(cashAmount) < total) ? 'Enter enough cash to cover the total' : '';
   const justPlaced = placeOrder.isSuccess && !lines.length ? placeOrder.data.data : null;
   const openOrders = orders.data?.data.filter((order) => !['completed', 'cancelled'].includes(order.status)).length ?? 0;
+  const selectedBranch = shop.branches.find((b) => b.id === branchId);
+  const trackedOrder = trackingId != null ? orders.data?.data.find((o) => o.id === trackingId) ?? null : null;
+  /** "Buy again": put a past order's items back in the basket (matched by SKU), returns how many products were added. */
+  const reorder = (order: Order) => {
+    let added = 0;
+    for (const item of order.items) {
+      const product = shop.data.find((p) => p.sku === item.sku);
+      if (!product) continue;
+      setQuantity(product, (cart[product.id]?.quantity ?? 0) + Math.max(1, Math.round(Number(item.quantity))));
+      added++;
+    }
+    return added;
+  };
 
   return <div className={`min-h-screen bg-[#f5f7f4] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
     <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1560px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
+      <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
@@ -160,6 +193,7 @@ export function ShopPage() {
             {basketCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950 ring-2 ring-white">{basketCount}</span>}
           </a>
           {signedIn ? <>
+            <button onClick={() => setHistoryOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"><Receipt size={17} /> <span className="hidden md:inline">My orders</span>{openOrders > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950">{openOrders}</span>}</button>
             <div className="hidden items-center gap-2.5 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-3.5 sm:flex">
               <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-emerald-600 to-emerald-900 text-xs font-bold text-white">{initials(account.data!.name)}</span>
               <div className="leading-tight"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Signed in</p><p className="text-sm font-semibold">{firstName}</p></div>
@@ -174,7 +208,7 @@ export function ShopPage() {
 
       {/* Category rail */}
       <nav aria-label="Categories" className="border-t border-slate-100">
-        <div className="mx-auto flex max-w-[1560px] gap-1.5 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1920px] gap-1.5 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 lg:px-8">
           {categories.map((category) => {
             const Icon = category === ALL ? LayoutGrid : iconFor(category);
             const active = selectedCategory === category;
@@ -192,11 +226,11 @@ export function ShopPage() {
       </nav>
     </header>
 
-    <div id="top" className="mx-auto max-w-[1560px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+    <div id="top" className="mx-auto max-w-[1920px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
       <ShopHero photos={shop.data} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main className="mt-8 grid gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
+      <main className="mt-8 grid gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <section id="products" className="min-w-0 scroll-mt-36">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -227,7 +261,7 @@ export function ShopPage() {
             ? <EmptyState title="No products yet" text="This store hasn't listed anything online yet. Please check back soon." />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
-              : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+              : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 min-[1700px]:grid-cols-5">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
               </div>}
         </section>
@@ -296,7 +330,27 @@ export function ShopPage() {
                 </div>
               </fieldset>
               {fulfilment === 'delivery' && <div className="mt-4 space-y-3">
-                <label className="block text-xs font-bold uppercase tracking-[.14em] text-slate-500">Delivery address<textarea value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} maxLength={500} rows={3} placeholder="House/building, street, barangay, city" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal normal-case tracking-normal outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" /></label>
+                <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">Deliver to</p>
+                {deliveryAddress ? (
+                  <div className="overflow-hidden rounded-2xl ring-1 ring-orange-200">
+                    {deliveryPin && <button type="button" onClick={() => setPickingLocation(true)} className="block w-full" aria-label="Change delivery location on the map"><DeliveryMap home={deliveryPin} height={150} bare preview /></button>}
+                    <div className="flex items-start gap-3 bg-orange-50/60 p-3.5">
+                      <MapPin size={18} className="mt-0.5 shrink-0 text-orange-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-snug text-slate-900">{deliveryAddress}</p>
+                        {deliveryLocation.note && <p className="mt-1 text-xs text-slate-500">Note: {deliveryLocation.note}</p>}
+                        {!deliveryPin && <p className="mt-1 text-xs font-medium text-amber-700">No map pin yet. Add one so the rider finds you.</p>}
+                      </div>
+                      <button type="button" onClick={() => setPickingLocation(true)} className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50">Change</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setPickingLocation(true)} className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white"><MapPin size={20} /></span>
+                    <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900">Set delivery address</span><span className="block text-xs text-slate-500">Search or pin your exact location on the map</span></span>
+                    <ArrowRight size={18} className="shrink-0 text-orange-600" />
+                  </button>
+                )}
                 <label className="block text-sm font-bold text-slate-800">Cash to pay rider with
                   <span className="mt-2 flex h-14 items-center overflow-hidden rounded-xl border-2 border-emerald-300 bg-emerald-50 shadow-sm transition focus-within:border-emerald-700 focus-within:ring-4 focus-within:ring-emerald-600/15">
                     <span aria-hidden="true" className="grid h-full min-w-14 place-items-center border-r border-emerald-200 bg-emerald-100 font-display text-2xl font-bold text-emerald-900">₱</span>
@@ -334,8 +388,11 @@ export function ShopPage() {
             </div>
             <div className="p-5">
               {orders.isPending ? <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}</div>
-                : orders.data?.data.length ? <ul className="space-y-3">{orders.data.data.map((order) => <OrderCard key={order.id} order={order} cancelling={cancelOrder.isPending && cancelOrder.variables === order.id} onCancel={() => cancelOrder.mutate(order.id)} />)}</ul>
-                  : <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No orders yet. Your pickups will appear here.</p>}
+                : orders.data?.data.length ? <>
+                  <ul className="space-y-3">{orders.data.data.slice(0, 3).map((order) => <OrderCard key={order.id} order={order} cancelling={cancelOrder.isPending && cancelOrder.variables === order.id} onCancel={() => cancelOrder.mutate(order.id)} onTrack={() => setTrackingId(order.id)} />)}</ul>
+                  <button onClick={() => setHistoryOpen(true)} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-50"><Receipt size={15} /> All orders &amp; purchase history</button>
+                </>
+                  : <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No orders yet. Your pickups and deliveries will appear here.</p>}
             </div>
           </section>}
         </aside>
@@ -344,7 +401,7 @@ export function ShopPage() {
 
     {/* ───────── Footer ───────── */}
     <footer className="bg-[#0a3d2c] text-emerald-50/80">
-      <div className="mx-auto grid max-w-[1560px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1920px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1" /><p className="font-display text-lg font-bold text-white">{shop.business.name}</p></div>
           <p className="mt-4 max-w-sm text-sm leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
@@ -370,6 +427,26 @@ export function ShopPage() {
       <span className="flex-1"><span className="block text-xs text-emerald-100/70">Estimated total</span><span className="font-display font-bold">{peso(total)}</span></span>
       <span className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-4 text-sm font-bold text-emerald-950">View basket <ArrowRight size={15} /></span>
     </a>}
+
+    {pickingLocation && (
+      <DeliveryLocationDialog
+        initial={deliveryLocation}
+        store={toLatLng(selectedBranch?.latitude, selectedBranch?.longitude) ?? toLatLng(shop.branches.find((b) => b.latitude != null)?.latitude, shop.branches.find((b) => b.latitude != null)?.longitude)}
+        storeName={selectedBranch?.name}
+        onClose={() => setPickingLocation(false)}
+        onSave={saveLocation}
+      />
+    )}
+    {trackedOrder && <TrackOrderDialog order={trackedOrder} onClose={() => setTrackingId(null)} />}
+    {historyOpen && signedIn && (
+      <OrderHistoryDialog
+        base={base}
+        orders={orders.data?.data ?? []}
+        onClose={() => setHistoryOpen(false)}
+        onTrack={(order) => { setHistoryOpen(false); setTrackingId(order.id); }}
+        onReorder={reorder}
+      />
+    )}
 
     <CustomerAuthDialog
       open={authOpen && !account.data}
@@ -449,7 +526,8 @@ function Stepper({ name, quantity, onChange, size = 'md' }: { name: string; quan
   </div>;
 }
 
-function OrderCard({ order, cancelling, onCancel }: { order: Order; cancelling: boolean; onCancel: () => void }) {
+function OrderCard({ order, cancelling, onCancel, onTrack }: { order: Order; cancelling: boolean; onCancel: () => void; onTrack: () => void }) {
+  const onTheWay = order.status === 'out_for_delivery' && !order.delivered_at;
   const cancelled = order.status === 'cancelled';
   const flow = order.fulfilment === 'delivery' ? ['pending', 'confirmed', 'ready', 'out_for_delivery', 'completed'] : ['pending', 'confirmed', 'ready', 'completed'];
   const step = flow.indexOf(order.status);
@@ -464,7 +542,12 @@ function OrderCard({ order, cancelling, onCancel }: { order: Order; cancelling: 
     <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">{order.items.map((item) => `${Number(item.quantity)} ${item.unit} ${item.name}`).join(' · ')}</p>
     <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
       <span className="font-display text-base font-bold">{peso(order.estimated_total)}</span>
-      {['pending', 'confirmed'].includes(order.status) && <button disabled={cancelling} onClick={onCancel} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"><X size={13} /> {cancelling ? 'Cancelling…' : 'Cancel order'}</button>}
+      <span className="flex items-center gap-1">
+        {['pending', 'confirmed'].includes(order.status) && <button aria-label="Cancel order" disabled={cancelling} onClick={onCancel} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"><X size={13} /> {cancelling ? 'Cancelling…' : 'Cancel'}</button>}
+        <button onClick={onTrack} className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${onTheWay ? 'bg-rose-600 text-white hover:bg-rose-700' : 'text-emerald-800 hover:bg-emerald-50'}`}>
+          {onTheWay ? <><MapPin size={13} /> Track rider</> : order.fulfilment === 'delivery' && !['completed', 'cancelled'].includes(order.status) ? <><MapPin size={13} /> Track</> : 'Details'}
+        </button>
+      </span>
     </div>
   </li>;
 }
@@ -481,7 +564,7 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 function ShopLoading() {
   return <div className="min-h-screen bg-[#f5f7f4]">
     <div className="h-[118px] border-b border-slate-200 bg-white" />
-    <div className="mx-auto max-w-[1560px] px-4 pt-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1920px] px-4 pt-8 sm:px-6 lg:px-8">
       <div className="h-72 animate-pulse rounded-[32px] bg-emerald-900/10" />
       <div className="mt-8 grid grid-cols-2 gap-5 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <div key={i} className="h-72 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />)}</div>
     </div>

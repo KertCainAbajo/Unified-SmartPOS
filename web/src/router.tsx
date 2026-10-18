@@ -70,6 +70,7 @@ export const router = createBrowserRouter([
           { path: 'purchasing', lazy: page(() => import('./pages/purchasing/PurchasingPage'), 'PurchasingPage') },
           { path: 'customers', lazy: page(() => import('./pages/operations/CustomersPage'), 'CustomersPage') },
           { path: 'online-orders', lazy: page(() => import('./pages/operations/OnlineOrdersPage'), 'OnlineOrdersPage') },
+          { path: 'deliveries', lazy: page(() => import('./pages/operations/DeliveriesPage'), 'DeliveriesPage') },
           { path: 'expenses', lazy: page(() => import('./pages/operations/ExpensesPage'), 'ExpensesPage') },
           { path: 'reports', lazy: page(() => import('./pages/reports/ReportsPage'), 'ReportsPage') },
           { path: 'audit', lazy: page(() => import('./pages/reports/AuditLogPage'), 'AuditLogPage') },

@@ -157,8 +157,15 @@ class AuthController extends Controller
         } else {
             Auth::guard('web')->logout();
             if ($request->hasSession()) {
+                // The staff app and the online shop share this browser's session. Start a fresh session for safety,
+                // but carry over a shopper's own sign-in so ending a staff session does not sign the customer out.
+                $customerKey = Auth::guard('customer')->getName();
+                $customerId = $request->session()->get($customerKey);
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
+                if ($customerId !== null) {
+                    $request->session()->put($customerKey, $customerId);
+                }
             }
         }
 

@@ -20,6 +20,14 @@ class OnlineOrder extends Model
         'status' => 'pending',
         'fulfilment' => 'pickup',
         'delivery_address' => null,
+        'delivery_lat' => null,
+        'delivery_lng' => null,
+        'rider_user_id' => null,
+        'rider_lat' => null,
+        'rider_lng' => null,
+        'rider_location_at' => null,
+        'delivered_at' => null,
+        'delivery_issue' => null,
         'cash_amount' => null,
         'rider_name' => null,
         'rider_phone' => null,
@@ -43,6 +51,12 @@ class OnlineOrder extends Model
             'cash_amount' => 'decimal:2',
             'placed_at' => 'datetime',
             'dispatched_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'rider_location_at' => 'datetime',
+            'delivery_lat' => 'float',
+            'delivery_lng' => 'float',
+            'rider_lat' => 'float',
+            'rider_lng' => 'float',
             'confirmed_at' => 'datetime',
             'ready_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -80,6 +94,31 @@ class OnlineOrder extends Model
     public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    public function rider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rider_user_id');
+    }
+
+    /** The rider is on the way: delivery order, out for delivery and not yet handed over. */
+    public function isBeingDelivered(): bool
+    {
+        return $this->isDelivery() && $this->status === OnlineOrderStatus::OutForDelivery && $this->delivered_at === null;
+    }
+
+    /**
+     * What the customer who placed the order may see. The rider's position is only shared while that rider is on the
+     * way with this order; staff-only fields stay hidden.
+     */
+    public function customerView(): array
+    {
+        $hidden = ['rider_user_id', 'handled_by', 'sale_id', 'delivery_issue', 'tenant_id', 'customer_account_id'];
+        if (! $this->isBeingDelivered()) {
+            $hidden = [...$hidden, 'rider_lat', 'rider_lng', 'rider_location_at'];
+        }
+
+        return $this->makeHidden($hidden)->toArray();
     }
 
     public function handler(): BelongsTo

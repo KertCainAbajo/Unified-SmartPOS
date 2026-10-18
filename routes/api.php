@@ -30,7 +30,9 @@ use App\Http\Controllers\Api\V1\Staff\StaffController;
 use App\Http\Controllers\Api\V1\Tenancy\BranchController;
 use App\Http\Controllers\Api\V1\Tenancy\RoleController;
 use App\Http\Controllers\Api\V1\Tenancy\TenantController;
+use App\Http\Controllers\Api\V1\Shop\AddressAreaController;
 use App\Http\Controllers\Api\V1\Shop\CustomerShopController;
+use App\Http\Controllers\Api\V1\Shop\RiderDeliveryController;
 use App\Http\Controllers\Api\V1\Shop\StaffOnlineOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,6 +68,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('applications/reschedule-request', [PublicCareerController::class, 'rescheduleRequest'])->name('reschedule-request');
     });
 
+    // Philippine address dropdowns (region → province → city → barangay), cached from the official PSGC list.
+    Route::get('address/areas', AddressAreaController::class)->middleware('throttle:120,1')->name('address.areas');
+
     // ---- Customer online shop ---------------------------------------------------------------
     Route::prefix('shop/{business}')->name('shop.')->middleware('throttle:api')->group(function () {
         Route::get('/', [CustomerShopController::class, 'catalog'])->name('catalog');
@@ -79,6 +84,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('logout', [CustomerShopController::class, 'logout'])->name('logout');
             Route::get('me', [CustomerShopController::class, 'me'])->name('me');
             Route::get('orders', [CustomerShopController::class, 'orders'])->name('orders.index');
+            Route::get('purchases', [CustomerShopController::class, 'purchases'])->name('purchases.index');
             Route::post('orders', [CustomerShopController::class, 'placeOrder'])->middleware('throttle:checkout')->name('orders.store');
             Route::post('orders/{order}/cancel', [CustomerShopController::class, 'cancelOrder'])->whereNumber('order')->name('orders.cancel');
         });
@@ -239,7 +245,17 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 // Customers and expenses
                 Route::apiResource('customers', CustomerController::class)->except('destroy');
                 Route::get('online-orders', [StaffOnlineOrderController::class, 'index'])->name('online-orders.index');
+                Route::get('online-orders/riders', [StaffOnlineOrderController::class, 'riders'])->name('online-orders.riders');
                 Route::get('online-orders/{onlineOrder}', [StaffOnlineOrderController::class, 'show'])->name('online-orders.show');
+
+                // Riders
+                Route::get('deliveries', [RiderDeliveryController::class, 'index'])->name('deliveries.index');
+                Route::get('deliveries/history', [RiderDeliveryController::class, 'history'])->name('deliveries.history');
+                Route::post('deliveries/duty', [RiderDeliveryController::class, 'duty'])->name('deliveries.duty');
+                Route::post('deliveries/{onlineOrder}/claim', [RiderDeliveryController::class, 'claim'])->name('deliveries.claim');
+                Route::post('deliveries/{onlineOrder}/location', [RiderDeliveryController::class, 'location'])->name('deliveries.location');
+                Route::post('deliveries/{onlineOrder}/delivered', [RiderDeliveryController::class, 'delivered'])->name('deliveries.delivered');
+                Route::post('deliveries/{onlineOrder}/return', [RiderDeliveryController::class, 'returnToStore'])->name('deliveries.return');
                 Route::post('online-orders/{onlineOrder}/status', [StaffOnlineOrderController::class, 'updateStatus'])->name('online-orders.status');
                 Route::get('expense-categories', [ExpenseController::class, 'categories'])->name('expense-categories.index');
                 Route::post('expense-categories', [ExpenseController::class, 'storeCategory'])->name('expense-categories.store');

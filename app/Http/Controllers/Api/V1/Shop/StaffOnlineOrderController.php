@@ -7,7 +7,9 @@ use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\OnlineOrder;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Shop\RiderDirectory;
 use App\Support\Money;
 use App\Support\Permissions;
 use App\Support\TenantContext;
@@ -17,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Staff-facing order queue for branches the signed-in employee can access. Anyone who can ring up sales
@@ -24,9 +27,19 @@ use Illuminate\Validation\Rule;
  */
 class StaffOnlineOrderController extends Controller
 {
-    private const RELATIONS = ['branch:id,name', 'account:id,name,email,phone', 'items'];
+    private const RELATIONS = ['branch:id,name,address,latitude,longitude', 'account:id,name,email,phone', 'items'];
 
-    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit) {}
+    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit, private readonly RiderDirectory $riders) {}
+
+    /** Riders who can take deliveries from a branch, least busy first. */
+    public function riders(Request $request, Tenant $tenant)
+    {
+        $this->authorizePermission(Permissions::SALES_CREATE);
+        $data = $request->validate(['branch_id' => ['required', 'integer']]);
+        abort_unless($this->context->canAccessBranch($data['branch_id']), 404);
+
+        return response()->json(['data' => $this->riders->forBranch($tenant, (int) $data['branch_id'])]);
+    }
 
     public function index(Request $request, Tenant $tenant)
     {
@@ -101,11 +114,24 @@ class StaffOnlineOrderController extends Controller
                 OnlineOrderStatus::Cancelled->value,
             ])],
             'cancel_reason' => ['required_if:status,cancelled', 'nullable', 'string', 'max:255'],
-            'rider_name' => ['required_if:status,out_for_delivery', 'nullable', 'string', 'max:255'],
+            // Either a staff rider account (tracked on the map) or, for an outside courier, just a name.
+            'rider_user_id' => ['nullable', 'integer'],
+            'rider_name' => ['nullable', 'string', 'max:255'],
             'rider_phone' => ['nullable', 'string', 'max:30'],
-        ], ['rider_name.required_if' => 'Enter who is delivering this order.']);
+        ]);
+        $rider = null;
+        if ($data['status'] === OnlineOrderStatus::OutForDelivery->value) {
+            if (filled($data['rider_user_id'] ?? null)) {
+                if (! $this->riders->isRider($tenant, (int) $onlineOrder->branch_id, (int) $data['rider_user_id'])) {
+                    throw ValidationException::withMessages(['rider_user_id' => 'Choose a rider who works at this branch.']);
+                }
+                $rider = User::query()->findOrFail($data['rider_user_id']);
+            } elseif (blank($data['rider_name'] ?? null)) {
+                throw ValidationException::withMessages(['rider_name' => 'Choose a rider or enter who is delivering this order.']);
+            }
+        }
 
-        DB::transaction(function () use ($onlineOrder, $data, $request) {
+        DB::transaction(function () use ($onlineOrder, $data, $request, $rider) {
             $locked = OnlineOrder::query()->whereKey($onlineOrder->id)->lockForUpdate()->firstOrFail();
             $target = OnlineOrderStatus::from($data['status']);
             if (! in_array($target, $locked->status->nextStaffStatuses($locked->isDelivery()), true)) {
@@ -115,11 +141,20 @@ class StaffOnlineOrderController extends Controller
             if ($target === OnlineOrderStatus::Confirmed) {
                 $attributes['confirmed_at'] = now();
             }
+            if ($locked->delivered_at && $target !== OnlineOrderStatus::Cancelled) {
+                throw new BusinessRuleException('The rider already delivered this order. Record the payment at the POS.', 'ONLINE_ORDER_ALREADY_DELIVERED', status: 409);
+            }
+            $clearRider = ['rider_user_id' => null, 'rider_lat' => null, 'rider_lng' => null, 'rider_location_at' => null, 'delivered_at' => null];
             if ($target === OnlineOrderStatus::Ready) {
                 $attributes['ready_at'] = $locked->ready_at ?? now();
+                if ($locked->status === OnlineOrderStatus::OutForDelivery) {
+                    $attributes += $clearRider; // brought back to the store
+                }
             }
             if ($target === OnlineOrderStatus::OutForDelivery) {
-                $attributes += ['rider_name' => trim($data['rider_name']), 'rider_phone' => filled($data['rider_phone'] ?? null) ? trim($data['rider_phone']) : null, 'dispatched_at' => now()];
+                $phone = filled($data['rider_phone'] ?? null) ? trim($data['rider_phone']) : $rider?->phone;
+                $attributes = [...$attributes, ...$clearRider, 'rider_user_id' => $rider?->id, 'rider_name' => $rider?->name ?? trim($data['rider_name']),
+                    'rider_phone' => $phone, 'dispatched_at' => now(), 'delivery_issue' => null];
             }
             if ($target === OnlineOrderStatus::Cancelled) {
                 $attributes += ['cancelled_at' => now(), 'cancelled_by' => 'staff', 'cancel_reason' => $data['cancel_reason'] ?? null];
