@@ -72,7 +72,8 @@ class OnlineOrder extends Model
     /** Change the rider must bring: cash the customer pays with, minus the estimated total. */
     protected function changeDue(): Attribute
     {
-        return Attribute::get(fn () => $this->cash_amount === null ? null
+        // Null when the order was loaded without its cash or total columns (e.g. a short list), instead of failing.
+        return Attribute::get(fn () => ! array_key_exists('cash_amount', $this->attributes) || ! array_key_exists('estimated_total', $this->attributes) || $this->cash_amount === null ? null
             : Money::round(Money::max('0', Money::sub((string) $this->cash_amount, (string) $this->estimated_total))));
     }
 

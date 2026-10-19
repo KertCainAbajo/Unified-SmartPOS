@@ -34,16 +34,16 @@ class CustomerPasswordResetService
         if (! $account) {
             return;
         }
-        $latest = $account->passwordCodes()->latest('id')->first();
+        $latest = $account->passwordCodes()->where('purpose', 'reset')->latest('id')->first();
         if ($latest && $latest->created_at->diffInSeconds(now()) < self::RESEND_SECONDS) {
             return;
         }
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $row = DB::transaction(function () use ($account, $code) {
-            $account->passwordCodes()->whereNull('used_at')->update(['used_at' => now()]);
+            $account->passwordCodes()->where('purpose', 'reset')->whereNull('used_at')->update(['used_at' => now()]);
 
-            return $account->passwordCodes()->create(['code_hash' => Hash::make($code), 'expires_at' => now()->addMinutes(self::CODE_MINUTES)]);
+            return $account->passwordCodes()->create(['purpose' => 'reset', 'code_hash' => Hash::make($code), 'expires_at' => now()->addMinutes(self::CODE_MINUTES)]);
         });
 
         try {
@@ -62,7 +62,7 @@ class CustomerPasswordResetService
     public function check(Tenant $tenant, string $email, string $code): CustomerPasswordCode
     {
         $account = $this->account($tenant, $email);
-        $current = $account?->passwordCodes()->whereNull('used_at')->latest('id')->first();
+        $current = $account?->passwordCodes()->where('purpose', 'reset')->whereNull('used_at')->latest('id')->first();
         if (! $current || ! $current->isUsable()) {
             throw ValidationException::withMessages(['code' => 'This code is invalid or has expired. Request a new one.']);
         }
@@ -86,7 +86,7 @@ class CustomerPasswordResetService
         return DB::transaction(function () use ($current, $password) {
             $account = $current->account;
             $account->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
-            $account->passwordCodes()->whereNull('used_at')->update(['used_at' => now()]);
+            $account->passwordCodes()->where('purpose', 'reset')->whereNull('used_at')->update(['used_at' => now()]);
 
             return $account;
         });

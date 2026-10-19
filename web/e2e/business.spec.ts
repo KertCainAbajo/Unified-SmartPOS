@@ -96,8 +96,12 @@ test('team is grouped by position', async ({ page }) => {
   const cashier = page.getByRole('button', { name: /^Cashier \d+$/ });
   await cashier.click();
   await expect(cashier).toHaveAttribute('aria-pressed', 'true');
+  // Card view (the default): one card per person.
+  await expect(page.getByRole('button', { name: /Ana Cruz/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Jose Reyes/ })).toHaveCount(0);
+  // The list view shows the same people as table rows.
+  await page.getByRole('button', { name: 'List', exact: true }).click();
   await expect(page.getByRole('row', { name: /Ana Cruz/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /Jose Reyes/ })).toHaveCount(0);
 });
 
 test('settings tabs and the unsaved-changes bar', async ({ page }) => {
@@ -116,7 +120,7 @@ test('settings tabs and the unsaved-changes bar', async ({ page }) => {
 test('reports show the sales chart', async ({ page }) => {
   await open(page, '/reports', 'Reports');
   await expect(page.getByText('Sales over time')).toBeVisible();
-  for (const tab of ['By branch / cashier / payment', 'Products & stock', 'Profit & expenses']) {
+  for (const tab of ['By channel / branch / cashier', 'Products & stock', 'Profit & expenses']) {
     await page.getByRole('tab', { name: tab }).click();
     await expect(page.getByRole('alert')).toHaveCount(0);
   }

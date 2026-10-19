@@ -158,6 +158,7 @@ function Terminal({ session, branchName, onShiftClosed, onlineOrderId, borrowedF
 
   return (
     <div className="flex flex-col gap-4 lg:h-[calc(100vh-7.5rem)] lg:flex-row">
+      <h1 className="sr-only">Point of Sale · {branchName}</h1>
       {/* Products */}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 px-4 py-3 text-white shadow-md shadow-brand-900/20">

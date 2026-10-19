@@ -18,6 +18,9 @@ class CustomerAccount extends Authenticatable
     /** The shop account was moved to a platform administrator login; it no longer signs in to the shop. */
     public const STATUS_MOVED_TO_ADMIN = 'moved_to_admin';
 
+    /** Signed up but has not entered the code emailed to them yet; cannot sign in or order. */
+    public const STATUS_UNVERIFIED = 'unverified';
+
     protected $guarded = [];
 
     /** True when this email belongs to a platform administrator: such an email no longer shops as a customer. */
@@ -43,7 +46,7 @@ class CustomerAccount extends Authenticatable
 
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'last_login_at' => 'datetime'];
+        return ['password' => 'hashed', 'last_login_at' => 'datetime', 'email_verified_at' => 'datetime'];
     }
 
     public function isActive(): bool

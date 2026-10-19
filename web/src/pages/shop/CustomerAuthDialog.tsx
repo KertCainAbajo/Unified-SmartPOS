@@ -9,8 +9,12 @@ type Mode = 'login' | 'register';
  * Full-screen customer sign-in / sign-up for the online shop. It opens over the shop so the basket survives.
  * Field names match the shop API (name, phone, email, password, password_confirmation); the parent posts the form as-is.
  */
-export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, photos, apiBase }: {
+export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, photos, apiBase, verifying, onVerified, onCancelVerify }: {
   open: boolean;
+  /** Set after sign-up: the email waiting for its 6-digit code. */
+  verifying?: { email: string; resendIn: number; remember: boolean } | null;
+  onVerified?: () => void;
+  onCancelVerify?: () => void;
   /** Shop API base, e.g. `/shop/aling-nena-mini-mart`, used by the forgot-password steps. */
   apiBase: string;
   onClose: () => void;
@@ -127,7 +131,10 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
             </div>
 
             <div className="my-auto w-full max-w-[410px] self-center lg:self-auto">
-              {recovering ? (
+              {verifying ? (
+                <EmailVerification apiBase={apiBase} email={verifying.email} remember={verifying.remember} initialResendIn={verifying.resendIn}
+                  onBack={() => onCancelVerify?.()} onDone={() => onVerified?.()} />
+              ) : recovering ? (
                 <PasswordRecovery
                   apiBase={apiBase}
                   initialEmail={prefillEmail}
@@ -479,6 +486,115 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
             {busy
               ? <><Loader2 className="size-5 animate-spin" /> Please wait…</>
               : <>{step === 'email' ? 'Send code' : step === 'code' ? 'Verify code' : 'Save new password'} <ArrowRight className="size-4 transition group-hover:translate-x-0.5" /></>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** After sign-up: enter the 6-digit code emailed to the customer to activate the account. */
+function EmailVerification({ apiBase, email, remember, initialResendIn, onBack, onDone }: {
+  apiBase: string;
+  email: string;
+  remember: boolean;
+  initialResendIn: number;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState('');
+  const [resendIn, setResendIn] = useState(initialResendIn);
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
+
+  async function verify(value = code) {
+    if (value.length !== 6) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`${apiBase}/verify-email`, { method: 'POST', body: { email, code: value, remember } });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.field('code') ?? e.message : errorMessage(e));
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resend() {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await api<{ resend_after_seconds: number }>(`${apiBase}/verify-email/resend`, { method: 'POST', body: { email } });
+      setResendIn(r.resend_after_seconds ?? 60);
+      setSent('A new code is on its way.');
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-800">
+        <ArrowLeft className="size-4" /> Change my details
+      </button>
+
+      <ol className="mt-5 flex items-center gap-2" aria-label="Step 2 of 2">
+        <li className="flex flex-1 items-center gap-2">
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><Check className="size-3.5" strokeWidth={3} /></span>
+          <span className="hidden text-xs font-semibold text-slate-800 sm:block">Your details</span>
+          <span className="h-0.5 flex-1 rounded-full bg-emerald-500" />
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-emerald-800 text-xs font-bold text-white ring-4 ring-emerald-100">2</span>
+          <span className="hidden text-xs font-semibold text-slate-800 sm:block">Confirm email</span>
+        </li>
+      </ol>
+
+      <div className="auth-fade">
+        <span className="relative mt-6 grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
+          <Mail className="size-6" />
+          <span className="absolute -right-1 -top-1 size-3.5 animate-ping rounded-full bg-emerald-400/70" />
+          <span className="absolute -right-1 -top-1 size-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+        </span>
+        <h2 id="shop-auth-title" className="mt-4 font-display text-[28px] font-extrabold leading-tight tracking-tight text-[#0b3b2c]">Check your email</h2>
+        <p className="mt-1.5 text-sm leading-6 text-slate-500">We sent a 6-digit code to <b className="text-slate-700">{maskEmail(email)}</b>. Enter it to finish creating your account. It expires in 15 minutes.</p>
+
+        <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); void verify(); }}>
+          {error && (
+            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
+            </p>
+          )}
+          {sent && !error && <p role="status" className="sp-alert-in flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200"><CheckCircle2 className="size-4" /> {sent}</p>}
+
+          {/* Filling the last box checks the code straight away. */}
+          <CodeInput value={code} onChange={(v) => { setCode(v); setError(''); setSent(''); if (v.length === 6) void verify(v); }} disabled={busy} />
+
+          <p className="text-center text-sm text-slate-500">
+            Didn&apos;t get it?{' '}
+            {resendIn > 0
+              ? <span className="font-medium text-slate-400">Resend in {resendIn}s</span>
+              : <button type="button" disabled={busy} onClick={() => void resend()} className="font-semibold text-emerald-700 hover:underline disabled:opacity-50">Resend code</button>}
+            <span className="mx-1.5 text-slate-300">·</span>
+            <button type="button" onClick={onBack} className="font-semibold text-emerald-700 hover:underline">Wrong email?</button>
+          </p>
+          <p className="text-center text-[11px] text-slate-400">Check your Spam or Promotions folder too.</p>
+
+          <button
+            type="submit"
+            disabled={busy || code.length !== 6}
+            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? <><Loader2 className="size-5 animate-spin" /> Checking…</> : <>Confirm and continue <ArrowRight className="size-4 transition group-hover:translate-x-0.5" /></>}
           </button>
         </form>
       </div>

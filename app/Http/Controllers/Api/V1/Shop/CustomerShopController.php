@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Catalog\ProductImageService;
 use App\Services\DocumentNumberer;
+use App\Services\Shop\CustomerEmailVerificationService;
 use App\Services\Shop\CustomerPasswordResetService;
 use App\Services\Shop\OnlineOrderNotifier;
 use App\Support\Money;
@@ -102,7 +103,7 @@ class CustomerShopController extends Controller
         return response()->json(['message' => 'Your password was changed. Sign in with your new password.']);
     }
 
-    public function register(Request $request, string $business): JsonResponse
+    public function register(Request $request, string $business, CustomerEmailVerificationService $verification): JsonResponse
     {
         $tenant = $this->shopTenant($business);
         $data = $request->validate([
@@ -113,23 +114,47 @@ class CustomerShopController extends Controller
         if (User::query()->where('email', $email)->where('is_platform_admin', true)->exists()) {
             throw ValidationException::withMessages(['email' => [self::ADMIN_EMAIL_MESSAGE]]);
         }
-        if ($tenant->customerAccounts()->where('email', $email)->exists()) {
+        $existing = $tenant->customerAccounts()->where('email', $email)->first();
+        if ($existing && $existing->status !== CustomerAccount::STATUS_UNVERIFIED) {
             throw ValidationException::withMessages(['email' => ['An account already uses this email.']]);
         }
 
-        $account = DB::transaction(function () use ($tenant, $data, $email) {
+        // Signing up again before confirming simply updates the details and sends a new code.
+        $account = DB::transaction(function () use ($tenant, $data, $email, $existing) {
+            if ($existing) {
+                $existing->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone']), 'password' => $data['password']])->save();
+                $existing->customer?->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone'])])->save();
+
+                return $existing;
+            }
             $customer = $tenant->customers()->create(['name' => trim($data['name']), 'email' => $email, 'phone' => trim($data['phone'])]);
+
             return $tenant->customerAccounts()->create([
                 'customer_id' => $customer->id, 'name' => trim($data['name']), 'email' => $email,
-                'phone' => trim($data['phone']), 'password' => $data['password'],
+                'phone' => trim($data['phone']), 'password' => $data['password'], 'status' => CustomerAccount::STATUS_UNVERIFIED,
             ]);
         });
+        $wait = $verification->send($tenant, $account);
+
+        return response()->json([
+            'verification_required' => true, 'email' => $email,
+            'message' => 'We sent a 6-digit code to your email. Enter it to finish creating your account.',
+            'resend_after_seconds' => $wait ?: CustomerEmailVerificationService::RESEND_SECONDS,
+        ], 202)->header('Cache-Control', 'no-store');
+    }
+
+    /** Finish sign-up: check the emailed code, activate the account and sign the customer in. */
+    public function verifyEmail(Request $request, string $business, CustomerEmailVerificationService $verification): JsonResponse
+    {
+        $tenant = $this->shopTenant($business);
+        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255'], 'code' => ['required', 'digits:6'], 'remember' => ['sometimes', 'boolean']]);
+        $account = $verification->verify($tenant, $data['email'], $data['code']);
 
         // Shoppers stay signed in on their own device unless they untick "Keep me signed in".
         Auth::guard('customer')->login($account, $request->boolean('remember', true));
         $request->session()->regenerate();
 
-        return response()->json(['data' => $this->accountView($account)], 201)->header('Cache-Control', 'no-store');
+        return response()->json(['data' => $this->accountView($account)])->header('Cache-Control', 'no-store');
     }
 
     public function login(Request $request, string $business): JsonResponse
@@ -145,6 +170,14 @@ class CustomerShopController extends Controller
             CustomerAccount::closeForAdmin($account->email);
             return response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 422);
         }
+        if ($account->status === CustomerAccount::STATUS_UNVERIFIED) {
+            $wait = app(CustomerEmailVerificationService::class)->send($tenant, $account);
+
+            return response()->json([
+                'message' => 'Confirm your email first. We sent a 6-digit code to '.$account->email.'.', 'code' => 'EMAIL_NOT_VERIFIED',
+                'email' => $account->email, 'resend_after_seconds' => $wait ?: CustomerEmailVerificationService::RESEND_SECONDS,
+            ], 422);
+        }
         if (! $account->isActive()) {
             return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
         }
@@ -153,6 +186,17 @@ class CustomerShopController extends Controller
         $account->forceFill(['last_login_at' => now()])->save();
 
         return response()->json(['data' => $this->accountView($account)])->header('Cache-Control', 'no-store');
+    }
+
+    /** Email another sign-up code. Answers the same way whether or not the email is waiting for confirmation. */
+    public function resendVerification(Request $request, string $business, CustomerEmailVerificationService $verification): JsonResponse
+    {
+        $tenant = $this->shopTenant($business);
+        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255']]);
+        $account = $tenant->customerAccounts()->where('email', mb_strtolower(trim($data['email'])))->where('status', CustomerAccount::STATUS_UNVERIFIED)->first();
+        $wait = $account ? $verification->send($tenant, $account) : 0;
+
+        return response()->json(['message' => 'If this email is waiting for confirmation, we sent it a new code.', 'resend_after_seconds' => $wait ?: CustomerEmailVerificationService::RESEND_SECONDS]);
     }
 
     public function logout(Request $request, string $business): JsonResponse

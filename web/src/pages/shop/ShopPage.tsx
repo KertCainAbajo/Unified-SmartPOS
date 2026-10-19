@@ -116,10 +116,25 @@ export function ShopPage() {
     enabled: !!account.data,
     refetchInterval: (q) => (q.state.data?.data.some((o) => o.status === 'out_for_delivery' && !o.delivered_at) ? 10000 : 30000),
   });
+  /** Sign-up waiting for the 6-digit code emailed to the customer. */
+  const [verifying, setVerifying] = useState<{ email: string; resendIn: number; remember: boolean } | null>(null);
   const authMutation = useMutation({
-    mutationFn: (payload: Record<string, string>) => api(`${base}/${mode}`, { method: 'POST', body: payload }),
-    onSuccess: async () => { setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); setAuthOpen(false); toast.success(mode === 'register' ? 'Welcome! Your account is ready.' : 'Welcome back! You are signed in.'); },
-    onError: (e) => setError(errorMessage(e)),
+    mutationFn: (payload: Record<string, string>) => api<{ verification_required?: boolean; email?: string; resend_after_seconds?: number }>(`${base}/${mode}`, { method: 'POST', body: payload }),
+    onSuccess: async (result, payload) => {
+      setError('');
+      if (result?.verification_required) {
+        setVerifying({ email: result.email ?? payload.email, resendIn: result.resend_after_seconds ?? 60, remember: payload.remember !== '0' });
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['shop-account', business] });
+      setAuthOpen(false);
+      toast.success(mode === 'register' ? 'Welcome! Your account is ready.' : 'Welcome back! You are signed in.');
+    },
+    onError: (e, payload) => {
+      // Signed up earlier but never entered the code: go straight to the code step (a new code was emailed).
+      if (e instanceof ApiError && e.code === 'EMAIL_NOT_VERIFIED') { setError(''); setVerifying({ email: payload.email, resendIn: 60, remember: payload.remember !== '0' }); return; }
+      setError(errorMessage(e));
+    },
   });
   const logoutMutation = useMutation({ mutationFn: () => api(`${base}/logout`, { method: 'POST' }), onSuccess: async () => { setCart({}); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); toast.info('You are signed out. See you again!'); } });
   const placeOrder = useMutation({
@@ -146,8 +161,14 @@ export function ShopPage() {
     const payload = Object.fromEntries([...form.entries()].map(([key, value]) => [key, String(value)]));
     authMutation.mutate(payload);
   }
-  function openAuth(next: 'login' | 'register' = 'login') { setMode(next); setError(''); setAuthOpen(true); }
-  const closeAuth = useCallback(() => { setAuthOpen(false); setError(''); }, []);
+  function openAuth(next: 'login' | 'register' = 'login') { setMode(next); setError(''); setVerifying(null); setAuthOpen(true); }
+  const closeAuth = useCallback(() => { setAuthOpen(false); setError(''); setVerifying(null); }, []);
+  const onEmailVerified = async () => {
+    setVerifying(null);
+    await queryClient.invalidateQueries({ queryKey: ['shop-account', business] });
+    setAuthOpen(false);
+    toast.success('Email confirmed. Welcome! Your account is ready.');
+  };
 
   // Forgive a pasted link that picked up a trailing full stop, comma or space: /shop/aling-nena-mini-mart. → /shop/aling-nena-mini-mart
   const cleanBusiness = business.trim().toLowerCase().replace(/[^a-z0-9]+$/, '');
@@ -484,6 +505,9 @@ export function ShopPage() {
       basketCount={basketCount}
       basketTotal={peso(total)}
       apiBase={base}
+      verifying={verifying}
+      onVerified={() => void onEmailVerified()}
+      onCancelVerify={() => setVerifying(null)}
       photos={[...lines.map(({ product }) => product), ...shop.data.filter((product) => !cart[product.id])]}
     />
   </div>;

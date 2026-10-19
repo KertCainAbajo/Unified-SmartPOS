@@ -34,8 +34,9 @@ class CustomerShopTest extends TestCase
         $this->withHeaders(['Origin' => 'http://localhost', 'Referer' => 'http://localhost/'])->postJson("/api/v1/shop/{$tenant->slug}/register", [
             'name' => 'Ana Reyes', 'email' => 'ana@example.com', 'phone' => '09171234567',
             'password' => 'long-password-1', 'password_confirmation' => 'long-password-1',
-        ])->assertCreated();
+        ])->assertStatus(202);
         $account = CustomerAccount::query()->where('email', 'ana@example.com')->firstOrFail();
+        $account->forceFill(['status' => 'active', 'email_verified_at' => now()])->save(); // the code step is covered in CustomerEmailVerificationTest
 
         $order = $this->actingAs($account, 'customer')->postJson("/api/v1/shop/{$tenant->slug}/orders", [
             'branch_id' => $branch->id, 'contact_name' => 'Ana Reyes', 'contact_phone' => '09171234567',
