@@ -90,7 +90,12 @@ export function ShopPage() {
     queryKey: ['shop-account', business],
     queryFn: async () => {
       try { return (await api<{ data: Account }>(`${base}/me`)).data; }
-      catch (e) { if (e instanceof ApiError && (e.status === 401 || e.status === 403)) return null; throw e; }
+      catch (e) {
+        // An email that became a platform admin no longer shops: explain why they were signed out.
+        if (e instanceof ApiError && e.code === 'MOVED_TO_ADMIN') { toast.info(e.message); return null; }
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) return null;
+        throw e;
+      }
     },
   });
   // Poll faster while a rider is on the way so the map follows them.

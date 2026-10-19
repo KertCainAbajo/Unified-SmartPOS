@@ -364,82 +364,175 @@ function TenantDrawer({ id, onClose }: { id: number; onClose: () => void }) {
 
 /* ------------------------------------------------------------------ Accounts */
 
+type AccountFilter = '' | 'admins' | 'disabled' | 'never';
+type UserList = Paginated<PlatformUser> & { summary?: { total: number; admins: number; disabled: number; never: number } };
+
 function AccountsTab() {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'' | 'admins' | 'disabled'>('');
+  const [filter, setFilter] = useState<AccountFilter>('');
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
   const [action, setAction] = useState<{ user: PlatformUser; kind: 'status' | 'admin' } | null>(null);
   const { user: me } = useAuth();
   const list = useQuery({
     queryKey: ['platform-users', q, filter, page],
-    queryFn: () => api<Paginated<PlatformUser>>('/platform/users', { query: { q, filter, page } }),
+    queryFn: () => api<UserList>('/platform/users', { query: { q, filter, page } }),
     placeholderData: keepPreviousData,
   });
+  const admins = useQuery({ queryKey: ['platform-users', '', 'admins', 1], queryFn: () => api<UserList>('/platform/users', { query: { filter: 'admins' } }) });
   const rows = list.data?.data ?? [];
+  const summary = list.data?.summary;
+  const pick = (f: AccountFilter) => { setFilter(f); setPage(1); };
+
+  const tiles: { value: AccountFilter; label: string; count?: number; icon: LucideIcon; tone: keyof typeof TONES }[] = [
+    { value: '', label: 'All accounts', count: summary?.total, icon: Users, tone: 'brand' },
+    { value: 'admins', label: 'Platform admins', count: summary?.admins, icon: Crown, tone: 'amber' },
+    { value: 'disabled', label: 'Disabled', count: summary?.disabled, icon: UserX, tone: 'rose' },
+    { value: 'never', label: 'Never signed in', count: summary?.never, icon: Clock, tone: 'slate' },
+  ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-brand-900 sm:text-3xl">Accounts & admins</h1>
-        <p className="mt-1 text-sm text-slate-500">Find any sign-in account, see which businesses it belongs to, disable it if it is misused, and manage who can open this console.</p>
-      </div>
-      <ShopCustomerAdmin />
-      <div className="flex flex-col gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-900/5 sm:flex-row sm:items-center">
-        <div className="relative sm:w-96">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
-            placeholder="Search name, email or username" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search accounts" />
-        </div>
-        <div className="inline-flex rounded-xl bg-slate-100 p-1 sm:ml-auto" role="group" aria-label="Show">
-          {([['', 'Everyone'], ['admins', 'Platform admins'], ['disabled', 'Disabled']] as const).map(([v, label]) => (
-            <button key={v} type="button" aria-pressed={filter === v} onClick={() => { setFilter(v); setPage(1); }}
-              className={cx('rounded-lg px-3 py-1.5 text-xs font-semibold transition duration-200', filter === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>{label}</button>
-          ))}
-        </div>
+        <p className="mt-1 text-sm text-slate-500">Every sign-in account on the platform. Disable an account that is misused, and decide who can open this console.</p>
       </div>
 
-      {list.error ? <ErrorBanner error={list.error} /> : list.isPending ? <Spinner /> : rows.length === 0 ? (
-        <p className="rounded-2xl bg-white p-10 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-900/5">No accounts match.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {rows.map((u) => {
-            const self = u.id === me?.id;
-            return (
-              <li key={u.id} className={cx('sp-rise flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 sm:flex-row sm:items-center', u.status === 'disabled' ? 'ring-rose-200' : 'ring-slate-900/5')}>
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <Avatar name={u.name} />
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-900">
-                      {u.name}
-                      {u.is_platform_admin && <span className="inline-flex items-center gap-0.5 rounded-md bg-sun-300/30 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-amber-700"><Crown className="size-3" />Platform admin</span>}
-                      {self && <span className="rounded-md bg-brand-700 px-1.5 py-px text-[10px] font-bold uppercase text-white">You</span>}
-                      <AccountPill status={u.status} />
-                    </p>
-                    <p className="truncate text-xs text-slate-500">{u.email ?? u.username}{u.company_managed && ' · company-managed login'} · last sign-in {ago(u.last_login_at).toLowerCase()}</p>
-                    {u.businesses.length > 0 && <p className="mt-1 flex flex-wrap gap-1">{u.businesses.map((b, i) => <span key={i} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600 ring-1 ring-slate-200"><Store className="size-3 text-brand-500" />{b.name}</span>)}</p>}
-                  </div>
-                </div>
-                {!self && (
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    {u.email && (u.is_platform_admin || u.status === 'active') && (
-                      <Button size="sm" variant="secondary" icon={<Crown className="size-3.5" />} onClick={() => setAction({ user: u, kind: 'admin' })}>{u.is_platform_admin ? 'Remove admin' : 'Make admin'}</Button>
-                    )}
-                    {u.status !== 'pending' && (
-                      <Button size="sm" variant={u.status === 'disabled' ? 'primary' : 'secondary'} icon={u.status === 'disabled' ? <UserCheck className="size-3.5" /> : <UserX className="size-3.5" />} onClick={() => setAction({ user: u, kind: 'status' })}>
-                        {u.status === 'disabled' ? 'Enable' : 'Disable'}
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5"><Pagination page={page} data={list.data} onPage={setPage} /></div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((t) => (
+          <button key={t.value || 'all'} type="button" onClick={() => pick(t.value)} aria-pressed={filter === t.value}
+            className={cx('sp-rise flex items-center gap-3 rounded-2xl p-4 text-left ring-1 transition duration-200', filter === t.value ? 'bg-white shadow-md ring-2 ring-brand-500' : 'bg-white/70 shadow-sm ring-slate-900/5 hover:bg-white')}>
+            <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl', TONES[t.tone])}><t.icon className="size-5" /></span>
+            <span className="min-w-0">
+              <span className="block font-display text-2xl font-bold leading-none text-slate-900">{t.count ?? '—'}</span>
+              <span className="mt-1 block truncate text-xs font-medium text-slate-500">{t.label}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center">
+            <div className="relative sm:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+                placeholder="Search name, email or username" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search accounts" />
+            </div>
+            <p className="text-xs text-slate-400 sm:ml-auto">{list.data ? `${list.data.meta?.total ?? list.data.total ?? rows.length} ${filter ? tiles.find((t) => t.value === filter)?.label.toLowerCase() : 'accounts'}` : ''}</p>
+          </div>
+
+          {list.error ? <div className="p-4"><ErrorBanner error={list.error} /></div> : list.isPending ? <Spinner /> : rows.length === 0 ? (
+            <p className="p-10 text-center text-sm text-slate-500">No accounts match.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[52rem] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <th className="py-3 pl-4 pr-3">Account</th>
+                    <th className="px-3 py-3">Login</th>
+                    <th className="px-3 py-3">Businesses</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Last sign-in</th>
+                    <th className="py-3 pl-3 pr-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map((u) => {
+                    const self = u.id === me?.id;
+                    const canAdmin = !self && !!u.email && (u.is_platform_admin || u.status === 'active');
+                    return (
+                      <tr key={u.id} className={cx('group transition-colors hover:bg-slate-50/70', u.status === 'disabled' && 'bg-rose-50/30')}>
+                        <td className="py-3 pl-4 pr-3">
+                          <div className="flex items-center gap-3">
+                            <span className="relative">
+                              <Avatar name={u.name} />
+                              {u.is_platform_admin && <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-sun-400 text-brand-900 ring-2 ring-white"><Crown className="size-2.5" /></span>}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 truncate font-semibold text-slate-900">{u.name}{self && <span className="rounded bg-brand-700 px-1 py-px text-[9px] font-bold uppercase text-white">You</span>}</p>
+                              <p className="truncate text-xs text-slate-500">{u.email ?? u.username}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {u.is_platform_admin
+                            ? <span className="inline-flex items-center gap-1 rounded-full bg-sun-300/30 px-2 py-0.5 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200"><Crown className="size-3" />Platform admin</span>
+                            : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{u.company_managed ? 'Business login' : 'Personal'}</span>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex max-w-[14rem] flex-wrap gap-1">
+                            {u.businesses.slice(0, 2).map((b, i) => <span key={i} className="inline-flex max-w-full items-center gap-1 truncate rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600 ring-1 ring-slate-200"><Store className="size-3 shrink-0 text-brand-500" /><span className="truncate">{b.name}</span></span>)}
+                            {u.businesses.length > 2 && <span className="text-[11px] text-slate-400">+{u.businesses.length - 2}</span>}
+                            {u.businesses.length === 0 && <span className="text-xs text-slate-300">—</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3"><AccountPill status={u.status} /></td>
+                        <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-500" title={u.last_login_at ? formatDateTime(u.last_login_at) : undefined}>{u.last_login_at ? ago(u.last_login_at) : <span className="text-slate-300">Never</span>}</td>
+                        <td className="py-3 pl-3 pr-4">
+                          <div className="flex justify-end gap-1.5">
+                            {canAdmin && (
+                              <IconAction label={u.is_platform_admin ? 'Remove admin' : 'Make admin'} tone={u.is_platform_admin ? 'amber' : 'default'} onClick={() => setAction({ user: u, kind: 'admin' })}>
+                                {u.is_platform_admin ? <ShieldOff className="size-4" /> : <Crown className="size-4" />}
+                              </IconAction>
+                            )}
+                            {!self && u.status !== 'pending' && (
+                              <IconAction label={u.status === 'disabled' ? 'Enable account' : 'Disable account'} tone={u.status === 'disabled' ? 'green' : 'rose'} onClick={() => setAction({ user: u, kind: 'status' })}>
+                                {u.status === 'disabled' ? <UserCheck className="size-4" /> : <UserX className="size-4" />}
+                              </IconAction>
+                            )}
+                            {self && <span className="text-[11px] text-slate-400">Your account</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <Pagination page={page} data={list.data} onPage={setPage} />
+        </section>
+
+        <aside className="space-y-6">
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+            <h2 className="flex items-center gap-2 font-display font-bold text-slate-900"><Crown className="size-4 text-amber-500" />Platform admins</h2>
+            <p className="mt-0.5 text-xs text-slate-500">People who can open this console.</p>
+            <ul className="mt-3 space-y-2">
+              {(admins.data?.data ?? []).map((a) => (
+                <li key={a.id} className="flex items-center gap-2.5">
+                  <Avatar name={a.name} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{a.name}{a.id === me?.id && <span className="ml-1 text-[10px] font-bold uppercase text-brand-700">· you</span>}</span>
+                    <span className="block truncate text-[11px] text-slate-500">{a.email}</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400" title={a.last_login_at ? formatDateTime(a.last_login_at) : undefined}>{ago(a.last_login_at)}</span>
+                </li>
+              ))}
+            </ul>
+            {(admins.data?.data.length ?? 0) === 1 && <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800 ring-1 ring-amber-100"><AlertTriangle className="mt-px size-3.5 shrink-0" />Only one admin. Add a second trusted person so the platform is never locked out.</p>}
+          </section>
+          <ShopCustomerAdmin />
+        </aside>
+      </div>
       {action && <AccountDialog user={action.user} kind={action.kind} onClose={() => setAction(null)} />}
     </div>
+  );
+}
+
+function IconAction({ label, tone, onClick, children }: { label: string; tone: 'default' | 'amber' | 'rose' | 'green'; onClick: () => void; children: ReactNode }) {
+  const tones = {
+    default: 'text-slate-500 hover:bg-amber-50 hover:text-amber-700 hover:ring-amber-200',
+    amber: 'text-amber-700 hover:bg-amber-50 hover:ring-amber-200',
+    rose: 'text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:ring-rose-200',
+    green: 'text-emerald-700 hover:bg-emerald-50 hover:ring-emerald-200',
+  };
+  return (
+    <button type="button" onClick={onClick} title={label} aria-label={label}
+      className={cx('group/btn relative grid size-9 place-items-center rounded-xl bg-white ring-1 ring-slate-200 transition duration-150 active:scale-95', tones[tone])}>
+      {children}
+      <span className="pointer-events-none absolute -top-8 right-0 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow transition group-hover/btn:opacity-100">{label}</span>
+    </button>
   );
 }
 
@@ -465,15 +558,15 @@ function ShopCustomerAdmin() {
 
   return (
     <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 via-white to-white shadow-sm ring-1 ring-amber-200/70">
-      <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-4 p-5">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-sun-400 to-amber-500 text-white shadow-sm"><Crown className="size-5" /></span>
           <div>
-            <h2 className="font-display font-bold text-slate-900">Add a super admin from the online shop</h2>
+            <h2 className="font-display font-bold text-slate-900">Add an admin from the online shop</h2>
             <p className="text-xs text-slate-500">Ask the person to sign up in any online shop first, then enter the exact email they used. Their shop account moves here: they sign in on the Management sign-in with the same email and shop password, and no longer as a shop customer.</p>
           </div>
         </div>
-        <form className="flex w-full gap-2 lg:w-[26rem]" onSubmit={(e) => { e.preventDefault(); if (valid) setSearched(email.trim().toLowerCase()); }}>
+        <form className="flex w-full gap-2" onSubmit={(e) => { e.preventDefault(); if (valid) setSearched(email.trim().toLowerCase()); }}>
           <div className="relative flex-1">
             <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="their.email@gmail.com" aria-label="Shop customer email"
@@ -707,46 +800,106 @@ function ReasonField({ value, onChange, suggestions, preview }: { value: string;
 
 /* ------------------------------------------------------------------ Activity */
 
-const ACTIVITY: Record<string, { label: (e: LogEntry) => string; icon: LucideIcon; tone: string }> = {
-  'platform.tenant_status_changed': { label: (e) => `${e.new?.status === 'suspended' ? 'Suspended' : 'Reactivated'} ${e.target ?? 'a business'}`, icon: CirclePause, tone: 'bg-amber-100 text-amber-700' },
-  'platform.user_status_changed': { label: (e) => `${e.new?.status === 'disabled' ? 'Disabled' : 'Enabled'} ${e.target ?? 'an account'}`, icon: UserX, tone: 'bg-rose-100 text-rose-700' },
-  'platform.admin_granted': { label: (e) => `Made ${e.target ?? 'someone'} a platform admin`, icon: Crown, tone: 'bg-sun-300/30 text-amber-700' },
-  'platform.admin_revoked': { label: (e) => `Removed ${e.target ?? 'someone'} as platform admin`, icon: ShieldOff, tone: 'bg-slate-100 text-slate-700' },
+type ActivityType = '' | 'businesses' | 'accounts' | 'admins';
+type ActivityList = Paginated<LogEntry> & { summary?: { total: number; this_week: number; businesses: number; accounts: number; admins: number } };
+
+const ACTIVITY: Record<string, { verb: (e: LogEntry) => string; icon: LucideIcon; tone: string; category: string; chip: string }> = {
+  'platform.tenant_status_changed': { verb: (e) => (e.new?.status === 'suspended' ? 'suspended' : 'reactivated'), icon: CirclePause, tone: 'bg-amber-100 text-amber-700 ring-amber-200', category: 'Business', chip: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  'platform.user_status_changed': { verb: (e) => (e.new?.status === 'disabled' ? 'disabled the account of' : 'enabled the account of'), icon: UserX, tone: 'bg-rose-100 text-rose-700 ring-rose-200', category: 'Account', chip: 'bg-rose-50 text-rose-700 ring-rose-200' },
+  'platform.admin_granted': { verb: () => 'made', icon: Crown, tone: 'bg-sun-300/40 text-amber-800 ring-amber-200', category: 'Admin', chip: 'bg-sun-300/30 text-amber-800 ring-amber-200' },
+  'platform.admin_revoked': { verb: () => 'removed', icon: ShieldOff, tone: 'bg-slate-100 text-slate-700 ring-slate-200', category: 'Admin', chip: 'bg-slate-100 text-slate-700 ring-slate-200' },
 };
+const suffix = (e: LogEntry) => (e.action === 'platform.admin_granted' ? ' a platform admin' : e.action === 'platform.admin_revoked' ? ' as platform admin' : '');
+
+function dayLabel(iso: string): string {
+  const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return new Date(iso).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
 
 function ActivityTab() {
   const [page, setPage] = useState(1);
-  const list = useQuery({ queryKey: ['platform-activity', page], queryFn: () => api<Paginated<LogEntry>>('/platform/activity', { query: { page } }), placeholderData: keepPreviousData });
+  const [type, setType] = useState<ActivityType>('');
+  const list = useQuery({ queryKey: ['platform-activity', type, page], queryFn: () => api<ActivityList>('/platform/activity', { query: { page, type } }), placeholderData: keepPreviousData });
   const rows = list.data?.data ?? [];
+  const s = list.data?.summary;
+  const days = rows.reduce<{ label: string; items: LogEntry[] }[]>((acc, e) => {
+    const label = dayLabel(e.created_at);
+    const last = acc[acc.length - 1];
+    if (last?.label === label) last.items.push(e); else acc.push({ label, items: [e] });
+    return acc;
+  }, []);
+  const filters: { value: ActivityType; label: string; count?: number; icon: LucideIcon; tone: keyof typeof TONES }[] = [
+    { value: '', label: 'All actions', count: s?.total, icon: Activity, tone: 'brand' },
+    { value: 'businesses', label: 'Businesses', count: s?.businesses, icon: Building2, tone: 'amber' },
+    { value: 'accounts', label: 'Accounts', count: s?.accounts, icon: UserX, tone: 'rose' },
+    { value: 'admins', label: 'Admins', count: s?.admins, icon: Crown, tone: 'violet' },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold text-brand-900 sm:text-3xl">Activity log</h1>
-        <p className="mt-1 text-sm text-slate-500">Everything platform administrators did, with the reason they gave. Entries cannot be edited.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-brand-900 sm:text-3xl">Activity log</h1>
+          <p className="mt-1 text-sm text-slate-500">Everything platform administrators did, with the reason they gave. Entries are permanent and cannot be edited.</p>
+        </div>
+        {s && <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-900/5"><span className="size-2 rounded-full bg-emerald-500" />{s.this_week} in the last 7 days</span>}
       </div>
-      {list.error ? <ErrorBanner error={list.error} /> : list.isPending ? <Spinner /> : rows.length === 0 ? (
-        <p className="rounded-2xl bg-white p-10 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-900/5">No administrator actions yet.</p>
-      ) : (
-        <ol className="relative space-y-3 before:absolute before:bottom-4 before:left-[1.45rem] before:top-4 before:w-px before:bg-slate-200">
-          {rows.map((e) => {
-            const look = ACTIVITY[e.action] ?? { label: () => e.action, icon: Activity, tone: 'bg-slate-100 text-slate-600' };
-            return (
-              <li key={e.id} className="sp-rise relative flex gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5">
-                <span className={cx('relative z-[1] grid size-9 shrink-0 place-items-center rounded-full ring-4 ring-white', look.tone)}><look.icon className="size-4" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-semibold text-slate-900">{look.label(e)}</span>
-                    <span className="text-xs text-slate-400">{formatDateTime(e.created_at)}</span>
-                  </p>
-                  <p className="text-xs text-slate-500">by {e.by ?? 'an administrator'}{e.business && e.business !== e.target && <> · {e.business}</>}</p>
-                  {e.reason && <p className="mt-1.5 rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-700 ring-1 ring-slate-100">“{e.reason}”</p>}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5"><Pagination page={page} data={list.data} onPage={setPage} /></div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {filters.map((f) => (
+          <button key={f.value || 'all'} type="button" onClick={() => { setType(f.value); setPage(1); }} aria-pressed={type === f.value}
+            className={cx('sp-rise flex items-center gap-3 rounded-2xl p-4 text-left ring-1 transition duration-200', type === f.value ? 'bg-white shadow-md ring-2 ring-brand-500' : 'bg-white/70 shadow-sm ring-slate-900/5 hover:bg-white')}>
+            <span className={cx('grid size-10 shrink-0 place-items-center rounded-xl', TONES[f.tone])}><f.icon className="size-5" /></span>
+            <span><span className="block font-display text-2xl font-bold leading-none text-slate-900">{f.count ?? '—'}</span><span className="mt-1 block text-xs font-medium text-slate-500">{f.label}</span></span>
+          </button>
+        ))}
+      </div>
+
+      <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        {list.error ? <div className="p-4"><ErrorBanner error={list.error} /></div> : list.isPending ? <Spinner /> : rows.length === 0 ? (
+          <div className="flex flex-col items-center px-6 py-14 text-center">
+            <span className="grid size-14 place-items-center rounded-2xl bg-slate-100 text-slate-400"><Activity className="size-6" /></span>
+            <p className="mt-3 font-display font-semibold text-slate-900">No actions yet</p>
+            <p className="mt-1 text-sm text-slate-500">Suspensions, account changes and admin changes appear here.</p>
+          </div>
+        ) : days.map((d) => (
+          <div key={d.label}>
+            <p className="sticky top-0 z-[1] flex items-center gap-2 border-y border-slate-100 bg-slate-50/90 px-5 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 backdrop-blur first:border-t-0">
+              <CalendarDays className="size-3.5 text-brand-600" />{d.label}<span className="font-semibold normal-case tracking-normal text-slate-400">· {d.items.length}</span>
+            </p>
+            <ol className="relative px-5 py-2 before:absolute before:bottom-6 before:left-[2.6rem] before:top-6 before:w-px before:bg-slate-200">
+              {d.items.map((e) => {
+                const look = ACTIVITY[e.action] ?? { verb: () => e.action, icon: Activity, tone: 'bg-slate-100 text-slate-600 ring-slate-200', category: 'Other', chip: 'bg-slate-100 text-slate-600 ring-slate-200' };
+                const vague = !!e.reason && reasonQuality(e.reason).level !== 'good';
+                return (
+                  <li key={e.id} className="sp-rise relative flex gap-4 py-3">
+                    <span className={cx('relative z-[1] grid size-9 shrink-0 place-items-center rounded-full ring-4 ring-white', look.tone)}><look.icon className="size-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+                        <p className="text-sm text-slate-700">
+                          <strong className="font-semibold text-slate-900">{e.by ?? 'An administrator'}</strong> {look.verb(e)} <strong className="font-semibold text-slate-900">{e.target ?? 'a record'}</strong>{suffix(e)}
+                          {e.business && e.business !== e.target && <span className="text-slate-500"> · {e.business}</span>}
+                        </p>
+                        <span className="shrink-0 text-xs tabular-nums text-slate-400" title={formatDateTime(e.created_at)}>{new Date(e.created_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className={cx('rounded-full px-2 py-px text-[10px] font-bold uppercase tracking-wide ring-1', look.chip)}>{look.category}</span>
+                        {vague && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-px text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200"><AlertTriangle className="size-3" />Vague reason</span>}
+                      </div>
+                      {e.reason && (
+                        <blockquote className={cx('mt-2 rounded-xl border-l-4 px-3 py-2 text-sm', vague ? 'border-amber-300 bg-amber-50/50 text-slate-600' : 'border-brand-300 bg-slate-50 text-slate-700')}>{e.reason}</blockquote>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ))}
+        <Pagination page={page} data={list.data} onPage={setPage} />
+      </section>
     </div>
   );
 }

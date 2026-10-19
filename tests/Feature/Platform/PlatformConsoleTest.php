@@ -131,6 +131,29 @@ class PlatformConsoleTest extends TestCase
         $this->assertFalse(\Illuminate\Support\Facades\Hash::check('old-Staff-pass-1', $staff->password));
     }
 
+    /** An email that is a platform admin cannot keep shopping, however it became admin; a signed-in shopper is signed out. */
+    public function test_admin_email_is_signed_out_of_the_shop_and_its_shop_account_closed(): void
+    {
+        [$tenant] = $this->createTenant();
+        $person = User::factory()->create(['email' => 'boss@example.com']);
+        $customer = \App\Models\CustomerAccount::query()->forceCreate([
+            'tenant_id' => $tenant->id, 'name' => 'Boss', 'email' => 'boss@example.com', 'phone' => '0917', 'password' => 'Shop-pass-99',
+        ]);
+        $person->forceFill(['is_platform_admin' => true])->save(); // made admin some other way, shop account still open
+
+        $this->actingAs($customer, 'customer')->getJson("/api/v1/shop/{$tenant->slug}/me")
+            ->assertForbidden()->assertJsonPath('code', 'MOVED_TO_ADMIN');
+        $this->assertSame('moved_to_admin', $customer->fresh()->status);
+
+        // Granting admin from the account list closes the shop accounts straight away.
+        $other = User::factory()->create(['email' => 'lead@example.com']);
+        $shopper = \App\Models\CustomerAccount::query()->forceCreate([
+            'tenant_id' => $tenant->id, 'name' => 'Lead', 'email' => 'lead@example.com', 'phone' => '0918', 'password' => 'Shop-pass-98',
+        ]);
+        $this->actingAsUser($this->admin())->patchJson("/api/v1/platform/users/{$other->id}/admin", ['is_platform_admin' => true, 'reason' => 'Support lead'])->assertOk();
+        $this->assertSame('moved_to_admin', $shopper->fresh()->status);
+    }
+
     public function test_console_is_closed_to_business_owners(): void
     {
         [$tenant, $owner] = $this->createTenant();

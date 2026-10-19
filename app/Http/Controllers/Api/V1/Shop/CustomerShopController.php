@@ -141,7 +141,8 @@ class CustomerShopController extends Controller
             return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
         }
         // Shown only after the password matched, so it never reveals which emails are administrators.
-        if ($account->status === CustomerAccount::STATUS_MOVED_TO_ADMIN) {
+        if ($account->status === CustomerAccount::STATUS_MOVED_TO_ADMIN || CustomerAccount::emailIsPlatformAdmin($account->email)) {
+            CustomerAccount::closeForAdmin($account->email);
             return response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 422);
         }
         if (! $account->isActive()) {
@@ -335,6 +336,11 @@ class CustomerShopController extends Controller
     {
         $tenant = $this->shopTenant($business);
         $account = Auth::guard('customer')->user();
+        if ($account instanceof CustomerAccount && $account->isActive() && CustomerAccount::emailIsPlatformAdmin($account->email)) {
+            CustomerAccount::closeForAdmin($account->email);
+            Auth::guard('customer')->logoutCurrentDevice();
+            abort(response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 403));
+        }
         abort_unless($account instanceof CustomerAccount && $account->tenant_id === $tenant->id && $account->isActive(), 403, 'Customer account is not available for this shop.');
         return $account;
     }

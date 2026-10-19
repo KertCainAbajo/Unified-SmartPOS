@@ -20,6 +20,19 @@ class CustomerAccount extends Authenticatable
 
     protected $guarded = [];
 
+    /** True when this email belongs to a platform administrator: such an email no longer shops as a customer. */
+    public static function emailIsPlatformAdmin(?string $email): bool
+    {
+        return $email !== null && $email !== '' && User::query()->where('email', mb_strtolower($email))->where('is_platform_admin', true)->exists();
+    }
+
+    /** Close every shop account using this email (it moved to a platform administrator login). Returns how many. */
+    public static function closeForAdmin(string $email): int
+    {
+        return static::query()->where('email', mb_strtolower($email))->where('status', 'active')
+            ->update(['status' => self::STATUS_MOVED_TO_ADMIN, 'remember_token' => null]);
+    }
+
     protected $hidden = ['password', 'remember_token'];
 
     protected $attributes = [

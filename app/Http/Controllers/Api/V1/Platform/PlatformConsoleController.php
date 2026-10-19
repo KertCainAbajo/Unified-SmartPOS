@@ -93,18 +93,24 @@ class PlatformConsoleController extends Controller
     /** Find sign-in accounts by name, email or username, with the businesses they belong to. */
     public function users(Request $request): JsonResponse
     {
-        $data = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'filter' => ['nullable', 'in:admins,disabled']]);
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'filter' => ['nullable', 'in:admins,disabled,never']]);
         $term = trim((string) ($data['q'] ?? ''));
 
         $users = User::query()
             ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")->orWhere('email', 'like', "%{$term}%")->orWhere('username', 'like', "%{$term}%")))
             ->when(($data['filter'] ?? null) === 'admins', fn ($q) => $q->where('is_platform_admin', true))
             ->when(($data['filter'] ?? null) === 'disabled', fn ($q) => $q->where('status', UserStatus::Disabled->value))
+            ->when(($data['filter'] ?? null) === 'never', fn ($q) => $q->whereNull('last_login_at'))
             ->with(['memberships' => fn ($q) => $q->select('id', 'tenant_id', 'user_id', 'status')->with('tenant:id,name,slug')])
             ->orderByDesc('is_platform_admin')->orderBy('name')
             ->paginate($this->perPage($request, 25));
 
-        return response()->json($users->through(fn (User $u) => $this->presentUser($u)));
+        return response()->json([...$users->through(fn (User $u) => $this->presentUser($u))->toArray(), 'summary' => [
+            'total' => User::query()->count(),
+            'admins' => User::query()->where('is_platform_admin', true)->count(),
+            'disabled' => User::query()->where('status', UserStatus::Disabled->value)->count(),
+            'never' => User::query()->whereNull('last_login_at')->count(),
+        ]]);
     }
 
     /** Disable or re-enable a sign-in account everywhere. A disabled account is signed out on its next request. */
@@ -155,6 +161,9 @@ class PlatformConsoleController extends Controller
                 throw new BusinessRuleException('The platform needs at least one administrator.', 'LAST_PLATFORM_ADMIN', status: 409);
             }
             $user->forceFill(['is_platform_admin' => $grant, ...($converted ? ['managed_by_tenant_id' => null] : [])])->save();
+            if ($grant && $user->email) {
+                CustomerAccount::closeForAdmin($user->email); // an admin email no longer shops as a customer
+            }
         });
         $this->audit->log($grant ? 'platform.admin_granted' : 'platform.admin_revoked', $user, null, null,
             ['reason' => trim($data['reason']), 'email' => $user->email, ...($converted ? ['converted_to_personal' => true] : [])]);
@@ -211,8 +220,7 @@ class PlatformConsoleController extends Controller
             if (! $user->wasRecentlyCreated) {
                 $user->tokens()->delete(); // devices signed in with the old password must sign in again
             }
-            $closed = CustomerAccount::query()->where('email', $email)->where('status', 'active')
-                ->update(['status' => CustomerAccount::STATUS_MOVED_TO_ADMIN, 'remember_token' => null]);
+            $closed = CustomerAccount::closeForAdmin($email);
 
             return [$user, $user->wasRecentlyCreated, $converted, $closed];
         });
@@ -228,9 +236,18 @@ class PlatformConsoleController extends Controller
     /** Everything platform administrators did: suspensions, account changes and admin grants, with their reasons. */
     public function activity(Request $request): JsonResponse
     {
-        $page = $this->platformLog()->paginate($this->perPage($request, 30));
+        $data = $request->validate(['type' => ['nullable', 'in:businesses,accounts,admins']]);
+        $actions = ['businesses' => ['platform.tenant_status_changed'], 'accounts' => ['platform.user_status_changed'], 'admins' => ['platform.admin_granted', 'platform.admin_revoked']];
+        $page = $this->platformLog()->when($data['type'] ?? null, fn ($q, $type) => $q->whereIn('action', $actions[$type]))
+            ->paginate($this->perPage($request, 30));
+        $counts = AuditLog::query()->where('action', 'like', 'platform.%')->selectRaw('action, count(*) as total')->groupBy('action')->pluck('total', 'action');
+        $sum = fn (array $list) => (int) collect($list)->sum(fn ($a) => $counts[$a] ?? 0);
 
-        return response()->json($page->through($this->presentLog(...)));
+        return response()->json([...$page->through($this->presentLog(...))->toArray(), 'summary' => [
+            'total' => (int) $counts->sum(),
+            'businesses' => $sum($actions['businesses']), 'accounts' => $sum($actions['accounts']), 'admins' => $sum($actions['admins']),
+            'this_week' => AuditLog::query()->where('action', 'like', 'platform.%')->where('created_at', '>=', now()->subDays(7))->count(),
+        ]]);
     }
 
     private function platformLog()
