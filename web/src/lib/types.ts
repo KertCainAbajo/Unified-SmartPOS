@@ -253,7 +253,12 @@ export interface Payment {
   status: string;
 }
 
+export type SaleChannel = 'in_store' | 'pickup' | 'delivery';
+
 export interface Sale {
+  /** Where the sale came from: a counter sale or a completed online pickup/delivery order. */
+  channel?: SaleChannel;
+  online_order?: { id: number; order_number: string; fulfilment: 'pickup' | 'delivery'; rider_name: string | null; delivery_address: string | null };
   id: number;
   receipt_number: string;
   status: 'completed' | 'voided';

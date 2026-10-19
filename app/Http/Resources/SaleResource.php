@@ -26,6 +26,9 @@ class SaleResource extends JsonResource
             'cashier' => $this->whenLoaded('cashier', fn () => $this->cashier->only(['id', 'name'])),
             'cashier_id' => $this->cashier_id,
             'customer' => $this->whenLoaded('customer', fn () => $this->customer?->only(['id', 'name', 'tin'])),
+            // Where the sale came from: a counter sale, or an online order picked up or delivered.
+            'channel' => $this->when($this->relationLoaded('onlineOrder'), fn () => $this->onlineOrder?->fulfilment ?? 'in_store'),
+            'online_order' => $this->when($this->relationLoaded('onlineOrder') && $this->onlineOrder, fn () => $this->onlineOrder->only(['id', 'order_number', 'fulfilment', 'rider_name', 'delivery_address'])),
             'subtotal' => $this->subtotal,
             'discount_total' => $this->discount_total,
             'vat_exemption_amount' => $this->vat_exemption_amount,

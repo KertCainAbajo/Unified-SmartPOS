@@ -15,6 +15,7 @@ use App\Support\Permissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 /**
  * @tags Sales and checkout
@@ -26,7 +27,7 @@ class SaleController extends Controller
      *
      * Cashiers (`sales.view`) see their own sales; `sales.view_all` sees all sales in authorized branches.
      * Filters: `date_from`, `date_to` (business date, YYYY-MM-DD), `branch_id`, `cashier_id`, `status`,
-     * `register_session_id`, `receipt_number`.
+     * `register_session_id`, `receipt_number`, `channel` (`in_store`, `pickup`, `delivery`).
      */
     public function index(Request $request, Tenant $tenant): AnonymousResourceCollection
     {
@@ -34,10 +35,11 @@ class SaleController extends Controller
         $request->validate([
             'date_from' => ['sometimes', 'date_format:Y-m-d'],
             'date_to' => ['sometimes', 'date_format:Y-m-d'],
+            'channel' => ['sometimes', Rule::in(['in_store', 'pickup', 'delivery'])],
         ]);
 
         $sales = $this->scopeToAccessibleBranches($tenant->sales())
-            ->with('cashier:id,name')
+            ->with(['cashier:id,name', 'onlineOrder:id,sale_id,order_number,fulfilment,rider_name,delivery_address'])
             ->when(! $this->tenantContext()->can(Permissions::SALES_VIEW_ALL), fn ($q) => $q->where('cashier_id', $request->user()->id))
             ->when($request->filled('date_from'), fn ($q) => $q->where('business_date', '>=', $request->string('date_from')))
             ->when($request->filled('date_to'), fn ($q) => $q->where('business_date', '<=', $request->string('date_to')))
@@ -46,6 +48,8 @@ class SaleController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('register_session_id'), fn ($q) => $q->where('register_session_id', $request->integer('register_session_id')))
             ->when($request->filled('receipt_number'), fn ($q) => $q->where('receipt_number', $request->string('receipt_number')))
+            ->when($request->input('channel') === 'in_store', fn ($q) => $q->whereDoesntHave('onlineOrder'))
+            ->when(in_array($request->input('channel'), ['pickup', 'delivery'], true), fn ($q) => $q->whereHas('onlineOrder', fn ($o) => $o->where('fulfilment', $request->input('channel'))))
             ->latest('id')
             ->paginate($this->perPage($request));
 
@@ -91,7 +95,7 @@ class SaleController extends Controller
     {
         $this->authorize('view', $sale);
 
-        return new SaleResource($sale->load(['items', 'payments', 'cashier:id,name', 'customer']));
+        return new SaleResource($sale->load(['items', 'payments', 'cashier:id,name', 'customer', 'onlineOrder:id,sale_id,order_number,fulfilment,rider_name,delivery_address']));
     }
 
     /** Receipt data for printing or reprinting. */

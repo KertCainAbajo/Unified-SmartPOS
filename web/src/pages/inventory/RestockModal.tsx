@@ -23,11 +23,11 @@ export interface RestockItem {
 type Method = 'receive' | 'order' | 'transfer';
 type Target = 'reorder' | 'double';
 
-/** Units needed to reach the target level (never negative, rounded up to whole units). */
+/** Units needed to reach the target level, rounded up to whole units; 0 when the branch already has enough. */
 const suggest = (item: RestockItem, target: Target) => {
   const reorder = Number(item.reorder_level);
   const goal = target === 'double' ? Math.max(reorder * 2, reorder + 1) : reorder + 1;
-  return Math.max(Math.ceil(goal - Number(item.quantity)), 1);
+  return Math.max(Math.ceil(goal - Number(item.quantity)), 0);
 };
 
 /**
@@ -35,11 +35,12 @@ const suggest = (item: RestockItem, target: Target) => {
  * to a supplier, or a transfer from another branch); quantities are pre-filled to bring each product back above its
  * reorder level.
  */
-export function RestockModal({ items, open, onClose, onDone }: { items: RestockItem[]; open: boolean; onClose: () => void; onDone: () => void }) {
+export function RestockModal({ items: pickedItems, open, onClose, onDone }: { items: RestockItem[]; open: boolean; onClose: () => void; onDone: () => void }) {
   const { can, branches, branchName, path, tenantId } = useTenant();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const branchId = items[0]?.branch_id;
+  // The branch being restocked: starts as the branch the products were picked at, and can be changed.
+  const [branchId, setBranchId] = useState<number | undefined>(pickedItems[0]?.branch_id);
 
   const methods: { value: Method; title: string; body: string; icon: LucideIcon }[] = [
     ...(can('purchasing.receive') ? [{ value: 'receive' as Method, title: 'Delivery arrived', body: 'Add the stock now. Use this when the goods are already here.', icon: PackageCheck }] : []),
@@ -63,18 +64,33 @@ export function RestockModal({ items, open, onClose, onDone }: { items: RestockI
   const productOf = (id: number) => products.data?.data.find((p) => p.id === id);
   const stockAt = (productId: number, branch: number | '') => Number(productOf(productId)?.stock?.find((s) => s.branch_id === branch)?.quantity ?? 0);
 
+  /** The picked products as they stand at the chosen branch (its own on-hand quantities). */
+  const items = useMemo(
+    () => pickedItems.map((i) => (i.branch_id === branchId || branchId === undefined ? i : { ...i, branch_id: branchId, quantity: String(stockAt(i.product_id, branchId)) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pickedItems, branchId, products.data],
+  );
+
   // Reset when opened with a new selection.
   useEffect(() => {
     if (!open) return;
+    setBranchId(pickedItems[0]?.branch_id);
     setMethod(methods[0]?.value ?? 'receive');
     setTarget('double');
-    setQty(Object.fromEntries(items.map((i) => [i.product_id, String(suggest(i, 'double'))])));
     setCost({});
     setInvoice('');
     setError(null);
     setFinishNow(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, items]);
+  }, [open, pickedItems]);
+
+  // Suggested quantities follow the chosen branch's stock; a transfer source must be a different branch.
+  useEffect(() => {
+    if (!open) return;
+    setQty(Object.fromEntries(items.map((i) => [i.product_id, String(suggest(i, target))])));
+    setFromBranch('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, branchId, products.data]);
 
   // Default costs from the product's average cost once products load.
   useEffect(() => {
@@ -163,6 +179,26 @@ export function RestockModal({ items, open, onClose, onDone }: { items: RestockI
       <div className="space-y-6">
         {error !== null && fieldErrors.length === 0 && <ErrorBanner error={error} />}
         {fieldErrors.map((m) => <p key={m} className="text-sm text-red-600">{m}</p>)}
+
+        {/* Which branch */}
+        {branches.length > 1 && (
+          <section>
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800"><span className="grid size-6 place-items-center rounded-full bg-brand-600 text-white"><Store className="size-3.5" /></span>Which branch are you restocking?</p>
+            <div role="radiogroup" aria-label="Branch to restock" className="flex flex-wrap gap-2">
+              {branches.map((b) => {
+                const on = b.id === branchId;
+                const low = products.data ? pickedItems.filter((i) => stockAt(i.product_id, b.id) <= Number(i.reorder_level)).length : null;
+                return (
+                  <button key={b.id} type="button" role="radio" aria-checked={on} onClick={() => setBranchId(b.id)}
+                    className={cx('inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition', on ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50')}>
+                    <Store className="size-4" /> {b.name}
+                    {low !== null && <span className={cx('rounded-full px-1.5 text-[11px]', on ? 'bg-white/20' : low ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700')}>{low ? `${low} low` : 'stocked'}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* 1. How */}
         <section>

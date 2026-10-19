@@ -27,7 +27,10 @@ class TenantContext
         $this->tenant = $tenant;
         $this->membership = $membership;
         $this->permissions = array_fill_keys($membership->permissionKeys(), true);
-        $this->branchIds = $membership->all_branches
+        // Owners work across every branch, even if an older record limited them to a few.
+        $isOwner = isset($this->permissions[Permissions::TENANT_MANAGE]) && ($membership->isOwnerMembership()
+            || $membership->roles()->whereNull('roles.tenant_id')->where('roles.key', Permissions::ROLE_OWNER)->exists());
+        $this->branchIds = $membership->all_branches || $isOwner
             ? null
             : $membership->branches()->pluck('branches.id')->map(fn ($id) => (int) $id)->all();
     }

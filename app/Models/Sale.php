@@ -8,6 +8,7 @@ use App\Enums\SaleStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /** Completed sales are never deleted; reversals are voids or refunds. */
 class Sale extends Model
@@ -62,6 +63,12 @@ class Sale extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /** The online order this sale completed, if it came from the shop (pickup or delivery). */
+    public function onlineOrder(): HasOne
+    {
+        return $this->hasOne(OnlineOrder::class);
     }
 
     public function items(): HasMany

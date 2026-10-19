@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, Calculator, Package, Printer, ReceiptText, RotateCcw, Wallet } from 'lucide-react';
+import { ArrowLeft, Ban, Bike, Calculator, Package, Printer, ReceiptText, RotateCcw, ShoppingBag, Store, Wallet } from 'lucide-react';
 import { BranchTag } from '../../components/BranchSwitcher';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -34,7 +34,7 @@ export function SaleDetailPage() {
       <PageHeader
         eyebrow="Sale"
         title={`Receipt ${s.receipt_number}`}
-        description={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{formatDateTime(s.sold_at)}</span><span>Cashier: <strong className="font-semibold text-slate-700">{s.cashier?.name ?? '—'}</strong></span>{s.customer && <span>Customer: <strong className="font-semibold text-slate-700">{s.customer.name}</strong></span>}<BranchTag id={s.branch_id} /></span>}
+        description={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{formatDateTime(s.sold_at)}</span><span>Cashier: <strong className="font-semibold text-slate-700">{s.cashier?.name ?? '—'}</strong></span>{s.customer && <span>Customer: <strong className="font-semibold text-slate-700">{s.customer.name}</strong></span>}<BranchTag id={s.branch_id} /><ChannelTag sale={s} /></span>}
         actions={
           <>
             <Button variant="secondary" icon={<Printer className="size-4" />} onClick={() => setShowReceipt(true)} disabled={!receipt.data}>
@@ -256,5 +256,18 @@ function RefundModal({ sale, items, open, onClose }: { sale: Sale; items: SaleIt
         <Checkbox label="Return items to stock" checked={restock} onChange={setRestock} />
       </div>
     </Modal>
+  );
+}
+
+/** Counter sale, or the online pickup/delivery order this sale completed. */
+function ChannelTag({ sale }: { sale: Sale }) {
+  const order = sale.online_order;
+  if (!order) return <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600"><Store className="size-3.5" /> In store</span>;
+  const delivery = order.fulfilment === 'delivery';
+  return (
+    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold', delivery ? 'bg-orange-50 text-orange-700' : 'bg-sky-50 text-sky-700')} title={order.delivery_address ?? undefined}>
+      {delivery ? <Bike className="size-3.5" /> : <ShoppingBag className="size-3.5" />}
+      {delivery ? 'Delivery' : 'Pickup'} · {order.order_number}{delivery && order.rider_name ? ` · rider ${order.rider_name}` : ''}
+    </span>
   );
 }

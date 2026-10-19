@@ -1,5 +1,6 @@
 import {
   ArrowDownRight,
+  Bike,
   CalendarDays,
   ChevronRight,
   Download,
@@ -8,6 +9,8 @@ import {
   ReceiptText,
   RotateCcw,
   Search,
+  ShoppingBag,
+  Store,
   TrendingUp,
   Wallet,
   X,
@@ -19,11 +22,11 @@ import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
 import { ErrorBanner, Pagination, cx } from '../../components/ui';
 import { formatMoney, todayManila } from '../../lib/format';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
-import type { Paginated, Sale } from '../../lib/types';
+import type { Paginated, Sale, SaleChannel } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
 
-type Filters = { date_from: string; date_to: string; status: string; receipt_number: string };
+type Filters = { date_from: string; date_to: string; status: string; receipt_number: string; channel: string };
 
 const addDays = (isoDate: string, days: number): string => {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -79,6 +82,13 @@ const STATUS: Record<string, { pill: string; dot: string; label: string }> = {
   voided: { pill: 'bg-slate-100 text-slate-500 ring-slate-500/15', dot: 'bg-slate-400', label: 'Voided' },
 };
 
+/** Where a sale came from. Sales loaded before this existed have no channel and count as counter sales. */
+const CHANNEL: Record<SaleChannel, { label: string; icon: LucideIcon; className: string }> = {
+  in_store: { label: 'In store', icon: Store, className: 'bg-slate-100 text-slate-600 ring-slate-500/15' },
+  pickup: { label: 'Pickup', icon: ShoppingBag, className: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
+  delivery: { label: 'Delivery', icon: Bike, className: 'bg-orange-50 text-orange-700 ring-orange-600/20' },
+};
+
 const DISCOUNT: Record<string, { label: string; className: string }> = {
   senior_citizen: { label: 'Senior', className: 'bg-sun-300/30 text-amber-800 ring-amber-500/25' },
   pwd: { label: 'PWD', className: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
@@ -86,11 +96,13 @@ const DISCOUNT: Record<string, { label: string; className: string }> = {
 
 /** Downloads the listed sales as a CSV file. */
 function exportCsv(rows: Sale[]) {
-  const header = ['Receipt', 'Business date', 'Time', 'Cashier', 'Discount', 'Status', 'Total', 'Refunded'];
+  const header = ['Receipt', 'Business date', 'Time', 'Type', 'Online order', 'Cashier', 'Discount', 'Status', 'Total', 'Refunded'];
   const lines = rows.map((s) => [
     s.receipt_number,
     s.business_date,
     timeOf(s.sold_at),
+    CHANNEL[s.channel ?? 'in_store'].label,
+    s.online_order?.order_number ?? '',
     s.cashier?.name ?? '',
     s.discount.type === 'none' ? '' : DISCOUNT[s.discount.type]?.label ?? s.discount.type,
     s.status === 'voided' ? 'Voided' : STATUS[s.payment_status]?.label ?? s.payment_status,
@@ -108,7 +120,7 @@ export function SalesPage() {
   const { can, tenantId, viewAll, scopeBranchId } = useTenant();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<Filters>({ date_from: '', date_to: '', status: '', receipt_number: '' });
+  const [filters, setFilters] = useState<Filters>({ date_from: '', date_to: '', status: '', receipt_number: '', channel: '' });
   const receipt = useDebounced(filters.receipt_number.trim());
   const list = useTenantQuery<Paginated<Sale>>('/sales', { ...filters, branch_id: scopeBranchId, receipt_number: receipt || undefined, page });
 
@@ -120,8 +132,8 @@ export function SalesPage() {
 
   const ranges = periods();
   const activePeriod = ranges.find((r) => r.from === filters.date_from && r.to === filters.date_to);
-  const filtered = filters.receipt_number !== '' || filters.date_from !== '' || filters.date_to !== '' || filters.status !== '';
-  const resetFilters = () => set({ date_from: '', date_to: '', status: '', receipt_number: '' });
+  const filtered = filters.receipt_number !== '' || filters.date_from !== '' || filters.date_to !== '' || filters.status !== '' || filters.channel !== '';
+  const resetFilters = () => set({ date_from: '', date_to: '', status: '', receipt_number: '', channel: '' });
 
   const rows = list.data?.data ?? [];
   const total = list.data?.meta?.total ?? list.data?.total ?? rows.length;
@@ -143,6 +155,7 @@ export function SalesPage() {
   const chips: { key: string; label: string; clear: () => void }[] = [];
   if (filters.receipt_number) chips.push({ key: 'receipt', label: `Receipt “${filters.receipt_number}”`, clear: () => set({ receipt_number: '' }) });
   if (filters.date_from || filters.date_to) chips.push({ key: 'period', label: periodLabel, clear: () => set({ date_from: '', date_to: '' }) });
+  if (filters.channel) chips.push({ key: 'channel', label: `${CHANNEL[filters.channel as SaleChannel].label} only`, clear: () => set({ channel: '' }) });
   if (filters.status) chips.push({ key: 'status', label: filters.status === 'voided' ? 'Voided only' : 'Completed only', clear: () => set({ status: '' }) });
 
   return (
@@ -213,6 +226,8 @@ export function SalesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+              <Pills label="Type" value={filters.channel} onChange={(channel) => set({ channel })}
+                options={[{ value: '', label: 'All' }, { value: 'in_store', label: 'In store' }, { value: 'pickup', label: 'Pickup' }, { value: 'delivery', label: 'Delivery' }]} />
               <Pills label="Status" value={filters.status} onChange={(status) => set({ status })}
                 options={[{ value: '', label: 'All' }, { value: 'completed', label: 'Completed' }, { value: 'voided', label: 'Voided' }]} />
             </div>
@@ -258,6 +273,7 @@ export function SalesPage() {
               <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur">
                 <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Receipt</th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold">Type</th>
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Time</th>
                   {viewAll && <th scope="col" className="px-3 py-3 text-left font-semibold">Branch</th>}
                   <th scope="col" className="px-3 py-3 text-left font-semibold">Cashier</th>
@@ -270,7 +286,7 @@ export function SalesPage() {
               {groupByDay(rows).map((day) => (
                 <tbody key={day.date} className="border-b border-slate-100 last:border-b-0">
                   <tr className="bg-gradient-to-r from-brand-50/70 via-slate-50/60 to-slate-50/30">
-                    <th scope="colgroup" colSpan={viewAll ? 5 : 4} className="py-2.5 pl-5 pr-3 text-left">
+                    <th scope="colgroup" colSpan={viewAll ? 6 : 5} className="py-2.5 pl-5 pr-3 text-left">
                       <span className="inline-flex items-center gap-2.5">
                         <span className="grid size-7 place-items-center rounded-lg bg-white text-brand-600 shadow-sm ring-1 ring-slate-900/5">
                           <CalendarDays className="size-3.5" />
@@ -291,6 +307,7 @@ export function SalesPage() {
                     const status = STATUS[isVoid ? 'voided' : sale.payment_status] ?? STATUS.paid;
                     const discount = DISCOUNT[sale.discount.type];
                     const cashier = sale.cashier?.name;
+                    const channel = CHANNEL[sale.channel ?? 'in_store'];
                     return (
                       <tr
                         key={sale.id}
@@ -309,6 +326,16 @@ export function SalesPage() {
                               {sale.receipt_number}
                             </span>
                           </span>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset', channel.className)}>
+                            <channel.icon className="size-3.5" /> {channel.label}
+                          </span>
+                          {sale.online_order && (
+                            <span className="mt-1 block truncate text-[11px] text-slate-500" title={sale.online_order.delivery_address ?? undefined}>
+                              {sale.online_order.order_number}{sale.online_order.rider_name ? ` · ${sale.online_order.rider_name}` : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-3.5 tabular-nums text-slate-500">{timeOf(sale.sold_at)}</td>
                         {viewAll && <td className="px-3 py-3.5"><BranchTag id={sale.branch_id} /></td>}

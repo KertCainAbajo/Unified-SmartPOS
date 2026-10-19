@@ -123,6 +123,7 @@ class StaffService
                 ]);
                 $membership->roles()->sync($roles->modelKeys());
                 $membership->branches()->sync($branchIds);
+                $this->ownersSeeEveryBranch($membership);
                 $profileFields = $this->saveProfile($membership, $data['profile'] ?? []);
 
                 $this->audit->log('staff.created', $membership, null, [
@@ -191,6 +192,7 @@ class StaffService
             ]);
             $membership->roles()->sync($roles->modelKeys());
             $membership->branches()->sync($branchIds);
+            $this->ownersSeeEveryBranch($membership);
             $this->audit->log('staff.existing_account_invited', $membership, null, [
                 'user_id' => $user->id, 'roles' => $roles->pluck('key')->all(), 'branch_ids' => $branchIds,
             ], tenantId: $tenantId);
@@ -265,6 +267,7 @@ class StaffService
         return DB::transaction(function () use ($target, $roles) {
             $old = $target->roles()->pluck('key')->all();
             $target->roles()->sync($roles->modelKeys());
+            $this->ownersSeeEveryBranch($target);
             $this->audit->log('staff.roles_changed', $target, ['roles' => $old], ['roles' => $roles->pluck('key')->all()], ['user_id' => $target->user_id]);
 
             return $target;
@@ -281,10 +284,25 @@ class StaffService
             $old = ['all_branches' => $target->all_branches, 'branch_ids' => $target->branchIds()];
             $target->forceFill(['all_branches' => $allBranches])->save();
             $target->branches()->sync($branchIds);
+            $this->ownersSeeEveryBranch($target);
             $this->audit->log('staff.branches_changed', $target, $old, ['all_branches' => $allBranches, 'branch_ids' => $branchIds], ['user_id' => $target->user_id]);
 
             return $target;
         });
+    }
+
+    /**
+     * A business owner always works across every branch (switching between them and restocking any of them), so an
+     * owner membership is never limited to a few branches, whatever was picked on the staff form.
+     */
+    private function ownersSeeEveryBranch(TenantMembership $membership): void
+    {
+        $isOwner = $membership->isOwnerMembership()
+            || $membership->roles()->whereNull('roles.tenant_id')->where('roles.key', Permissions::ROLE_OWNER)->exists();
+        if ($isOwner && ! $membership->all_branches) {
+            $membership->forceFill(['all_branches' => true])->save();
+            $membership->branches()->detach();
+        }
     }
 
     /* ======================================================================= Status lifecycle */
