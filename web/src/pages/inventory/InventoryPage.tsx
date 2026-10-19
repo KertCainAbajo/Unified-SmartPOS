@@ -135,7 +135,7 @@ function StockTab() {
         <EmptyState icon={Package} title={term ? 'No products match' : 'No stock records yet'} description={term ? 'Try another name or SKU.' : 'Record opening stock with Adjust stock to start tracking this branch.'} />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="sp-cards w-full text-sm">
             <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Product</Th>{viewAll && <Th>Branch</Th>}<Th right>On hand</Th><Th>Level</Th><Th right>Reorder at</Th><Th>Status</Th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((r) => {
@@ -212,7 +212,7 @@ function LowStockTab({ selectAll, onAutoOpened }: { selectAll: number; onAutoOpe
             {canRestock && !viewAll && <Button size="sm" icon={<PackagePlus className="size-4" />} onClick={() => setRestocking(rows)}>Restock all {rows.length}</Button>}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
                   {canRestock && (
@@ -304,7 +304,7 @@ function HistoryTab() {
         <EmptyState icon={History} title="No movements yet" description={type ? 'No movements of this type at this branch.' : 'Sales, receipts, transfers and adjustments will be listed here.'} />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="sp-cards w-full text-sm">
             <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400"><Th first>Movement</Th><Th>Product</Th><Th right>Change</Th><Th right>Balance</Th><Th right>Unit cost</Th><Th>By</Th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((m) => {
@@ -410,7 +410,7 @@ function CountsTab() {
             </div>
             {d.status === 'draft' && <p className="flex items-start gap-2 text-xs text-slate-500"><Info className="mt-0.5 size-3.5 shrink-0 text-brand-600" />Expected quantities are taken when you complete the count, so sales made meanwhile are accounted for.</p>}
             <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
-              <table className="w-full text-sm">
+              <table className="sp-cards w-full text-sm">
                 <thead><tr className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-4 py-2 text-left font-semibold">Product</th><th className="px-4 py-2 text-right font-semibold">Counted</th><th className="px-4 py-2 text-right font-semibold">Expected</th><th className="px-4 py-2 text-right font-semibold">Variance</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {(d.items ?? []).map((i) => {

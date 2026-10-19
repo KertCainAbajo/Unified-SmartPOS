@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { ErrorPage } from './pages/ErrorPage';
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from './auth/AuthProvider';
 import { Spinner } from './components/ui';
@@ -33,7 +34,7 @@ function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: k
   return async () => ({ Component: (await load())[name] as ComponentType });
 }
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter([{ errorElement: <ErrorPage />, children: [
   // Public careers pages: no sign-in needed (applicants have no SmartPOS account).
   { path: '/careers', element: <CareersIndexPage /> },
   { path: '/careers/:code', element: <CareersPage /> },
@@ -86,4 +87,4 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <NotFoundPage /> },
-]);
+]}]);

@@ -56,7 +56,7 @@ export function RefundsPage() {
         actions={<ScopeChip />}
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone={pendingCount ? 'warn' : 'default'} icon={Clock} label="Awaiting approval" value={pendingCount} hint={pendingCount ? 'Customers are waiting' : 'Nothing to review'} />
         <StatCard tone="brand" icon={CheckCircle2} label="Completed" value={totalOf(completed.data)} hint="Money returned" />
         <StatCard tone="rose" icon={XCircle} label="Rejected" value={totalOf(rejected.data)} hint="Declined requests" />

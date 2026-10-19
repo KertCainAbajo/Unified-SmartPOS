@@ -118,7 +118,7 @@ function ReportTable({ head, children, foot, loading, error, empty, emptyIcon = 
   if (empty) return <EmptyState icon={emptyIcon} title={empty} description="Try a wider period or another branch." />;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="sp-cards w-full text-sm">
         <thead><tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">{head}</tr></thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
         {foot && <tfoot><tr className="border-t-2 border-slate-200 bg-brand-50/50 font-semibold text-slate-900">{foot}</tr></tfoot>}
@@ -235,7 +235,7 @@ function SalesReport({ filters }: { filters: Filters }) {
   return (
     <div className="space-y-6">
       <ErrorBanner error={report.error} />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone="brand" icon={TrendingUp} label="Net sales" value={ready ? formatMoney(sum('net_sales')) : null} hint={`${txns} transactions${txns ? ` · avg ${formatMoney((net / txns).toFixed(2))}` : ''}`} />
         <StatCard tone={refunds > 0 ? 'rose' : 'default'} icon={RotateCcw} label="Refunds" value={ready ? formatMoney(sum('refunds')) : null} hint={discounts.data ? `${discounts.data.data.refunds.pending_count} pending approval` : `${pct(refunds, net).toFixed(1)}% of net`} />
         <StatCard tone="featured" icon={Wallet} label="Net after refunds" value={ready ? formatMoney(sum('net_after_refunds')) : null} hint={`${rows.length} ${groupBy === 'day' ? 'days' : 'months'} with sales`} />
@@ -507,7 +507,7 @@ function ProfitReport({ filters }: { filters: Filters }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone="brand" icon={TrendingUp} label="Net revenue" value={formatMoney(p.net_revenue)} hint="Excluding VAT, after refunds" />
         <StatCard tone="sky" icon={Boxes} label="Gross profit" value={formatMoney(p.gross_profit)} hint={margin === null ? 'Margin unavailable' : `${margin.toFixed(1)}% gross margin`} />
         <StatCard tone="rose" icon={Wallet} label="Operating expenses" value={formatMoney(p.operating_expenses)} hint={`${expRows.length} categories`} />

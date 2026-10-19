@@ -116,7 +116,7 @@ function StoreDashboard() {
 
       {/* Key numbers */}
       {(canReports || can('inventory.view')) && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {canReports && (
             <>
               <Kpi icon={<Wallet />} tone="green" label="Today's net sales" value={formatMoney(t?.net_after_refunds ?? '0.00')} hint={`${t?.transactions ?? 0} transactions`} loading={todaySummary.isPending} />
@@ -340,7 +340,7 @@ function BestSellers({ rows, loading }: { rows?: Seller[]; loading: boolean }) {
         ))}
       </div>
 
-      <table className="mt-3 w-full text-sm">
+      <table className="sp-cards mt-3 w-full text-sm">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-slate-400">
             <th className="py-2 pl-5 text-left font-medium">#</th>

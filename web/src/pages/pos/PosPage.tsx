@@ -160,7 +160,7 @@ function Terminal({ session, branchName, onShiftClosed, onlineOrderId, borrowedF
     <div className="flex flex-col gap-4 lg:h-[calc(100vh-7.5rem)] lg:flex-row">
       <h1 className="sr-only">Point of Sale · {branchName}</h1>
       {/* Products */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 px-4 py-3 text-white shadow-md shadow-brand-900/20">
           <span aria-hidden className="pointer-events-none absolute -right-10 -top-16 size-40 rounded-full bg-sun-400/20 blur-2xl" />
           <span className="relative inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
@@ -183,7 +183,7 @@ function Terminal({ session, branchName, onShiftClosed, onlineOrderId, borrowedF
       </div>
 
       {/* Cart */}
-      <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 lg:w-[440px]">
+      <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 lg:w-[340px] lg:shrink-0 xl:w-[400px] 2xl:w-[440px]">
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
           <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><ShoppingCart className="size-4" /></span>
           <div className="flex-1">

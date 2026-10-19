@@ -119,7 +119,7 @@ export function ExpensesPage() {
         }
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone="featured" icon={Wallet} label="Total spent" value={ready ? formatMoney(spent.toFixed(2)) : null} hint={scope} />
         <StatCard tone="brand" icon={ReceiptText} label="Entries" value={ready ? total : null} hint={rows.length ? `Avg ${formatMoney((spent / rows.length).toFixed(2))} each` : 'Nothing recorded'} />
         <StatCard tone="sun" icon={PieChart} label="Top category" value={ready ? byCategory[0]?.[0] ?? '—' : null} hint={byCategory[0] ? `${formatMoney(byCategory[0][1].toFixed(2))} · ${((byCategory[0][1] / spent) * 100).toFixed(0)}% of spend` : 'No spending yet'} />
@@ -144,7 +144,7 @@ export function ExpensesPage() {
               action={can('expenses.manage') && <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>Record expense</Button>} />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="sp-cards w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
                     <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Expense</th>

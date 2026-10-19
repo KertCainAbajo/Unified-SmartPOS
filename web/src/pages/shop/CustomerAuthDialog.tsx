@@ -110,26 +110,50 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
           </aside>
 
           {/* ───── Form side ───── */}
-          <div className="relative flex flex-col px-6 pb-8 pt-6 sm:px-10 sm:pb-10 sm:pt-9 lg:px-12">
+          <div className="relative flex min-h-full flex-col lg:px-12 lg:pb-10 lg:pt-9">
             <button
               type="button"
               onClick={onClose}
               disabled={busy}
               aria-label="Close sign in"
-              className="absolute right-4 top-4 z-10 grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 sm:right-5 sm:top-5"
+              className="absolute right-4 top-4 z-20 grid size-10 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/25 backdrop-blur transition hover:bg-white/25 disabled:opacity-40 sm:right-5 sm:top-5 lg:bg-slate-100 lg:text-slate-500 lg:ring-0 lg:hover:bg-slate-200 lg:hover:text-slate-800"
             >
               <X className="size-5" />
             </button>
 
-            {/* Compact brand strip on small screens */}
-            <div className="mb-6 flex items-center gap-3 pr-12 lg:hidden">
-              <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100" />
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Online pickup</p>
-                <p className="truncate font-display text-base font-bold text-slate-900">{storeName}</p>
+            {/* Phones and small tablets: a branded header with real product photos, the form slides up over it. */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-800 to-[#062a1d] px-6 pb-14 pt-6 text-white sm:px-10 lg:hidden">
+              <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-amber-300/25 blur-3xl" />
+              <span aria-hidden className="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full bg-emerald-300/20 blur-3xl" />
+              <div className="relative flex items-center gap-3 pr-12">
+                <img src="/brand/minimart-logo.svg" alt="" className="size-12 rounded-2xl bg-[#fffbea] object-contain p-1 shadow-lg ring-2 ring-white/20" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Pickup &amp; delivery</p>
+                  <p className="truncate font-display text-base font-bold">{storeName}</p>
+                </div>
               </div>
+              <p className="relative mt-5 font-display text-[26px] font-extrabold leading-[1.1] tracking-tight">
+                Order ahead.<br /><span className="text-amber-300">Skip the wait.</span>
+              </p>
+              {basketPhotos.length > 0 && (
+                <div className="relative mt-5 flex items-end gap-2.5" aria-hidden>
+                  {basketPhotos.slice(0, basketCount > 0 ? 3 : 4).map((p, i) => (
+                    <span key={p.name} className="grid size-[3.75rem] shrink-0 place-items-center overflow-hidden rounded-2xl bg-white p-1.5 shadow-lg shadow-black/20 transition" style={{ transform: `rotate(${[-6, 3, -2, 5][i]}deg) translateY(${[0, -6, 2, -4][i]}px)` }}>
+                      {p.image_url ? <img src={p.image_url} alt="" className="size-full object-contain" /> : <ShoppingBasket className="size-6 text-emerald-700" />}
+                    </span>
+                  ))}
+                  {basketCount > 0 && (
+                    <span className="ml-auto shrink-0 whitespace-nowrap rounded-2xl bg-white/12 px-3 py-2 text-right ring-1 ring-white/20 backdrop-blur">
+                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-100">Basket saved</span>
+                      <span className="block font-display text-sm font-bold">{basketTotal}</span><span className="block text-[10px] text-emerald-100">{basketCount} {basketCount === 1 ? 'item' : 'items'}</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
+            <div className="relative z-10 -mt-8 flex flex-1 flex-col rounded-t-[28px] bg-white px-6 pb-8 pt-7 shadow-[0_-12px_30px_-18px_rgba(2,44,34,0.5)] sm:px-10 sm:pb-10 lg:mt-0 lg:rounded-none lg:p-0 lg:shadow-none">
+            <span aria-hidden className="mx-auto -mt-3 mb-4 block h-1.5 w-10 rounded-full bg-slate-200 lg:hidden" />
             <div className="my-auto w-full max-w-[410px] self-center lg:self-auto">
               {verifying ? (
                 <EmailVerification apiBase={apiBase} email={verifying.email} remember={verifying.remember} initialResendIn={verifying.resendIn}
@@ -291,6 +315,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               </>}
             </div>
           </div>
+            </div>
         </div>
       </div>
     </div>

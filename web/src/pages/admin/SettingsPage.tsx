@@ -288,7 +288,7 @@ function BusinessSettings({ section }: { section: Tab }) {
       )}
 
       {/* Sticky save bar */}
-      <div className={cx('fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-xl items-center gap-3 rounded-2xl bg-brand-900 px-4 py-3 text-white shadow-2xl shadow-brand-900/30 ring-1 ring-white/10 transition duration-300 lg:pl-4', dirty ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0')}>
+      <div className={cx('fixed inset-x-4 bottom-24 z-40 md:bottom-4 mx-auto flex max-w-xl items-center gap-3 rounded-2xl bg-brand-900 px-4 py-3 text-white shadow-2xl shadow-brand-900/30 ring-1 ring-white/10 transition duration-300 lg:pl-4', dirty ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0')}>
         <span className="size-2 animate-pulse rounded-full bg-sun-400" />
         <span className="flex-1 text-sm">You have unsaved changes</span>
         <button type="button" onClick={() => setForm({ ...tenant })} className="rounded-lg px-3 py-1.5 text-sm text-brand-100 transition hover:bg-white/10">Discard</button>

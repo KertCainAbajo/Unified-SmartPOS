@@ -101,6 +101,11 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
       (response.status === 0 ? 'Network error' : `Request failed (${response.status})`);
     throw new ApiError(response.status, message, data?.code, data?.errors ?? {});
   }
+  // A "successful" answer that is not data (an HTML error page, or the server still starting) is treated as a
+  // temporary failure, so screens show their "try again" message instead of crashing on missing data.
+  if (data === null) {
+    throw new ApiError(503, 'The store server did not answer properly. Please try again in a moment.', 'BAD_RESPONSE');
+  }
 
   return data as T;
 }

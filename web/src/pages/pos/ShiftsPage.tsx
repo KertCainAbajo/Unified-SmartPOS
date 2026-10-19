@@ -58,7 +58,7 @@ export function ShiftsPage() {
         actions={<ScopeChip />}
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone="brand" icon={TimerReset} label="Open now" value={totalOf(openNow.data)} hint="Drawers currently in use" />
         <StatCard tone="featured" icon={Banknote} label="Cash sales" value={list.data ? formatMoney(cash.toFixed(2)) : null} hint={`${rows.length} shifts listed`} />
         <StatCard tone="sky" icon={Scale} label="Balanced closes" value={list.data ? `${balanced}/${closed.length}` : null} hint={closed.length ? `${Math.round((balanced / closed.length) * 100)}% counted exactly` : 'No closed shifts listed'} />
@@ -74,7 +74,7 @@ export function ShiftsPage() {
           <EmptyState icon={Clock} title="No shifts yet" description="A shift starts when a cashier opens a register on the Point of Sale." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Shift</th>

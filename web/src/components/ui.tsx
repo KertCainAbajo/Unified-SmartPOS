@@ -185,30 +185,30 @@ const statTints = {
 export function StatCard({ label, value, hint, tone = 'default', icon: Icon }: { label: string; value: ReactNode | null; hint?: ReactNode; tone?: keyof typeof statTints | 'featured'; icon?: LucideIcon }) {
   if (tone === 'featured') {
     return (
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-5 text-white shadow-md shadow-brand-900/20">
+      <div className="relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-3.5 text-white shadow-md shadow-brand-900/20 sm:p-5">
         <span aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full bg-sun-400/20 blur-xl" />
         <span aria-hidden className="pointer-events-none absolute -bottom-12 -left-6 size-28 rounded-full bg-white/5" />
         <div className="relative flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-100">{label}</p>
-          {Icon && <span className="grid size-9 place-items-center rounded-xl bg-white/15 text-sun-300"><Icon className="size-4" /></span>}
+          <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-brand-100 sm:text-[11px]">{label}</p>
+          {Icon && <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-white/15 text-sun-300 sm:size-9"><Icon className="size-4" /></span>}
         </div>
-        {value === null ? <span className="relative mt-3 block h-8 w-32 animate-pulse rounded-lg bg-white/15" /> : <p className="relative mt-2 truncate font-display text-[1.65rem] font-bold leading-tight tabular-nums">{value}</p>}
+        {value === null ? <span className="relative mt-3 block h-8 w-32 animate-pulse rounded-lg bg-white/15" /> : <p className="relative mt-1.5 truncate font-display text-xl font-bold leading-tight tabular-nums sm:mt-2 sm:text-[1.65rem]">{value}</p>}
         {hint && <p className="relative mt-1 truncate text-xs text-brand-100/80">{hint}</p>}
       </div>
     );
   }
   return (
-    <div className={cx('rounded-2xl bg-white p-5 shadow-sm ring-1 transition hover:shadow-md', tone === 'warn' ? 'ring-amber-200' : 'ring-slate-900/5')}>
+    <div className={cx('min-w-0 rounded-2xl bg-white p-3.5 shadow-sm ring-1 transition hover:shadow-md sm:p-5', tone === 'warn' ? 'ring-amber-200' : 'ring-slate-900/5')}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-        {Icon && <span className={cx('grid size-9 place-items-center rounded-xl', statTints[tone])}><Icon className="size-4" /></span>}
+        <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">{label}</p>
+        {Icon && <span className={cx('grid size-8 shrink-0 place-items-center rounded-xl sm:size-9', statTints[tone])}><Icon className="size-4" /></span>}
       </div>
       {value === null ? (
         <span className="mt-3 block h-8 w-28 animate-pulse rounded-lg bg-slate-100" />
       ) : (
-        <p className={cx('mt-2 truncate font-display text-[1.65rem] font-bold leading-tight tabular-nums', tone === 'rose' ? 'text-rose-600' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900')}>{value}</p>
+        <p className={cx('mt-1.5 truncate font-display text-xl font-bold leading-tight tabular-nums sm:mt-2 sm:text-[1.65rem]', tone === 'rose' ? 'text-rose-600' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900')}>{value}</p>
       )}
-      {hint && <p className="mt-1 truncate text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-1 truncate text-[11px] text-slate-400 sm:text-xs">{hint}</p>}
     </div>
   );
 }
@@ -526,7 +526,7 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+      <table className="sp-cards w-full text-left text-sm">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
             {columns.map((c, i) => (

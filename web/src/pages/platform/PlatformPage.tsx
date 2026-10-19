@@ -139,7 +139,7 @@ function OverviewTab({ onOpen, onBusinesses }: { onOpen: (id: number) => void; o
         <p className="mt-1 text-sm text-slate-500">How the platform is doing. Business data such as sales and customers stays private to each business.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat featured icon={Building2} label="Businesses" value={o.businesses.total} hint={`${o.businesses.new_this_month} new this month`} />
         <Stat icon={CircleCheck} tone="green" label="Active" value={o.businesses.active} hint={`${o.businesses.online_shops} with an online shop`} />
         <Stat icon={CirclePause} tone="amber" label="Suspended" value={o.businesses.suspended} hint={o.businesses.suspended ? 'Cannot sign in' : 'None suspended'} />
@@ -426,7 +426,7 @@ function AccountsTab() {
             <p className="p-10 text-center text-sm text-slate-500">No accounts match.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[52rem] text-sm">
+              <table className="sp-cards w-full min-w-[52rem] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                     <th className="py-3 pl-4 pr-3">Account</th>

@@ -185,7 +185,7 @@ export function SalesPage() {
       </header>
 
       {/* Totals for what is listed below */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi Icon={Hash} label="Transactions" value={list.data ? String(total) : null} note={voided > 0 ? `${voided} voided excluded` : scope} tint="slate" />
         <Kpi Icon={TrendingUp} label="Gross sales" value={list.data ? formatMoney(gross.toFixed(2)) : null} note={counted.length ? `Avg ${formatMoney((gross / counted.length).toFixed(2))} per sale` : 'No sales yet'} tint="brand" />
         <Kpi Icon={RotateCcw} label="Refunds" value={list.data ? `−${formatMoney(refunds.toFixed(2))}` : null} note={refunds > 0 ? `${refundShare.toFixed(1)}% of gross` : 'Nothing returned'} tint={refunds > 0 ? 'rose' : 'slate'} />
@@ -269,7 +269,7 @@ export function SalesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur">
                 <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Receipt</th>

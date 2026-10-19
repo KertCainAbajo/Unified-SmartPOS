@@ -173,3 +173,41 @@ dialog[open]::backdrop { animation: sp-fade-in 0.2s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .smartpos-pin--rider::after { animation: none; }
 }
+
+/*
+ * Phones: list tables (class "sp-cards") show one card per row, each value labelled with its column name
+ * (labels come from lib/tableCards.ts). Tablets and computers keep the normal table.
+ */
+@media (max-width: 639.98px) {
+  table.sp-cards { display: block; width: 100%; min-width: 0 !important; }
+  table.sp-cards > thead { display: none; }
+  table.sp-cards > tbody { display: block; padding: 4px 10px 10px; border: 0 !important; }
+  table.sp-cards > tbody > tr {
+    display: block; margin: 10px 0 0; padding: 12px 14px; border-radius: 16px; background: #fff;
+    border: 1px solid rgb(226 232 240) !important; box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  }
+  table.sp-cards > tbody > tr > td, table.sp-cards > tbody > tr > th {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 5px 0 !important; border: 0 !important; text-align: right; width: auto !important; max-width: none !important;
+    white-space: normal;
+  }
+  table.sp-cards > tbody > tr > td::before, table.sp-cards > tbody > tr > th::before {
+    content: attr(data-label); flex-shrink: 0; max-width: 45%; text-align: left;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(148 163 184);
+  }
+  table.sp-cards > tbody > tr > td[data-label='']::before, table.sp-cards > tbody > tr > th[data-label='']::before { display: none; }
+  table.sp-cards > tbody > tr > td[data-label=''] { justify-content: flex-end; }
+  /* The first cell names the row (product, receipt, person): a full-width title. */
+  table.sp-cards > tbody > tr > :first-child {
+    justify-content: flex-start; text-align: left; padding-bottom: 9px !important; margin-bottom: 4px;
+    border-bottom: 1px dashed rgb(226 232 240) !important;
+  }
+  table.sp-cards > tbody > tr > :first-child::before { display: none; }
+  /* Rows that are only a group heading (one cell across all columns) stay plain headings. */
+  table.sp-cards > tbody > tr:has(> [colspan]:only-child) {
+    margin: 16px 0 0; padding: 0 4px; background: transparent; border: 0 !important; box-shadow: none;
+  }
+  table.sp-cards > tbody > tr:has(> [colspan]:only-child) > * { border: 0 !important; padding: 6px 0 !important; margin: 0; }
+  /* Tables inside scrolling boxes no longer need to scroll sideways. */
+  .overflow-x-auto:has(> table.sp-cards) { overflow-x: visible; }
+}

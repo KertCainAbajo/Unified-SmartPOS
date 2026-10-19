@@ -90,7 +90,7 @@ export function CustomersPage() {
       </header>
 
       {/* Summary */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat Icon={Users} label="Customers" value={list.data ? String(total) : null} note={searching ? 'Matching your search' : 'Saved in your store'} tint="brand" />
         <Stat Icon={UserCheck} label="Active" value={list.data ? String(active) : null} note={pageNote} tint="emerald" />
         <Stat Icon={UserMinus} label="Inactive" value={list.data ? String(rows.length - active) : null} note={pageNote} tint="slate" />
@@ -137,7 +137,7 @@ export function CustomersPage() {
           )
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead className="bg-slate-50/70">
                 <tr className="text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Customer</th>

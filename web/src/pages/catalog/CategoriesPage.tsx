@@ -51,7 +51,7 @@ export function CategoriesPage() {
         }
       />
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard tone="featured" icon={FolderTree} label="Categories" value={ready ? all.length : null} hint={`${active} active · ${all.length - active} inactive`} />
         <StatCard tone="brand" icon={Package} label="Products filed" value={ready ? products : null} hint={all.length ? `Avg ${(products / all.length).toFixed(1)} per category` : 'No categories yet'} />
         <StatCard tone="sun" icon={Layers} label="Largest" value={ready ? largest?.name ?? '—' : null} hint={largest ? `${largest.products_count} products` : 'Nothing filed yet'} />
@@ -80,7 +80,7 @@ export function CategoriesPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Category</th>

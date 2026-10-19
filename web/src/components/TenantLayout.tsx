@@ -251,6 +251,10 @@ function Shell() {
     navigate('/login');
   };
   const href = (to: string) => (to === '' ? `/t/${tenantId}` : `/t/${tenantId}/${to}`);
+  // Phone bottom bar: the four most useful places this person can open, then "Menu" for everything else.
+  const BOTTOM_ORDER = ['', 'deliveries', 'pos', 'online-orders', 'products', 'inventory', 'sales', 'recruitment', 'team', 'reports'];
+  const flat = allowed.flatMap((s) => s.items);
+  const bottom = BOTTOM_ORDER.map((to) => flat.find((i) => i.to === to)).filter((i): i is NavItem => !!i).slice(0, 4);
 
   const sidebar = (mini: boolean) => (
     <nav className="relative flex h-full flex-col bg-gradient-to-b from-brand-800 via-brand-900 to-[#0b2619] text-white" aria-label="Main">
@@ -508,11 +512,42 @@ function Shell() {
         </header>
 
         <main className="flex-1">
-          <div key={location.pathname} className="auth-fade mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8 2xl:px-10">
+          {/* Extra room at the bottom on phones so the bottom bar never covers the last row. */}
+          <div key={location.pathname} className="auth-fade mx-auto w-full max-w-[1920px] px-3 pb-28 pt-5 sm:px-6 sm:py-6 lg:px-8 lg:pb-6 2xl:px-10">
             <Outlet key={scopeKey} />
           </div>
         </main>
       </div>
+
+      {/* Phone bottom bar (hidden on tablets and computers, which have the side menu). */}
+      <nav aria-label="Quick menu" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.18)] backdrop-blur-md md:hidden print:hidden">
+        <ul className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${bottom.length + 1}, minmax(0, 1fr))` }}>
+          {bottom.map((item) => {
+            const active = segment === item.to;
+            const count = item.badge ? badges[item.badge] : 0;
+            return (
+              <li key={item.to}>
+                <Link to={href(item.to)} aria-current={active ? 'page' : undefined}
+                  className={cx('relative flex flex-col items-center gap-1 px-1 pb-2 pt-2.5 text-[10.5px] font-semibold transition', active ? 'text-brand-800' : 'text-slate-500')}>
+                  {active && <span aria-hidden className="absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-brand-600" />}
+                  <span className={cx('relative grid h-8 w-12 place-items-center rounded-2xl transition', active ? 'bg-brand-100 text-brand-800' : '')}>
+                    <item.icon className="size-5" />
+                    {count > 0 && item.badge !== 'shift' && <span className={cx('absolute -right-0.5 -top-1 grid min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-white', item.badge === 'onlineOrders' ? 'bg-rose-500' : 'bg-amber-500')}>{count > 9 ? '9+' : count}</span>}
+                    {item.badge === 'shift' && count > 0 && <span className="absolute right-1 top-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />}
+                  </span>
+                  <span className="max-w-full truncate">{item.to === '' ? 'Home' : item.label.replace('Point of Sale', 'POS').replace('Online orders', 'Orders').replace('My deliveries', 'Deliveries')}</span>
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button type="button" onClick={() => setMobileOpen(true)} className="relative flex w-full flex-col items-center gap-1 px-1 pb-2 pt-2.5 text-[10.5px] font-semibold text-slate-500">
+              <span className="grid h-8 w-12 place-items-center rounded-2xl"><Menu className="size-5" /></span>
+              Menu
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       <NotificationsPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </div>

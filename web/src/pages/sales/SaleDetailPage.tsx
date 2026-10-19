@@ -229,7 +229,7 @@ function RefundModal({ sale, items, open, onClose }: { sale: Sale; items: SaleIt
         <p className="text-sm text-slate-600">Amounts are calculated by the server from the original sale. Large or late refunds need manager approval.</p>
         <ErrorBanner error={refund.error && fieldErrors.length === 0 ? refund.error : null} />
         {fieldErrors.map((e) => <p key={e} className="text-sm text-red-600">{e}</p>)}
-        <table className="w-full text-sm">
+        <table className="sp-cards w-full text-sm">
           <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th className="py-1 text-right">Refundable</th><th className="py-1 text-right">Refund qty</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {lines.map((l) => (

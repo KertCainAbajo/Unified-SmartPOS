@@ -179,7 +179,7 @@ function TransferDetail({ id, onClose, nameOf }: { id: number | null; onClose: (
           </div>
           {t.notes && <p className="rounded-xl bg-cream/60 px-3 py-2 text-sm text-slate-700 ring-1 ring-sun-300/40">“{t.notes}”</p>}
           <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead><tr className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-4 py-2 text-left font-semibold">Product</th><th className="px-4 py-2 text-right font-semibold">Sent</th><th className="px-4 py-2 text-left font-semibold">Received</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {(t.items ?? []).map((i) => {

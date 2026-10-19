@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Aling Nena Shop</title>
+  <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b3b2c}img{width:140px;border-radius:28px;background:#fffbea;padding:12px}</style>
+</head>
+<body>
+  <!-- Normally never shown: the app opens the shop server directly (capacitor.config.ts → server.url). -->
+  <img src="logo.png" alt="Aling Nena Mini Mart" />
+  <script src="shop-url.js"></script>
+  <script>if (window.SHOP_URL) window.location.replace(window.SHOP_URL);</script>
+</body>
+</html>

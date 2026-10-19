@@ -164,7 +164,7 @@ function OrderDetail({ id, onClose }: { id: number | null; onClose: () => void }
           <div className="space-y-5">
             <OrderStepper status={o.status} />
             <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
-              <table className="w-full text-sm">
+              <table className="sp-cards w-full text-sm">
                 <thead><tr className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-4 py-2 text-left font-semibold">Product</th><th className="px-4 py-2 text-left font-semibold">Received</th><th className="px-4 py-2 text-right font-semibold">Unit cost</th><th className="px-4 py-2 text-right font-semibold">Line total</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {(o.items ?? []).map((i) => {

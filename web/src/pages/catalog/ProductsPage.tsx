@@ -139,7 +139,7 @@ export function ProductsPage() {
       </header>
 
       {/* Summary */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat Icon={Package} label="Products" value={list.data ? String(total) : null} note={filtered ? 'Matching your filters' : 'Active in the catalog'} tint="brand" />
         <Stat Icon={AlertTriangle} label="Low stock" value={list.data ? String(low) : null} note={low ? `At or below reorder level · ${pageNote.toLowerCase()}` : pageNote} tint={low ? 'amber' : 'slate'} />
         <Stat Icon={PackageX} label="Out of stock" value={list.data ? String(out) : null} note={out ? 'Restock soon' : pageNote} tint={out ? 'rose' : 'slate'} />
@@ -209,7 +209,7 @@ export function ProductsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="sp-cards w-full text-sm">
               <thead className="bg-slate-50/70">
                 <tr className="text-[11px] uppercase tracking-wider text-slate-400">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left font-semibold">Product</th>

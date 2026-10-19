@@ -3,8 +3,9 @@ import {
   Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
   MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { DeliveryMap, toLatLng } from '../../components/maps';
@@ -40,6 +41,12 @@ const tones = [
   { bg: 'bg-gradient-to-br from-violet-100 via-violet-50 to-white', fg: 'text-violet-700', label: 'text-violet-700' },
   { bg: 'bg-gradient-to-br from-orange-100 via-orange-50 to-white', fg: 'text-orange-700', label: 'text-orange-700' },
   { bg: 'bg-gradient-to-br from-lime-100 via-lime-50 to-white', fg: 'text-lime-700', label: 'text-lime-700' },
+];
+/** Category colours (soft tile + strong icon), assigned in catalogue order. */
+const CAT_COLORS = [
+  { bg: 'bg-sky-100', fg: 'text-sky-700' }, { bg: 'bg-amber-100', fg: 'text-amber-700' }, { bg: 'bg-orange-100', fg: 'text-orange-700' },
+  { bg: 'bg-rose-100', fg: 'text-rose-600' }, { bg: 'bg-lime-100', fg: 'text-lime-700' }, { bg: 'bg-violet-100', fg: 'text-violet-700' },
+  { bg: 'bg-teal-100', fg: 'text-teal-700' }, { bg: 'bg-fuchsia-100', fg: 'text-fuchsia-700' },
 ];
 const iconRules: [RegExp, LucideIcon][] = [
   [/bever|drink|juice|soda|water|coffee/i, CupSoda], [/snack|chip|biscuit|candy|sweet/i, Cookie], [/rice|grain|flour|bread/i, Wheat],
@@ -174,7 +181,7 @@ export function ShopPage() {
   const cleanBusiness = business.trim().toLowerCase().replace(/[^a-z0-9]+$/, '');
   if (cleanBusiness && cleanBusiness !== business) return <Navigate to={`/shop/${cleanBusiness}`} replace />;
   if (catalog.isPending) return <ShopLoading />;
-  if (catalog.isError) return <ShopDirectory missing={catalog.error instanceof ApiError && catalog.error.status === 404 ? business : undefined} error={catalog.error} onRetry={() => catalog.refetch()} />;
+  if (catalog.isError || !catalog.data) return <ShopDirectory missing={catalog.error instanceof ApiError && catalog.error.status === 404 ? business : undefined} error={catalog.error} onRetry={() => catalog.refetch()} />;
 
   const shop = catalog.data;
   const categories = [ALL, ...new Set(shop.data.map((product) => product.category).filter((value): value is string => !!value))];
@@ -250,22 +257,25 @@ export function ShopPage() {
         </div>
       </div>
 
-      {/* Category rail */}
-      <nav aria-label="Categories" className="border-t border-slate-100">
-        <div className="mx-auto flex max-w-[1920px] gap-1.5 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 lg:px-8">
-          {categories.map((category) => {
-            const Icon = category === ALL ? LayoutGrid : iconFor(category);
-            const active = selectedCategory === category;
-            return <button key={category} onClick={() => setSelectedCategory(category)} aria-pressed={active} className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold transition ${active ? 'bg-emerald-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
-              <Icon size={15} className={active ? 'text-amber-300' : 'text-slate-400'} />
-              {category}
-              <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{countFor(category)}</span>
-            </button>;
-          })}
-          {(savedCount > 0 || selectedCategory === SAVED) && <button onClick={() => setSelectedCategory(SAVED)} aria-pressed={selectedCategory === SAVED} className={`ml-auto inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold transition ${selectedCategory === SAVED ? 'bg-rose-500 text-white shadow-sm' : 'text-rose-600 hover:bg-rose-50'}`}>
-            <Heart size={15} className={selectedCategory === SAVED ? 'fill-white' : 'fill-rose-500 text-rose-500'} /> Saved
-            <span className={`rounded-full px-1.5 text-[10px] font-bold ${selectedCategory === SAVED ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-600'}`}>{savedCount}</span>
-          </button>}
+      {/* Categories: one row of pills; on smaller screens it slides sideways (fades and arrows show there are more). */}
+      <nav aria-label="Categories" className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50/60">
+        <div className="mx-auto max-w-[1920px] py-2.5 lg:px-8">
+          <CategoryRail>
+            {categories.map((category, i) => {
+              const Icon = category === ALL ? LayoutGrid : iconFor(category);
+              const color = category === ALL ? null : CAT_COLORS[(i - 1) % CAT_COLORS.length];
+              const active = selectedCategory === category;
+              return <button key={category} onClick={() => setSelectedCategory(category)} aria-pressed={active} className={`group inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold transition duration-200 ${active ? 'bg-emerald-900 text-white shadow-md shadow-emerald-900/20' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:-translate-y-px hover:shadow-sm hover:ring-slate-300'}`}>
+                <span className={`grid size-7 place-items-center rounded-full ${active ? 'bg-white/15 text-amber-300' : color ? `${color.bg} ${color.fg}` : 'bg-emerald-900 text-amber-300'}`}><Icon size={15} /></span>
+                {category}
+                <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{countFor(category)}</span>
+              </button>;
+            })}
+            {(savedCount > 0 || selectedCategory === SAVED) && <button onClick={() => setSelectedCategory(SAVED)} aria-pressed={selectedCategory === SAVED} className={`inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 lg:ml-auto text-[13px] font-semibold transition ${selectedCategory === SAVED ? 'bg-rose-500 text-white shadow-md' : 'bg-white text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50'}`}>
+              <span className={`grid size-7 place-items-center rounded-full ${selectedCategory === SAVED ? 'bg-white/20' : 'bg-rose-100'}`}><Heart size={14} className="fill-current" /></span> Saved
+              <span className={`rounded-full px-1.5 text-[10px] font-bold ${selectedCategory === SAVED ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-600'}`}>{savedCount}</span>
+            </button>}
+          </CategoryRail>
         </div>
       </nav>
     </header>
@@ -274,7 +284,7 @@ export function ShopPage() {
       <ShopHero photos={shop.data} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main className="mt-8 grid gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <main className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <section id="products" className="min-w-0 scroll-mt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -283,7 +293,7 @@ export function ShopPage() {
               <p className="mt-1 text-sm text-slate-500">{visibleProducts.length} of {shop.data.length} items{term && <> matching “<span className="font-semibold text-slate-700">{search.trim()}</span>”</>}</p>
             </div>
             <div className="flex gap-2">
-              <label className="relative flex-1 md:hidden">
+              <label className="relative min-w-0 flex-1 md:hidden">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products" aria-label="Search products" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
               </label>
@@ -311,7 +321,7 @@ export function ShopPage() {
         </section>
 
         {/* ───────── Basket ───────── */}
-        <aside className="space-y-5 lg:self-start">
+        <aside className="min-w-0 space-y-5 lg:self-start">
           <section id="basket" className="scroll-mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
@@ -528,6 +538,47 @@ function productStock(product: ShopProduct, selectedBranch: number | '', branche
   const place = branch ? `${branch.name}: ` : '';
   const suffix = branch ? ' in stock' : ' available across branches';
   return { label: `${place}${amount}${suffix}`, level: quantity <= 0 ? 'none' : quantity <= lowAt ? 'low' : 'available' };
+}
+
+/**
+ * One sliding row of category pills. Edge fades and arrow buttons appear only while there is more to see in that
+ * direction, so customers know to swipe; on wide screens everything fits and they disappear.
+ */
+function CategoryRail({ children }: { children: ReactNode }) {
+  const rail = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const update = useCallback(() => {
+    const el = rail.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [update]);
+  const slide = (dir: 1 | -1) => rail.current?.scrollBy({ left: dir * rail.current.clientWidth * 0.7, behavior: 'smooth' });
+
+  return (
+    <div className="relative">
+      <div ref={rail} onScroll={update} className="flex snap-x scroll-px-4 items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:px-6 lg:px-0 [&::-webkit-scrollbar]:hidden">
+        {children}
+        <span aria-hidden className="w-1 shrink-0" />
+      </div>
+      {edges.left && (
+        <>
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-white to-transparent" />
+          <button type="button" onClick={() => slide(-1)} aria-label="Previous categories" className="absolute left-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-white text-slate-600 shadow-md ring-1 ring-slate-200"><ChevronLeft size={16} /></button>
+        </>
+      )}
+      {edges.right && (
+        <>
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent" />
+          <button type="button" onClick={() => slide(1)} aria-label="More categories" className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-white text-emerald-700 shadow-md ring-1 ring-slate-200"><ChevronRight size={16} /></button>
+        </>
+      )}
+    </div>
+  );
 }
 
 function ProductCard({ product, stock, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; stock: ProductStock; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {

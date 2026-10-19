@@ -11,6 +11,8 @@ import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/Confirm';
 import { router } from './router';
+import { isShopApp, shopAppPath } from './lib/shopApp';
+import { installTableCards } from './lib/tableCards';
 import './index.css';
 
 const queryClient: QueryClient = new QueryClient({
@@ -29,6 +31,21 @@ const queryClient: QueryClient = new QueryClient({
     },
   },
 });
+
+// Inside the customer phone app, only the shop pages are reachable: opening or navigating anywhere else returns
+// to the shop (see lib/shopApp.ts).
+if (isShopApp()) {
+  // A full page load to the shop (rather than an in-app navigation) so it never fights the router mid-navigation.
+  const start = shopAppPath(window.location.pathname);
+  if (start) window.location.replace(start);
+  router.subscribe((state) => {
+    const back = shopAppPath(state.location.pathname);
+    if (back) window.location.replace(back);
+  });
+}
+
+// List tables become one card per row on phones (lib/tableCards.ts + index.css).
+installTableCards();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

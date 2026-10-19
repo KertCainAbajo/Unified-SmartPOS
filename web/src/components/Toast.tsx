@@ -81,7 +81,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center gap-2.5 p-4 sm:inset-x-auto sm:right-0 sm:items-end print:hidden" aria-live="polite">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center gap-2.5 p-4 pb-24 sm:inset-x-auto md:pb-4 sm:right-0 sm:items-end print:hidden" aria-live="polite">
         {toasts.map((t) => {
           const look = LOOK[t.tone];
           return (
