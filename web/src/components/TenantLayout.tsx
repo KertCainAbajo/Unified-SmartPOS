@@ -459,8 +459,9 @@ function Shell() {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+      {/* The header scrolls away with the page instead of staying pinned on top. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        <header className="relative z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
           <button className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="size-5" />
           </button>
@@ -500,7 +501,7 @@ function Shell() {
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main className="flex-1">
           <div key={location.pathname} className="auth-fade mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8 2xl:px-10">
             <Outlet key={scopeKey} />
           </div>

@@ -173,7 +173,7 @@ export function ShopPage() {
 
   return <div className={`min-h-screen bg-[#f5f7f4] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
+    <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
@@ -233,7 +233,7 @@ export function ShopPage() {
 
       {/* ───────── Shop + basket ───────── */}
       <main className="mt-8 grid gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
-        <section id="products" className="min-w-0 scroll-mt-36">
+        <section id="products" className="min-w-0 scroll-mt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
@@ -269,8 +269,8 @@ export function ShopPage() {
         </section>
 
         {/* ───────── Basket ───────── */}
-        <aside className="space-y-5 lg:sticky lg:top-[136px] lg:max-h-[calc(100vh-152px)] lg:self-start lg:overflow-y-auto lg:pb-2 [scrollbar-width:thin]">
-          <section id="basket" className="scroll-mt-36 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
+        <aside className="space-y-5 lg:self-start">
+          <section id="basket" className="scroll-mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="grid size-10 place-items-center rounded-xl bg-emerald-900 text-amber-300"><ShoppingBasket size={19} /></span>

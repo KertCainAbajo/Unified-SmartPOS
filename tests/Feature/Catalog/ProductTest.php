@@ -38,6 +38,18 @@ class ProductTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'product.created', 'auditable_id' => $product->id]);
     }
 
+    /** Inventory staff add new products to the catalog; changing a price later stays with managers. */
+    public function test_inventory_staff_add_products_but_cannot_change_prices(): void
+    {
+        [$tenant] = $this->createTenant();
+        $staff = $this->addMember($tenant, 'inventory_staff');
+
+        $id = $this->actingAsUser($staff)->postJson($this->tenantUrl($tenant, 'products'), $this->payload())
+            ->assertCreated()->assertJsonPath('data.sku', 'COKE-330')->json('data.id');
+        $this->patchJson($this->tenantUrl($tenant, "products/{$id}"), ['name' => 'Coke 330ml can'])->assertOk();
+        $this->patchJson($this->tenantUrl($tenant, "products/{$id}/price"), ['price' => '30.00'])->assertForbidden();
+    }
+
     public function test_sku_and_barcode_are_unique_per_tenant_but_reusable_across_tenants(): void
     {
         [$tenantA, $ownerA] = $this->createTenant();

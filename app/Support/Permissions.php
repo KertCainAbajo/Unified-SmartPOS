@@ -262,9 +262,10 @@ final class Permissions
             ],
             self::ROLE_INVENTORY => [
                 'name' => 'Inventory Staff',
-                'description' => 'Maintains stock, transfers and receiving.',
+                'description' => 'Maintains stock, transfers and receiving, and adds new products to the catalog (price changes stay with managers).',
                 'permissions' => [
                     self::PRODUCTS_VIEW,
+                    self::PRODUCTS_MANAGE,
                     self::INVENTORY_VIEW,
                     self::INVENTORY_ADJUST,
                     self::INVENTORY_TRANSFER,
