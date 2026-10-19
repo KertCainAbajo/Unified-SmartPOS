@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, Briefcase, Calculator, Check, CheckCircle2, ClipboardList, Headset, ShoppingCart, ChevronRight, Clock, Copy, Crown, KeyRound, Layers, MailCheck, Package, Printer, Receipt, RotateCcw, Settings, ShieldAlert, ShieldCheck, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AtSign, BarChart3, Bike, Boxes, LayoutGrid, List, Briefcase, Calculator, Check, CheckCircle2, ClipboardList, Headset, ShoppingCart, ChevronRight, Clock, Copy, Crown, KeyRound, Layers, MailCheck, Package, Printer, Receipt, RotateCcw, Settings, ShieldAlert, ShieldCheck, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
@@ -93,19 +93,19 @@ function useStatusCount(status: string, branchId: number | undefined) {
 }
 
 /** Positions from most to least senior; custom roles go last. */
-const ROLE_ORDER = ['business_owner', 'user_access_manager', 'branch_manager', 'accountant', 'auditor', 'purchasing_staff', 'inventory_staff', 'cashier', 'customer_service'];
+const ROLE_ORDER = ['business_owner', 'user_access_manager', 'branch_manager', 'accountant', 'auditor', 'purchasing_staff', 'inventory_staff', 'cashier', 'customer_service', 'delivery_rider'];
 const rank = (r?: Role) => (r ? (ROLE_ORDER.indexOf(r.key) + 1 || ROLE_ORDER.length + 1) : 99);
 const primaryRole = (m: StaffMember) => [...(m.roles ?? [])].sort((a, b) => rank(a) - rank(b))[0];
 
 const ROLE_ICON: Record<string, LucideIcon> = {
   business_owner: Crown, user_access_manager: ShieldCheck, branch_manager: Briefcase, accountant: Calculator, auditor: ClipboardList,
-  purchasing_staff: Truck, inventory_staff: Boxes, cashier: ShoppingCart, customer_service: Headset,
+  purchasing_staff: Truck, inventory_staff: Boxes, cashier: ShoppingCart, customer_service: Headset, delivery_rider: Bike,
 };
 const roleIcon = (r: Role) => ROLE_ICON[r.key] ?? UserRound;
 const ROLE_TONE: Record<string, string> = {
   business_owner: 'from-sun-400 to-sun-500', user_access_manager: 'from-indigo-400 to-indigo-600', branch_manager: 'from-brand-500 to-brand-700',
   accountant: 'from-teal-400 to-emerald-600', auditor: 'from-slate-400 to-slate-600', purchasing_staff: 'from-violet-400 to-violet-600',
-  inventory_staff: 'from-amber-400 to-orange-500', cashier: 'from-sky-400 to-sky-600', customer_service: 'from-rose-400 to-rose-600', default: 'from-slate-400 to-slate-500',
+  inventory_staff: 'from-amber-400 to-orange-500', cashier: 'from-sky-400 to-sky-600', customer_service: 'from-rose-400 to-rose-600', delivery_rider: 'from-emerald-400 to-emerald-600', default: 'from-slate-400 to-slate-500',
 };
 
 function RoleChip({ active, icon: Icon, label, count, tone = 'from-brand-500 to-brand-700', onClick }: { active: boolean; icon: LucideIcon; label: string; count: number; tone?: string; onClick: () => void }) {
@@ -129,6 +129,8 @@ function MembersTab() {
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [roleId, setRoleId] = useState<number | null>(null);
+  const [view, setViewState] = useState<'cards' | 'list'>(() => { try { return localStorage.getItem('team-view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; } });
+  const setView = (v: 'cards' | 'list') => { setViewState(v); try { localStorage.setItem('team-view', v); } catch { /* remembered for this visit only */ } };
   const filters = { status, q: q || undefined, branch_id: scopeBranchId, per_page: 100 };
   // Everyone matching the search/status (for the role counts), and the list itself (narrowed to one role if picked).
   const everyone = useTenantQuery<Paginated<StaffMember>>('/staff', { ...filters, page: 1 });
@@ -166,7 +168,17 @@ function MembersTab() {
           <SearchField className="lg:w-80" value={term} onChange={(v) => { setTerm(v); setPage(1); }} placeholder="Search name, username or employee ID" />
           <Segmented label="Status" value={status} onChange={(v) => { setStatus(v); setPage(1); }}
             options={[{ value: '', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'invited', label: 'Invited' }, { value: 'suspended', label: 'Suspended' }, { value: 'offboarded', label: 'Offboarded' }]} />
-          {can('staff.create') && <Button className="lg:ml-auto" icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)}>Add staff</Button>}
+          <div className="flex items-center gap-2 lg:ml-auto">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1" role="group" aria-label="Layout">
+              {([['cards', LayoutGrid, 'Cards'], ['list', List, 'List']] as const).map(([v, Icon, label]) => (
+                <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}
+                  className={cx('inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition duration-200', view === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+                  <Icon className="size-3.5" />{label}
+                </button>
+              ))}
+            </div>
+            {can('staff.create') && <Button icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)}>Add staff</Button>}
+          </div>
         </div>
 
         {/* Role / position categories */}
@@ -183,6 +195,19 @@ function MembersTab() {
           <EmptyState icon={Users} title={filtered ? 'No staff match' : 'No staff yet'}
             description={filtered ? 'Try another name or status.' : 'Add cashiers, inventory staff and managers so they can sign in.'}
             action={!filtered && can('staff.create') && <Button size="sm" icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)}>Add staff</Button>} />
+        ) : view === 'cards' ? (
+          <div className="space-y-8 bg-slate-50/50 p-4 sm:p-5">
+            {groups.map((g) => (
+              <section key={g.role?.id ?? 0} className="sp-rise">
+                <RoleGroupHeader role={g.role} members={g.members} />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {g.members.map((m) => (
+                    <StaffCard key={m.id} m={m} groupRole={g.role} isOwner={m.user_id === tenant.owner_user_id} isMe={m.user_id === user?.id} onOpen={() => setSelectedId(m.id)} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -197,19 +222,11 @@ function MembersTab() {
                 </tr>
               </thead>
               {groups.map((g) => {
-                const Icon = g.role ? roleIcon(g.role) : Users;
-                const activeCount = g.members.filter((m) => m.status === 'active').length;
                 return (
               <tbody key={g.role?.id ?? 0} className="divide-y divide-slate-100 border-b border-slate-100 last:border-b-0">
-                <tr className="bg-gradient-to-r from-brand-50/70 via-slate-50/60 to-slate-50/30">
-                  <th scope="colgroup" colSpan={6} className="py-2.5 pl-5 pr-4 text-left">
-                    <span className="flex flex-wrap items-center gap-2.5">
-                      <span className={cx('grid size-8 place-items-center rounded-lg bg-gradient-to-br text-white shadow-sm', g.role ? ROLE_TONE[g.role.key] ?? ROLE_TONE.default : ROLE_TONE.default)}><Icon className="size-4" /></span>
-                      <span className="text-[13px] font-semibold text-slate-800">{g.role?.name ?? 'No role'}</span>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200">{g.members.length} {g.members.length === 1 ? 'person' : 'people'}</span>
-                      {activeCount < g.members.length && <span className="text-[11px] text-slate-400">{activeCount} active</span>}
-                      {g.role?.description && <span className="hidden truncate text-xs font-normal text-slate-400 xl:inline">· {g.role.description}</span>}
-                    </span>
+                <tr className="bg-slate-50/70">
+                  <th scope="colgroup" colSpan={6} className="py-3.5 pl-5 pr-4 text-left font-normal">
+                    <RoleGroupHeader role={g.role} members={g.members} />
                   </th>
                 </tr>
                 {g.members.map((m) => {
@@ -271,6 +288,129 @@ function MembersTab() {
       <CreateStaff open={creating} onClose={() => setCreating(false)} />
       {selectedId !== null && <StaffDetail id={selectedId} onClose={() => setSelectedId(null)} />}
     </>
+  );
+}
+
+/* --------------------------------------------------------------------------- Staff cards */
+
+/** Soft background, text and accent colours per role, used for the card stripe and group header. */
+const ROLE_SOFT: Record<string, { bg: string; text: string; ring: string }> = {
+  business_owner: { bg: 'bg-sun-300/20', text: 'text-amber-800', ring: 'ring-amber-200' },
+  user_access_manager: { bg: 'bg-indigo-50', text: 'text-indigo-800', ring: 'ring-indigo-200' },
+  branch_manager: { bg: 'bg-brand-50', text: 'text-brand-800', ring: 'ring-brand-200' },
+  accountant: { bg: 'bg-teal-50', text: 'text-teal-800', ring: 'ring-teal-200' },
+  auditor: { bg: 'bg-slate-100', text: 'text-slate-700', ring: 'ring-slate-300' },
+  purchasing_staff: { bg: 'bg-violet-50', text: 'text-violet-800', ring: 'ring-violet-200' },
+  inventory_staff: { bg: 'bg-orange-50', text: 'text-orange-800', ring: 'ring-orange-200' },
+  cashier: { bg: 'bg-sky-50', text: 'text-sky-800', ring: 'ring-sky-200' },
+  customer_service: { bg: 'bg-rose-50', text: 'text-rose-800', ring: 'ring-rose-200' },
+  delivery_rider: { bg: 'bg-emerald-50', text: 'text-emerald-800', ring: 'ring-emerald-200' },
+  default: { bg: 'bg-slate-100', text: 'text-slate-700', ring: 'ring-slate-200' },
+};
+const soft = (r?: Role) => (r ? ROLE_SOFT[r.key] ?? ROLE_SOFT.default : ROLE_SOFT.default);
+
+const STATUS_LOOK: Record<StaffMember['status'], { label: string; cls: string; dot: string }> = {
+  active: { label: 'Active', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
+  invited: { label: 'Invited', cls: 'bg-sky-50 text-sky-700 ring-sky-200', dot: 'bg-sky-500' },
+  suspended: { label: 'Suspended', cls: 'bg-amber-50 text-amber-800 ring-amber-200', dot: 'bg-amber-500' },
+  offboarded: { label: 'Offboarded', cls: 'bg-slate-100 text-slate-500 ring-slate-200', dot: 'bg-slate-400' },
+};
+
+/** "Today, 3:42 PM", "Yesterday", "5 days ago", or the date. */
+function lastSeen(iso: string | null): string {
+  if (!iso) return 'Never signed in';
+  const d = new Date(iso);
+  const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86400000);
+  const time = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+  if (days <= 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  if (days < 7) return `${days} days ago`;
+  return formatDate(iso);
+}
+
+function RoleGroupHeader({ role, members }: { role: Role | undefined; members: StaffMember[] }) {
+  const Icon = role ? roleIcon(role) : Users;
+  const look = soft(role);
+  const activeCount = members.filter((m) => m.status === 'active').length;
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className={cx('grid size-10 place-items-center rounded-xl bg-gradient-to-br text-white shadow-sm', role ? ROLE_TONE[role.key] ?? ROLE_TONE.default : ROLE_TONE.default)}><Icon className="size-5" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2">
+          <span className="font-display text-base font-bold text-slate-900">{role?.name ?? 'No role'}</span>
+          <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-bold ring-1', look.bg, look.text, look.ring)}>{members.length} {members.length === 1 ? 'person' : 'people'}</span>
+          {activeCount < members.length && <span className="text-[11px] font-medium text-slate-500">{activeCount} active</span>}
+        </p>
+        {role?.description && <p className="mt-0.5 text-xs text-slate-500">{role.description}</p>}
+      </div>
+    </div>
+  );
+}
+
+function StaffCard({ m, groupRole, isOwner, isMe, onOpen }: { m: StaffMember; groupRole: Role | undefined; isOwner: boolean; isMe: boolean; onOpen: () => void }) {
+  const { viewAll, scopeBranchId } = useTenant();
+  const name = m.name ?? m.email ?? 'Unnamed';
+  const status = STATUS_LOOK[m.status];
+  const otherRoles = (m.roles ?? []).filter((r) => r.id !== groupRole?.id);
+  const look = soft(groupRole);
+  return (
+    <button type="button" onClick={onOpen}
+      className={cx('group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-slate-200 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-900/5 hover:ring-brand-300 focus-visible:outline-2 focus-visible:outline-brand-600', m.status === 'offboarded' && 'opacity-60')}>
+      <span aria-hidden className={cx('h-1.5 w-full bg-gradient-to-r', groupRole ? ROLE_TONE[groupRole.key] ?? ROLE_TONE.default : ROLE_TONE.default)} />
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start gap-3">
+          <span className="relative">
+            <span className="[&>span]:size-12 [&>span]:text-sm"><Avatar name={name} /></span>
+            <span className={cx('absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full ring-2 ring-white', status.dot)} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-[15px] font-bold leading-tight text-slate-900" title={name}>{name}</p>
+            <p className={cx('mt-0.5 truncate text-xs font-semibold', look.text)}>{m.profile?.job_title || groupRole?.name || 'No role'}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {isOwner && <span className="inline-flex items-center gap-0.5 rounded-md bg-sun-300/30 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-amber-700"><Crown className="size-3" />Owner</span>}
+              {isMe && <span className="rounded-md bg-brand-700 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-white">You</span>}
+            </div>
+          </div>
+          <span className={cx('inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', status.cls)}>
+            <span className={cx('size-1.5 rounded-full', status.dot)} />{status.label}
+          </span>
+        </div>
+
+        <dl className="mt-4 space-y-2 text-xs">
+          <div className="flex items-center gap-2">
+            <dt className="sr-only">Sign-in</dt>
+            <AtSign className="size-3.5 shrink-0 text-slate-400" />
+            <dd className="min-w-0 truncate font-medium text-slate-700">{m.username ?? m.email ?? '—'}</dd>
+            {m.employee_code && <dd className="ml-auto shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600">{m.employee_code}</dd>}
+          </div>
+          <div className="flex items-start gap-2">
+            <dt className="sr-only">Branches</dt>
+            <Store className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+            <dd className="flex min-w-0 flex-wrap gap-1">
+              {m.all_branches
+                ? <span className="inline-flex items-center gap-1 rounded-md bg-brand-700 px-1.5 py-0.5 text-[11px] font-semibold text-white"><Layers className="size-3" />All branches</span>
+                : m.branches?.length
+                  ? m.branches.map((b) => <BranchTag key={b.id} id={b.id} className={!viewAll && b.id === scopeBranchId ? 'bg-brand-50 text-brand-800 ring-brand-200' : undefined} />)
+                  : <span className="text-slate-400">No branch yet</span>}
+            </dd>
+          </div>
+          {otherRoles.length > 0 && (
+            <div className="flex items-start gap-2">
+              <dt className="sr-only">Also</dt>
+              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+              <dd className="flex flex-wrap gap-1">{otherRoles.map((r) => <span key={r.id} className={cx('rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1', soft(r).bg, soft(r).text, soft(r).ring)}>Also {r.name}</span>)}</dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
+          {m.must_change_password
+            ? <span className="inline-flex items-center gap-1 font-semibold text-amber-700"><Clock className="size-3.5" />First sign-in pending</span>
+            : <span className={cx('inline-flex items-center gap-1', m.last_login_at ? 'text-slate-500' : 'text-slate-400')} title={m.last_login_at ? formatDateTime(m.last_login_at) : undefined}><Clock className="size-3.5" />{lastSeen(m.last_login_at)}</span>}
+          <span className="inline-flex items-center gap-0.5 font-semibold text-brand-700 opacity-0 transition group-hover:opacity-100">Open <ChevronRight className="size-3.5" /></span>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -781,6 +921,8 @@ const PERMISSION_GROUP_ICON: Record<string, LucideIcon> = { sales: Receipt, refu
 
 function RolesTab() {
   const roles = useTenantQuery<{ data: Role[] }>('/roles');
+  const staff = useTenantQuery<Paginated<StaffMember>>('/staff', { per_page: 100 });
+  const peopleIn = (role: Role) => (staff.data?.data ?? []).filter((m) => m.status !== 'offboarded' && m.roles?.some((r) => r.id === role.id)).length;
   const [open, setOpen] = useState<Role | null>(null);
   const rows = roles.data?.data ?? [];
   const max = Math.max(1, ...rows.map((r) => r.permissions?.length ?? 0));
@@ -795,31 +937,38 @@ function RolesTab() {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {rows.map((r) => {
+        {[...rows].sort((a, b) => rank(a) - rank(b)).map((r) => {
           const count = r.permissions?.length ?? 0;
+          const Icon = roleIcon(r);
+          const look = soft(r);
+          const people = peopleIn(r);
           return (
-            <button key={r.id} type="button" onClick={() => setOpen(r)} className="group flex flex-col rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-900/5 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-brand-200">
+            <button key={r.id} type="button" onClick={() => setOpen(r)} className="sp-rise group relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-900/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-brand-200">
+              <span aria-hidden className={cx('absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', ROLE_TONE[r.key] ?? ROLE_TONE.default)} />
               <div className="flex items-start gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-900/20"><ShieldCheck className="size-5" /></span>
+                <span className={cx('grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-sm', ROLE_TONE[r.key] ?? ROLE_TONE.default)}><Icon className="size-5" /></span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-display font-semibold text-slate-900">{r.name}</p>
-                  <span className="mt-0.5 flex flex-wrap gap-1">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className="font-display text-base font-bold text-slate-900">{r.name}</span>
+                    {staff.data && <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-bold ring-1', look.bg, look.text, look.ring)}>{people} {people === 1 ? 'person' : 'people'}</span>}
+                  </p>
+                  <span className="mt-1 flex flex-wrap gap-1">
                     <span className={cx('rounded-md px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide', r.is_system ? 'bg-slate-100 text-slate-500' : 'bg-violet-50 text-violet-700')}>{r.is_system ? 'System' : 'Custom'}</span>
                     {r.requires_email_sign_in && <span className="rounded-md bg-sky-50 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-sky-700">Email sign-in</span>}
                   </span>
                 </div>
                 <ChevronRight className="size-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
               </div>
-              <p className="mt-3 line-clamp-2 flex-1 text-sm text-slate-500">{r.description ?? 'No description.'}</p>
+              <p className="mt-3 flex-1 text-sm text-slate-500">{r.description ?? 'No description.'}</p>
               <div className="mt-4">
                 <div className="flex justify-between text-xs"><span className="text-slate-500">Permissions</span><span className="font-semibold tabular-nums text-slate-800">{count}</span></div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600" style={{ width: `${(count / max) * 100}%` }} /></div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cx('h-full rounded-full bg-gradient-to-r', ROLE_TONE[r.key] ?? ROLE_TONE.default)} style={{ width: `${(count / max) * 100}%` }} /></div>
               </div>
             </button>
           );
         })}
       </div>
-      <Modal open={!!open} onClose={() => setOpen(null)} title={open?.name ?? ''} icon={ShieldCheck} size="lg" description={open ? `${open.permissions?.length ?? 0} permissions · ${open.is_system ? 'System role' : 'Custom role'}` : undefined}>
+      <Modal open={!!open} onClose={() => setOpen(null)} title={open?.name ?? ''} icon={open ? roleIcon(open) : ShieldCheck} size="lg" description={open ? `${open.permissions?.length ?? 0} permissions · ${open.is_system ? 'System role' : 'Custom role'}` : undefined}>
         <div className="space-y-4">
           {open?.description && <p className="text-sm text-slate-600">{open.description}</p>}
           <div className="grid gap-3 sm:grid-cols-2">

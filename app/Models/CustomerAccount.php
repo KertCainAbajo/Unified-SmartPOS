@@ -15,6 +15,9 @@ class CustomerAccount extends Authenticatable
 {
     use Notifiable;
 
+    /** The shop account was moved to a platform administrator login; it no longer signs in to the shop. */
+    public const STATUS_MOVED_TO_ADMIN = 'moved_to_admin';
+
     protected $guarded = [];
 
     protected $hidden = ['password', 'remember_token'];

@@ -65,7 +65,7 @@ class TenantIsolationTest extends TestCase
         $list = $this->getJson('/api/v1/platform/tenants')->assertOk()
             ->assertJsonPath('summary.total', 1)->assertJsonPath('summary.active', 1)->assertJsonPath('summary.suspended', 0);
         $row = $list->json('data.0');
-        $this->assertSame(['id', 'name', 'slug', 'status', 'owner', 'branches_count', 'members_count', 'created_at'], array_keys($row));
+        $this->assertSame(['id', 'name', 'slug', 'status', 'owner', 'branches_count', 'members_count', 'created_at', 'shop_enabled', 'last_activity_at', 'status_reason'], array_keys($row));
         $this->assertSame(['name', 'email'], array_keys($row['owner']));
     }
 

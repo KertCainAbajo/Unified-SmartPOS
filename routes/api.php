@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Inventory\StockTransferController;
 use App\Http\Controllers\Api\V1\Operations\CustomerController;
 use App\Http\Controllers\Api\V1\Operations\ExpenseController;
 use App\Http\Controllers\Api\V1\Operations\NotificationController;
+use App\Http\Controllers\Api\V1\Platform\PlatformConsoleController;
 use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\Pos\RefundController;
 use App\Http\Controllers\Api\V1\Pos\RegisterController;
@@ -112,6 +113,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::prefix('platform')->middleware(['password.changed', 'platform.admin'])->name('platform.')->group(function () {
             Route::get('tenants', [PlatformTenantController::class, 'index'])->name('tenants.index');
             Route::patch('tenants/{tenant}/status', [PlatformTenantController::class, 'updateStatus'])->name('tenants.status');
+            Route::get('overview', [PlatformConsoleController::class, 'overview'])->name('overview');
+            Route::get('tenants/{tenant}', [PlatformConsoleController::class, 'showTenant'])->name('tenants.show');
+            Route::get('users', [PlatformConsoleController::class, 'users'])->name('users.index');
+            Route::patch('users/{user}/status', [PlatformConsoleController::class, 'updateUserStatus'])->name('users.status');
+            Route::patch('users/{user}/admin', [PlatformConsoleController::class, 'updateAdmin'])->name('users.admin');
+            Route::get('activity', [PlatformConsoleController::class, 'activity'])->name('activity');
+            Route::get('customer-lookup', [PlatformConsoleController::class, 'customerLookup'])->name('customers.lookup');
+            Route::post('customer-accounts/{customerAccount}/make-admin', [PlatformConsoleController::class, 'promoteCustomer'])->name('customers.make-admin');
         });
 
         // ---- Tenant-scoped ---------------------------------------------------------------------

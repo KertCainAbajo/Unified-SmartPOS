@@ -33,6 +33,7 @@ import {
   Wallet,
   X,
   type LucideIcon,
+  Crown,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -401,6 +402,11 @@ function Shell() {
             <Link to="/" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition hover:bg-slate-50">
               <ChevronsUpDown className="size-4 text-slate-400" /> Switch business
             </Link>
+            {user?.is_platform_admin && (
+              <Link to="/platform" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50">
+                <Crown className="size-4" /> Super admin console
+              </Link>
+            )}
             <button type="button" onClick={signOut} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50">
               <LogOut className="size-4" /> Sign out
             </button>

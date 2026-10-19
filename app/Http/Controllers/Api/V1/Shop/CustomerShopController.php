@@ -6,6 +6,7 @@ use App\Enums\OnlineOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CustomerAccount;
+use App\Models\User;
 use App\Models\Inventory;
 use App\Models\OnlineOrder;
 use App\Models\Product;
@@ -27,6 +28,8 @@ use Illuminate\Validation\ValidationException;
 /** Public customer shop API. A shop account is isolated from staff authentication. */
 class CustomerShopController extends Controller
 {
+    private const ADMIN_EMAIL_MESSAGE = 'This email now signs in as a platform administrator. Use the Management sign-in, or shop with a different email.';
+
     public function catalog(string $business): JsonResponse
     {
         $tenant = $this->shopTenant($business);
@@ -107,6 +110,9 @@ class CustomerShopController extends Controller
             'phone' => ['required', 'string', 'max:30'], 'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed'],
         ]);
         $email = mb_strtolower(trim($data['email']));
+        if (User::query()->where('email', $email)->where('is_platform_admin', true)->exists()) {
+            throw ValidationException::withMessages(['email' => [self::ADMIN_EMAIL_MESSAGE]]);
+        }
         if ($tenant->customerAccounts()->where('email', $email)->exists()) {
             throw ValidationException::withMessages(['email' => ['An account already uses this email.']]);
         }
@@ -131,7 +137,14 @@ class CustomerShopController extends Controller
         $tenant = $this->shopTenant($business);
         $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255'], 'password' => ['required', 'string', 'max:128']]);
         $account = $tenant->customerAccounts()->where('email', mb_strtolower(trim($data['email'])))->first();
-        if (! $account || ! $account->isActive() || ! Hash::check($data['password'], $account->password)) {
+        if (! $account || ! Hash::check($data['password'], $account->password)) {
+            return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
+        }
+        // Shown only after the password matched, so it never reveals which emails are administrators.
+        if ($account->status === CustomerAccount::STATUS_MOVED_TO_ADMIN) {
+            return response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 422);
+        }
+        if (! $account->isActive()) {
             return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
         }
         Auth::guard('customer')->login($account, $request->boolean('remember', true));

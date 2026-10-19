@@ -157,6 +157,7 @@ export function LoginPage() {
           )}
         </IconField>
         {capsLock && <p className="-mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700"><TriangleAlert className="size-3.5" /> Caps Lock is on</p>}
+        {!staff && <p className="-mt-2 text-right"><Link to="/forgot-password" className="text-xs font-semibold text-brand-700 hover:text-brand-600 hover:underline">Forgot password?</Link></p>}
 
         <button
           type="submit"

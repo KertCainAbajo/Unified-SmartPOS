@@ -5,6 +5,7 @@ import { Spinner } from './components/ui';
 import { TenantLayout } from './components/TenantLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ForgotPasswordPage, ResetPasswordPage } from './pages/auth/PasswordRecoveryPages';
 import { SelectBusinessPage } from './pages/auth/SelectBusinessPage';
 import { ChangePasswordPage } from './pages/auth/ChangePasswordPage';
 import { ApplicationStatusPage } from './pages/careers/ApplicationStatusPage';
@@ -44,6 +45,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
     ],
   },
   {
