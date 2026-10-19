@@ -27,11 +27,39 @@ class ProductImageTest extends TestCase
         $this->assertNotNull($product->image_path);
         Storage::disk('public')->assertExists($product->image_path);
         [$width, $height, $type] = getimagesizefromstring(Storage::disk('public')->get($product->image_path));
-        $this->assertSame([900, 600, IMAGETYPE_JPEG], [$width, $height, $type]);
+        $this->assertSame([900, 900, IMAGETYPE_JPEG], [$width, $height, $type]);
         $this->assertStringStartsWith("/api/v1/tenants/{$tenant->id}/products/{$product->id}/image?v=", $response->json('data.image_url'));
         $this->assertDatabaseHas('audit_logs', ['action' => 'product.image_updated', 'auditable_id' => $product->id]);
 
         $this->get($response->json('data.image_url'))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    }
+
+    /** A phone photo on a plain table: the table becomes white and the product is centred, white parts of it kept. */
+    public function test_plain_background_is_removed_and_the_product_is_centred(): void
+    {
+        [$tenant, $owner] = $this->createTenant();
+        $product = $this->createProduct($tenant);
+        $photo = imagecreatetruecolor(1200, 800);
+        imagefill($photo, 0, 0, imagecolorallocate($photo, 210, 196, 170));                        // beige table
+        imagefilledrectangle($photo, 850, 250, 1000, 700, imagecolorallocate($photo, 40, 150, 40)); // green bottle, off to the right
+        imagefilledrectangle($photo, 890, 180, 960, 250, imagecolorallocate($photo, 255, 255, 255)); // white cap
+        $path = tempnam(sys_get_temp_dir(), 'photo').'.png';
+        imagepng($photo, $path);
+
+        $this->actingAsUser($owner)
+            ->post($this->tenantUrl($tenant, "products/{$product->id}/image"), ['image' => new UploadedFile($path, 'bottle.png', 'image/png', null, true)], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $out = imagecreatefromstring(Storage::disk('public')->get($product->refresh()->image_path));
+        $rgb = fn (int $x, int $y) => [(imagecolorat($out, $x, $y) >> 16) & 0xFF, (imagecolorat($out, $x, $y) >> 8) & 0xFF, imagecolorat($out, $x, $y) & 0xFF];
+        foreach ([[5, 5], [894, 5], [5, 894], [894, 894], [100, 450]] as [$x, $y]) {
+            $this->assertGreaterThan(245, min($rgb($x, $y)), "Background at {$x},{$y} is white");
+        }
+        [$r, $g] = $rgb(450, 500);
+        $this->assertGreaterThan($r + 60, $g, 'The bottle is in the middle of the square');
+        [$r2, $g2] = $rgb(450, 200);
+        $this->assertGreaterThan($r2 + 60, $g2, 'The product was trimmed and enlarged to fill the square');
+        @unlink($path);
     }
 
     public function test_replacing_and_removing_a_photo_cleans_up_the_old_file(): void

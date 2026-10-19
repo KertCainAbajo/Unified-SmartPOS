@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, Pagination, Select, cx } from '../../components/ui';
-import { ApiError } from '../../lib/api';
+import { ApiError, api, errorMessage } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../../components/Toast';
 import { formatDateTime, formatMoney, formatQty, todayManila } from '../../lib/format';
 import { useDebounced, useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Category, Paginated, Product, TaxType } from '../../lib/types';
@@ -435,9 +437,22 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
     } else if (isNew) setForm(blank);
   }, [product, isNew]);
 
-  const save = useTenantMutation<Record<string, unknown>>(isNew ? 'POST' : 'PATCH', isNew ? '/products' : `/products/${(product as Product | null)?.id}`, {
+  const [photo, setPhoto] = useState<File | null>(null);
+  useEffect(() => setPhoto(null), [product]);
+  const { path, tenantId } = useTenant();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  // A photo picked while adding goes up right after the product exists; the product is kept even if the photo fails.
+  const uploadPhoto = (id: number, file: File) => {
+    const body = new FormData();
+    body.append('image', file);
+    api(path(`/products/${id}/image`), { method: 'POST', body })
+      .then(() => { toast.success('Photo saved.'); void queryClient.invalidateQueries({ queryKey: ['t', tenantId] }); })
+      .catch((e) => toast.error(`Product saved, but the photo was not: ${errorMessage(e)} Edit the product to try again.`));
+  };
+  const save = useTenantMutation<Record<string, unknown>, { data: Product }>(isNew ? 'POST' : 'PATCH', isNew ? '/products' : `/products/${(product as Product | null)?.id}`, {
     success: isNew ? 'Product created.' : 'Product updated.',
-    onSuccess: onClose,
+    onSuccess: (r) => { if (isNew && photo && r?.data?.id) uploadPhoto(r.data.id, photo); onClose(); },
     toastErrors: false,
   });
   const err = (f: string) => (save.error instanceof ApiError ? save.error.field(f) : undefined);
@@ -467,10 +482,8 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
     >
       {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} className="mb-4" />}
 
-      <FormSection title="Photo" hint="Shown in the online shop and in this list.">
-        {isNew ? (
-          <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 sm:col-span-2">Save the product first, then edit it to add a photo.</p>
-        ) : product && <ProductPhoto product={product} />}
+      <FormSection title="Photo" hint="Shown in the online shop and in this list. A plain background is removed and the product is centred on white automatically.">
+        {isNew ? <NewProductPhoto file={photo} onChange={setPhoto} /> : product && <ProductPhoto product={product} />}
       </FormSection>
 
       <FormSection title="Basics">
@@ -510,7 +523,51 @@ function ProductForm({ product, categories, onClose }: { product: Product | 'new
   );
 }
 
-/** Upload, replace or remove a product photo. Saves immediately; the server resizes it for the shop. */
+/** Photo picked while adding a product: previewed here, uploaded (and formatted by the server) once the product is saved. */
+function NewProductPhoto({ file, onChange }: { file: File | null; onChange: (file: File | null) => void }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) { setPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  const pick = (f: File | undefined) => {
+    if (!f) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { setError('Choose a JPG, PNG or WebP image.'); return; }
+    if (f.size > 5 * 1024 * 1024) { setError('The photo is larger than 5 MB.'); return; }
+    setError(null);
+    onChange(f);
+  };
+
+  return (
+    <div className="flex flex-col gap-4 sm:col-span-2 sm:flex-row sm:items-center">
+      <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+        {preview ? <img src={preview} alt="New product" className="size-full object-contain p-2" /> : <ImagePlus className="size-8 text-slate-300" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files[0]); }}
+          className={cx('flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-5 text-center transition', dragging ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50')}
+        >
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
+          <span className="text-sm font-semibold text-slate-800">{file ? 'Choose another photo' : 'Add a photo'}</span>
+          <span className="mt-0.5 text-xs text-slate-500">Click or drop a JPG, PNG or WebP (up to 5 MB). Saved with the product.</span>
+        </label>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {error ? <p className="text-xs font-medium text-red-600">{error}</p> : <span className="truncate text-xs text-slate-500">{file?.name}</span>}
+          {file && <button type="button" onClick={() => onChange(null)} className="text-xs font-semibold text-red-600 hover:underline">Remove photo</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Upload, replace or remove a product photo. Saves immediately; the server formats it for the shop. */
 function ProductPhoto({ product }: { product: Product }) {
   const [imageUrl, setImageUrl] = useState(product.image_url);
   const [dragging, setDragging] = useState(false);
@@ -532,7 +589,7 @@ function ProductPhoto({ product }: { product: Product }) {
   return (
     <div className="flex flex-col gap-4 sm:col-span-2 sm:flex-row sm:items-center">
       <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200">
-        {imageUrl ? <img src={imageUrl} alt={product.name} className="size-full object-cover" /> : <ImagePlus className="size-8 text-slate-300" />}
+        {imageUrl ? <img src={imageUrl} alt={product.name} className="size-full bg-white object-contain" /> : <ImagePlus className="size-8 text-slate-300" />}
       </div>
       <div className="min-w-0 flex-1">
         <label
