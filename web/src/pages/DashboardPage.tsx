@@ -1,6 +1,9 @@
 import { BranchTag } from '../components/BranchSwitcher';
 import {
   AlertTriangle,
+  ArrowRight,
+  Bike,
+  ShoppingBag,
   ArrowUpRight,
   BarChart3,
   CalendarRange,
@@ -108,6 +111,8 @@ function StoreDashboard() {
           </div>
         </div>
       </section>
+
+      {(can('sales.create') || can('sales.view_all')) && <NewOnlineOrders base={base} />}
 
       {/* Key numbers */}
       {(canReports || can('inventory.view')) && (
@@ -363,5 +368,43 @@ function BestSellers({ rows, loading }: { rows?: Seller[]; loading: boolean }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+interface WaitingOrder { id: number; order_number: string; fulfilment: 'pickup' | 'delivery'; contact_name: string; estimated_total: string; placed_at: string; branch_id: number }
+
+/** New online orders waiting for the store, at every branch this person can reach. Hidden when there are none. */
+function NewOnlineOrders({ base }: { base: string }) {
+  const orders = useTenantQuery<Paginated<WaitingOrder>>('/online-orders', { status: 'pending', per_page: 5 }, { refetchInterval: 30000 });
+  const rows = orders.data?.data ?? [];
+  const total = orders.data?.total ?? rows.length;
+  if (!rows.length) return null;
+  const minutes = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return (
+    <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-2 ring-rose-200">
+      <div className="flex flex-wrap items-center gap-3 border-b border-rose-100 bg-rose-50 px-5 py-3.5">
+        <span className="relative grid size-9 place-items-center rounded-xl bg-rose-500 text-white"><ShoppingBag className="size-4" /><span className="absolute -right-1 -top-1 size-3 animate-ping rounded-full bg-rose-400" /></span>
+        <div className="flex-1">
+          <p className="font-display font-semibold text-rose-900">{total} new online {total === 1 ? 'order' : 'orders'} waiting</p>
+          <p className="text-xs text-rose-800/80">Confirm them so the customer knows the store is preparing their order.</p>
+        </div>
+        <Link to={`${base}/online-orders`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 text-sm font-semibold text-white transition hover:bg-rose-700">Open online orders <ArrowRight className="size-4" /></Link>
+      </div>
+      <ul className="divide-y divide-slate-100">
+        {rows.map((o) => (
+          <li key={o.id}>
+            <Link to={`${base}/online-orders`} className="flex items-center gap-3 px-5 py-3 transition hover:bg-slate-50">
+              <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${o.fulfilment === 'delivery' ? 'bg-orange-50 text-orange-600' : 'bg-sky-50 text-sky-600'}`}>{o.fulfilment === 'delivery' ? <Bike className="size-4" /> : <ShoppingBag className="size-4" />}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-slate-900">{o.order_number} · {o.contact_name}</span>
+                <span className="block text-xs text-slate-500">{o.fulfilment === 'delivery' ? 'Delivery' : 'Pickup'} · {minutes(o.placed_at) < 1 ? 'just now' : `${minutes(o.placed_at)} min ago`}</span>
+              </span>
+              <BranchTag id={o.branch_id} />
+              <span className="font-display text-sm font-bold text-slate-900">{formatMoney(o.estimated_total)}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -46,7 +46,7 @@ import { BrandLogo } from './BrandLogo';
 import { NotificationsPanel } from './NotificationsPanel';
 import { ErrorBanner, Spinner, cx } from './ui';
 
-type BadgeKey = 'refunds' | 'lowStock' | 'shift';
+type BadgeKey = 'refunds' | 'lowStock' | 'shift' | 'onlineOrders';
 
 interface NavItem {
   to: string;
@@ -73,7 +73,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { to: '', label: 'Dashboard', icon: LayoutDashboard, any: [], keywords: 'home overview', show: (has) => !isRiderOnly(has) },
       { to: 'deliveries', label: 'My deliveries', icon: Bike, any: ['deliveries.ride'], keywords: 'rider delivery map route', show: (has) => !has('tenant.manage') && !has('branches.manage') },
       { to: 'pos', label: 'Point of Sale', icon: ShoppingCart, any: ['sales.create'], badge: 'shift', keywords: 'register checkout sell cashier' },
-      { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all', 'sales.create'], keywords: 'pickup delivery shop customer orders' },
+      { to: 'online-orders', label: 'Online orders', icon: ShoppingBag, any: ['sales.view_all', 'sales.create'], badge: 'onlineOrders', keywords: 'pickup delivery shop customer orders' },
       { to: 'sales', label: 'Sales', icon: Receipt, any: ['sales.view', 'sales.view_all'], keywords: 'receipts transactions' },
       { to: 'refunds', label: 'Refunds', icon: RotateCcw, any: ['refunds.create', 'refunds.approve'], badge: 'refunds', keywords: 'returns' },
       { to: 'shifts', label: 'Shifts', icon: Clock, any: ['shifts.operate', 'shifts.view_all'], keywords: 'register sessions cash' },
@@ -158,10 +158,13 @@ function useNavBadges() {
   const refunds = useTenantQuery<Paginated<unknown>>('/refunds', { status: 'pending_approval', branch_id: scopeBranchId, per_page: 1 }, { enabled: can('refunds.approve') });
   const low = useTenantQuery<Paginated<unknown>>('/inventory/low-stock', { branch_id: scopeBranchId, per_page: 1 }, { enabled: can('inventory.view') });
   const shift = useTenantQuery<{ data: { id: number } | null }>('/register-sessions/current', undefined, { enabled: can('shifts.operate') });
+  // New online orders at every branch this person can reach, not only the selected one, so none go unnoticed.
+  const online = useTenantQuery<Paginated<unknown>>('/online-orders', { status: 'pending', per_page: 1 }, { enabled: can('sales.create') || can('sales.view_all'), refetchInterval: 30000 });
   return {
     refunds: totalOf(refunds.data),
     lowStock: totalOf(low.data),
     shift: shift.data?.data ? 1 : 0,
+    onlineOrders: totalOf(online.data),
   } satisfies Record<BadgeKey, number>;
 }
 
@@ -184,7 +187,7 @@ function Shell() {
   const unread = useQuery({
     queryKey: ['t', tenantId, 'notifications-unread'],
     queryFn: () => api<Paginated<AppNotification>>(path('/notifications'), { query: { unread: 1, per_page: 1 } }),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000, // new online orders should show up quickly
   });
   const unreadCount = unread.data?.total ?? 0;
 
@@ -354,7 +357,7 @@ function Shell() {
                             )}
                           >
                             <item.icon />
-                            {mini && count > 0 && <span className={cx('absolute -right-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-brand-900', item.badge === 'shift' ? 'bg-emerald-400' : 'bg-amber-400')} />}
+                            {mini && count > 0 && <span className={cx('absolute -right-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-brand-900', item.badge === 'shift' ? 'bg-emerald-400' : item.badge === 'onlineOrders' ? 'bg-rose-500' : 'bg-amber-400')} />}
                           </span>
                           {!mini && <span className="flex-1 truncate">{item.label}</span>}
                           {!mini && count > 0 && (
@@ -363,7 +366,9 @@ function Shell() {
                                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Open
                               </span>
                             ) : (
-                              <span className="min-w-5 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums text-amber-200 ring-1 ring-amber-300/30">{count > 99 ? '99+' : count}</span>
+                              item.badge === 'onlineOrders'
+                                ? <span title={`${count} new online ${count === 1 ? 'order' : 'orders'}`} className="inline-flex min-w-5 items-center justify-center gap-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white shadow-sm"><span className="size-1.5 animate-pulse rounded-full bg-white" />{count > 99 ? '99+' : count}</span>
+                                : <span className="min-w-5 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums text-amber-200 ring-1 ring-amber-300/30">{count > 99 ? '99+' : count}</span>
                             )
                           )}
                         </>

@@ -13,12 +13,14 @@ use App\Models\Tenant;
 use App\Services\Catalog\ProductImageService;
 use App\Services\DocumentNumberer;
 use App\Services\Shop\CustomerPasswordResetService;
+use App\Services\Shop\OnlineOrderNotifier;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -154,6 +156,35 @@ class CustomerShopController extends Controller
         return response()->json(['data' => $this->accountView($this->accountFor($business))]);
     }
 
+    /** Update the name and mobile number the store and rider use to reach the customer. */
+    public function updateProfile(Request $request, string $business): JsonResponse
+    {
+        $account = $this->accountFor($business);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'phone' => ['required', 'string', 'max:30']]);
+        $account->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone'])])->save();
+        $account->customer?->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone'])])->save();
+
+        return response()->json(['data' => $this->accountView($account)]);
+    }
+
+    /** Change the password while signed in (the current password is required). Other devices are signed out. */
+    public function changePassword(Request $request, string $business): JsonResponse
+    {
+        $account = $this->accountFor($business);
+        $data = $request->validate([
+            'current_password' => ['required', 'string', 'max:128'],
+            'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed', 'different:current_password'],
+        ]);
+        if (! Hash::check($data['current_password'], $account->password)) {
+            throw ValidationException::withMessages(['current_password' => 'Your current password is not correct.']);
+        }
+        $account->forceFill(['password' => $data['password'], 'remember_token' => Str::random(60)])->save();
+        Auth::guard('customer')->login($account, true);
+        $request->session()->regenerate();
+
+        return response()->json(['message' => 'Your password was changed.']);
+    }
+
     public function orders(string $business): JsonResponse
     {
         $account = $this->accountFor($business);
@@ -186,7 +217,7 @@ class CustomerShopController extends Controller
         return response()->json($sales);
     }
 
-    public function placeOrder(Request $request, string $business, DocumentNumberer $numberer): JsonResponse
+    public function placeOrder(Request $request, string $business, DocumentNumberer $numberer, OnlineOrderNotifier $notify): JsonResponse
     {
         $account = $this->accountFor($business);
         $tenant = $account->tenant;
@@ -257,10 +288,12 @@ class CustomerShopController extends Controller
             return $order;
         });
 
+        $notify->placed($order);
+
         return response()->json(['data' => $order->load(['branch:id,name,address,latitude,longitude', 'items'])->customerView()], 201);
     }
 
-    public function cancelOrder(string $business, int $order): JsonResponse
+    public function cancelOrder(string $business, int $order, OnlineOrderNotifier $notify): JsonResponse
     {
         $account = $this->accountFor($business);
         $order = $account->orders()->with('items')->findOrFail($order);
@@ -274,6 +307,7 @@ class CustomerShopController extends Controller
             }
             $locked->forceFill(['status' => OnlineOrderStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'customer'])->save();
         });
+        $notify->cancelledByCustomer($order);
         return response()->json(['data' => $order->fresh(['branch:id,name,address,latitude,longitude', 'items'])->customerView()]);
     }
 

@@ -3,15 +3,19 @@ import { AlertTriangle, Check, Info, Lock, Monitor, Play, ReceiptText, Store } f
 import { useTenant } from '../../tenant/TenantProvider';
 import { Badge, Button, ErrorBanner, Modal, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
-import { formatMoney, titleCase } from '../../lib/format';
+import { formatDateTime, formatMoney, titleCase } from '../../lib/format';
 import { printDocument } from '../../lib/print';
 import { useTenantMutation } from '../../lib/hooks';
 import type { Register, RegisterSession, ShiftSummary } from '../../lib/types';
 
-/** Shown on the POS when the cashier has no open shift. */
-export function OpenShiftCard({ registers, branchName }: { registers: Register[]; branchName: string }) {
+/**
+ * Shown on the POS when the cashier has no open shift. Owners and managers (onUseOpen) can also sell on a register
+ * another cashier already opened, e.g. to record an online order's payment; the money goes into that drawer.
+ */
+export function OpenShiftCard({ registers, branchName, forOnlineOrder = false, onUseOpen }: { registers: Register[]; branchName: string; forOnlineOrder?: boolean; onUseOpen?: (register: Register) => void }) {
   const { branches, branch, setBranchId } = useTenant();
   const available = registers.filter((r) => r.is_active && !r.open_session);
+  const inUse = registers.filter((r) => r.is_active && r.open_session);
   const [registerId, setRegisterId] = useState<number | ''>(available[0]?.id ?? '');
   const [float, setFloat] = useState('1000.00');
   const open = useTenantMutation<{ register_id: number; opening_float: string }>('POST', '/register-sessions', {
@@ -47,12 +51,36 @@ export function OpenShiftCard({ registers, branchName }: { registers: Register[]
         </div>
 
         <div className="p-6">
+          {forOnlineOrder && (
+            <p className="mb-4 flex items-start gap-2 rounded-xl bg-brand-50/70 p-3 text-sm text-slate-700 ring-1 ring-brand-100">
+              <Info className="mt-0.5 size-4 shrink-0 text-brand-600" />
+              <span>To record an online order's payment you need a register at <strong className="text-slate-900">{branchName}</strong>.{onUseOpen && inUse.length > 0 ? ' Use the register that is already open below, or open your own shift.' : ' Open a shift first.'}</span>
+            </p>
+          )}
+          {onUseOpen && inUse.length > 0 && (
+            <div className="mb-6">
+              <p className="mb-2 text-sm font-medium text-slate-700">Already open in this branch</p>
+              <ul className="space-y-2">
+                {inUse.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-emerald-50/60 p-3 ring-1 ring-emerald-200">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white"><Monitor className="size-5" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-slate-900">{r.name} <span className="font-mono text-xs text-slate-400">{r.code}</span></span>
+                      <span className="block text-xs text-slate-500">Shift of <strong className="font-semibold text-slate-700">{r.open_session?.opened_by_name ?? 'another cashier'}</strong>{r.open_session?.opened_at && <> · since {formatDateTime(r.open_session.opened_at)}</>}</span>
+                    </span>
+                    <Button size="sm" icon={<Play className="size-4" />} onClick={() => onUseOpen(r)}>Use this register</Button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-500">Sales go into that cashier's drawer and shift report. Their shift stays open; you can leave the register at any time.</p>
+            </div>
+          )}
           {open.error && !fieldErr('opening_float') && <ErrorBanner error={open.error} className="mb-4" />}
           {available.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-center">
               <span className="grid size-12 place-items-center rounded-2xl bg-amber-50 text-amber-600"><AlertTriangle className="size-6" /></span>
-              <p className="mt-3 font-medium text-slate-800">No free register in this branch</p>
-              <p className="mt-1 text-sm text-slate-500">{registers.length > 0 ? 'All registers already have an open shift.' : 'Ask a manager to add a register in Settings.'}</p>
+              <p className="mt-3 font-medium text-slate-800">No free register to open a new shift</p>
+              <p className="mt-1 text-sm text-slate-500">{registers.length === 0 ? 'Ask a manager to add a register in Settings.' : onUseOpen && inUse.length > 0 ? 'Use the open register above, or close that shift first in Shifts.' : 'All registers already have an open shift. Ask the cashier using it, or a manager, to help.'}</p>
             </div>
           ) : (
             <form

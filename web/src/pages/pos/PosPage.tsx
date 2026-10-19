@@ -16,40 +16,64 @@ import { NoAccess } from '../NotFoundPage';
 import { CloseShiftModal, OpenShiftCard, ZReadingModal } from './ShiftDialogs';
 import { PaymentModal, type PaymentLine } from './PaymentModal';
 
+/** Owners and managers can sell on a register another cashier already opened; remembered per tab until they leave it. */
+const borrowKey = (tenantId: number | string) => `pos-borrowed-shift-${tenantId}`;
+function readBorrowed(tenantId: number | string): number | null {
+  try { const v = Number(sessionStorage.getItem(borrowKey(tenantId))); return v > 0 ? v : null; } catch { return null; }
+}
+function writeBorrowed(tenantId: number | string, id: number | null) {
+  try { if (id) sessionStorage.setItem(borrowKey(tenantId), String(id)); else sessionStorage.removeItem(borrowKey(tenantId)); } catch { /* storage unavailable */ }
+}
+
 export function PosPage() {
-  const { can, branch, branches } = useTenant();
+  const { can, branch, branches, tenantId } = useTenant();
   const [searchParams] = useSearchParams();
   const onlineOrderId = searchParams.get('online_order_id');
   const current = useTenantQuery<{ data: RegisterSession | null }>('/register-sessions/current');
   const registers = useTenantQuery<{ data: Register[] }>('/registers', { branch_id: branch?.id }, { enabled: !!branch });
   const [zReading, setZReading] = useState<RegisterSession | null>(null);
+  const [borrowedId, setBorrowedIdState] = useState<number | null>(() => readBorrowed(tenantId));
+  const setBorrowedId = (id: number | null) => { writeBorrowed(tenantId, id); setBorrowedIdState(id); };
+  const ownSession = current.data?.data;
+  const borrowed = useTenantQuery<{ data: RegisterSession }>(`/register-sessions/${borrowedId}`, undefined, { enabled: !!borrowedId && !ownSession && can('shifts.view_all') });
+  const borrowedSession = borrowed.data?.data;
+  const borrowedUsable = !!borrowedSession && borrowedSession.status === 'open' && borrowedSession.branch_id === branch?.id;
+
+  // Forget a borrowed register once its shift is closed, it belongs to another branch, or it can no longer be read.
+  useEffect(() => {
+    if (borrowedId && (borrowed.isError || (borrowedSession && !borrowedUsable))) { writeBorrowed(tenantId, null); setBorrowedIdState(null); }
+  }, [borrowedId, borrowed.isError, borrowedSession, borrowedUsable, tenantId]);
 
   if (!can('sales.create')) return <NoAccess what="the point of sale" />;
   if (current.isPending) return <Spinner />;
   if (current.error) return <ErrorBanner error={current.error} />;
 
-  const session = current.data?.data;
+  const session = ownSession ?? (borrowedUsable ? borrowedSession : undefined);
   const zModal = zReading && <ZReadingModal session={zReading} onClose={() => setZReading(null)} />;
   if (!session) {
-    if (registers.isPending) return <Spinner />;
+    if (registers.isPending || (borrowedId && borrowed.isPending && can('shifts.view_all'))) return <Spinner />;
     return (
       <>
-        <OpenShiftCard key={branch?.id} registers={registers.data?.data ?? []} branchName={branch?.name ?? ''} />
+        <OpenShiftCard key={branch?.id} registers={registers.data?.data ?? []} branchName={branch?.name ?? ''} forOnlineOrder={!!onlineOrderId}
+          onUseOpen={can('shifts.view_all') ? (r) => r.open_session && setBorrowedId(r.open_session.id) : undefined} />
         {zModal}
       </>
     );
   }
 
   const sessionBranch = branches.find((b) => b.id === session.branch_id);
+  const register = registers.data?.data.find((r) => r.id === session.register_id);
+  const borrowedFrom = ownSession ? null : (register?.open_session?.opened_by_name ?? 'another cashier');
   return (
     <>
-      <Terminal session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} onShiftClosed={setZReading} onlineOrderId={onlineOrderId} />
+      <Terminal key={session.id} session={session} branchName={sessionBranch?.name ?? `Branch ${session.branch_id}`} onShiftClosed={(s) => { setBorrowedId(null); setZReading(s); }} onlineOrderId={onlineOrderId}
+        borrowedFrom={borrowedFrom} onLeave={() => setBorrowedId(null)} />
       {zModal}
     </>
   );
 }
 
-function Terminal({ session, branchName, onShiftClosed, onlineOrderId }: { session: RegisterSession; branchName: string; onShiftClosed: (s: RegisterSession) => void; onlineOrderId: string | null }) {
+function Terminal({ session, branchName, onShiftClosed, onlineOrderId, borrowedFrom, onLeave }: { session: RegisterSession; branchName: string; onShiftClosed: (s: RegisterSession) => void; onlineOrderId: string | null; borrowedFrom: string | null; onLeave: () => void }) {
   const { can, path, tenantId } = useTenant();
   const navigate = useNavigate();
   const toast = useToast();
@@ -139,14 +163,20 @@ function Terminal({ session, branchName, onShiftClosed, onlineOrderId }: { sessi
         <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-700 via-brand-800 to-brand-900 px-4 py-3 text-white shadow-md shadow-brand-900/20">
           <span aria-hidden className="pointer-events-none absolute -right-10 -top-16 size-40 rounded-full bg-sun-400/20 blur-2xl" />
           <span className="relative inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
-            <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> Shift open
+            <span className="size-2 animate-pulse rounded-full bg-emerald-400" /> {borrowedFrom ? `${borrowedFrom}'s shift` : 'Shift open'}
           </span>
-          <BranchPicker currentId={session.branch_id} currentName={branchName} onPick={(b) => setSwitchTo(b)} />
+          <BranchPicker currentId={session.branch_id} currentName={branchName} onPick={(b) => (borrowedFrom ? (onLeave(), setBranchId(b.id)) : setSwitchTo(b))} />
           <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Monitor className="size-4" />Register #{session.register_id}</span>
           <span className="relative flex items-center gap-1.5 text-sm text-brand-100"><Clock className="size-4" /><ShiftTimer since={session.opened_at} /></span>
-          <button type="button" onClick={() => setClosingShift(true)} className="relative ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-semibold ring-1 ring-white/20 transition hover:bg-white/20">
-            <LogOut className="size-3.5" /> Close shift
-          </button>
+          {borrowedFrom ? (
+            <button type="button" onClick={onLeave} title="Stop using this register. The shift stays open for its cashier." className="relative ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-semibold ring-1 ring-white/20 transition hover:bg-white/20">
+              <LogOut className="size-3.5" /> Leave register
+            </button>
+          ) : (
+            <button type="button" onClick={() => setClosingShift(true)} className="relative ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-semibold ring-1 ring-white/20 transition hover:bg-white/20">
+              <LogOut className="size-3.5" /> Close shift
+            </button>
+          )}
         </div>
         {onlineOrderId ? <div className="space-y-2">{onlineOrder.isError && <ErrorBanner error={onlineOrder.error} />}{onlineOrder.isPending ? <Spinner label="Loading online order…" /> : <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200"><span>Checking out online order {onlineOrder.data?.data.order_number ?? `#${onlineOrderId}`}. Confirm its payment below.</span><Button type="button" variant="secondary" size="sm" icon={<X className="size-4" />} onClick={() => navigate(`/t/${tenantId}/online-orders`)}>Cancel checkout</Button></div>}</div> : <ProductPicker branchId={session.branch_id} onPick={(product) => dispatch({ type: 'add', product })} />}
       </div>

@@ -9,6 +9,7 @@ use App\Models\OnlineOrder;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Shop\OnlineOrderNotifier;
 use App\Support\Money;
 use App\Support\Permissions;
 use App\Support\TenantContext;
@@ -27,7 +28,7 @@ class RiderDeliveryController extends Controller
 {
     private const RELATIONS = ['branch:id,name,address,phone,latitude,longitude', 'items'];
 
-    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit) {}
+    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit, private readonly OnlineOrderNotifier $notify) {}
 
     /**
      * The rider's day: deliveries on the way, packed orders at their branches waiting for a rider, everything they
@@ -132,7 +133,10 @@ class RiderDeliveryController extends Controller
             return $locked;
         });
 
-        return response()->json(['data' => $order->fresh(self::RELATIONS)]);
+        $fresh = $order->fresh(self::RELATIONS);
+        $this->notify->statusChanged($fresh, tellRider: false); // the customer hears their order is on the way
+
+        return response()->json(['data' => $fresh]);
     }
 
     /** Go on or off duty. Off-duty riders are listed last when the store sends an order out. */
@@ -172,6 +176,7 @@ class RiderDeliveryController extends Controller
             $order->forceFill(['delivered_at' => now(), 'rider_lat' => null, 'rider_lng' => null, 'rider_location_at' => null])->save();
             $this->audit->log('online_order.delivered', $order, null, ['order_number' => $order->order_number, 'rider_name' => $order->rider_name]);
         });
+        $this->notify->delivered($order);
 
         return response()->json(['data' => $order->fresh(self::RELATIONS)]);
     }
@@ -190,6 +195,7 @@ class RiderDeliveryController extends Controller
                 'status' => OnlineOrderStatus::Ready->value, 'order_number' => $order->order_number, 'reason' => trim($data['reason']),
             ]);
         });
+        $this->notify->returned($order, trim($data['reason']));
 
         return response()->json(['data' => $order->fresh(self::RELATIONS)]);
     }

@@ -1,4 +1,6 @@
 import {
+  Bike,
+  Store,
   AlertTriangle,
   BarChart3,
   Boxes,
@@ -66,7 +68,7 @@ export function ReportsPage() {
 
   const tabs = [
     ...(can('reports.view')
-      ? [{ value: 'sales' as Tab, label: 'Sales', icon: TrendingUp }, { value: 'breakdown' as Tab, label: 'By branch / cashier / payment', icon: Building2 }, { value: 'products' as Tab, label: 'Products & stock', icon: Boxes }]
+      ? [{ value: 'sales' as Tab, label: 'Sales', icon: TrendingUp }, { value: 'breakdown' as Tab, label: 'By channel / branch / cashier', icon: Building2 }, { value: 'products' as Tab, label: 'Products & stock', icon: Boxes }]
       : []),
     ...(can('reports.financial') ? [{ value: 'profit' as Tab, label: 'Profit & expenses', icon: PiggyBank }] : []),
   ];
@@ -314,6 +316,9 @@ function BreakdownReport({ filters }: { filters: Filters }) {
   const byBranch = useReport<{ branch_id: number; branch_name: string; transactions: number; net_sales: string; vat: string }[]>('sales-by-branch', filters);
   const byCashier = useReport<{ cashier_id: number; cashier_name: string; transactions: number; net_sales: string; discounts: string }[]>('sales-by-cashier', filters);
   const byMethod = useReport<{ method: string; payments: number; collected: string; refunded: string; net: string }[]>('sales-by-payment-method', filters);
+  const byChannel = useReport<{ channel: 'in_store' | 'pickup' | 'delivery'; sales: number; total: string }[]>('sales-by-channel', filters);
+  const channelRows = byChannel.data?.data ?? [];
+  const channelTotal = channelRows.reduce((s, r) => s + Number(r.total), 0);
   const branchRows = byBranch.data?.data ?? [];
   const cashierRows = [...(byCashier.data?.data ?? [])].sort((a, b) => Number(b.net_sales) - Number(a.net_sales));
   const methodRows = byMethod.data?.data ?? [];
@@ -323,6 +328,24 @@ function BreakdownReport({ filters }: { filters: Filters }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <Card title="By channel" subtitle="In-store sales compared with online pickup and delivery" icon={ShoppingBag} padded={false} className="lg:col-span-2">
+        <ReportTable loading={byChannel.isPending} error={byChannel.error} empty={channelRows.every((r) => r.sales === 0) && 'No sales'} emptyIcon={ShoppingBag}
+          head={<><Th>Channel</Th><Th right>Sales</Th><Th right>Total</Th><Th right>Average</Th><Th right>Share</Th></>}>
+          {channelRows.map((r) => {
+            const look = { in_store: { label: 'In store', note: 'Rung up at the counter', icon: Store, tone: 'bg-slate-100 text-slate-600' }, pickup: { label: 'Online pickup', note: 'Ordered online, collected in store', icon: ShoppingBag, tone: 'bg-sky-50 text-sky-700' }, delivery: { label: 'Online delivery', note: 'Delivered by a rider', icon: Bike, tone: 'bg-orange-50 text-orange-700' } }[r.channel];
+            return (
+              <tr key={r.channel} className="transition-colors hover:bg-brand-50/40">
+                <Td><span className="flex items-center gap-2.5"><span className={cx('grid size-8 place-items-center rounded-lg', look.tone)}><look.icon className="size-4" /></span><span><span className="block font-medium text-slate-900">{look.label}</span><span className="block text-xs text-slate-500">{look.note}</span></span></span></Td>
+                <Td right className="text-slate-500">{r.sales}</Td>
+                <Td right className="font-display font-semibold text-slate-900">{formatMoney(r.total)}</Td>
+                <Td right className="text-slate-500">{r.sales ? formatMoney((Number(r.total) / r.sales).toFixed(2)) : '—'}</Td>
+                <Td right><Share value={pct(Number(r.total), channelTotal)} /></Td>
+              </tr>
+            );
+          })}
+        </ReportTable>
+      </Card>
+
       <Card title="By branch" subtitle="Net sales per branch" icon={Building2} padded={false}>
         <ReportTable loading={byBranch.isPending} error={byBranch.error} empty={branchRows.length === 0 && 'No sales'} emptyIcon={Building2}
           head={<><Th>Branch</Th><Th right>Txns</Th><Th right>Net sales</Th><Th right>Share</Th></>}>

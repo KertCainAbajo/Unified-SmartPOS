@@ -45,6 +45,12 @@ class ReportController extends Controller
         return $this->respond($request, $tenant, Permissions::REPORTS_VIEW, fn (ReportService $r) => $r->salesByPaymentMethod());
     }
 
+    /** Completed sales by channel: in store, online pickup and online delivery. */
+    public function salesByChannel(Request $request, Tenant $tenant): JsonResponse
+    {
+        return $this->respond($request, $tenant, Permissions::REPORTS_VIEW, fn (ReportService $r) => $r->salesByChannel());
+    }
+
     /** Top products by net quantity sold. `limit` 1-100 (default 20). */
     public function bestSellers(Request $request, Tenant $tenant): JsonResponse
     {

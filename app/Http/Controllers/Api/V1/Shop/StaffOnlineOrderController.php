@@ -9,6 +9,7 @@ use App\Models\OnlineOrder;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Shop\OnlineOrderNotifier;
 use App\Services\Shop\RiderDirectory;
 use App\Support\Money;
 use App\Support\Permissions;
@@ -29,7 +30,7 @@ class StaffOnlineOrderController extends Controller
 {
     private const RELATIONS = ['branch:id,name,address,latitude,longitude', 'account:id,name,email,phone', 'items'];
 
-    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit, private readonly RiderDirectory $riders) {}
+    public function __construct(private readonly TenantContext $context, private readonly AuditLogger $audit, private readonly RiderDirectory $riders, private readonly OnlineOrderNotifier $notify) {}
 
     /** Riders who can take deliveries from a branch, least busy first. */
     public function riders(Request $request, Tenant $tenant)
@@ -104,7 +105,10 @@ class StaffOnlineOrderController extends Controller
     /** Advance preparation state. Completion is reserved for POS checkout so it always has a recorded sale. */
     public function updateStatus(Request $request, Tenant $tenant, OnlineOrder $onlineOrder)
     {
-        $this->authorizePermission(Permissions::SALES_CREATE);
+        // Customer service may cancel an order when a customer calls; everything else is for staff who ring up sales.
+        if (! ($request->input('status') === OnlineOrderStatus::Cancelled->value && $this->context->can(Permissions::CUSTOMERS_MANAGE))) {
+            $this->authorizePermission(Permissions::SALES_CREATE);
+        }
         $this->ensureAccessible($tenant, $onlineOrder);
         $data = $request->validate([
             'status' => ['required', Rule::in([
@@ -166,7 +170,10 @@ class StaffOnlineOrderController extends Controller
             ]));
         });
 
-        return response()->json(['data' => $onlineOrder->fresh(self::RELATIONS)]);
+        $fresh = $onlineOrder->fresh(self::RELATIONS);
+        $this->notify->statusChanged($fresh);
+
+        return response()->json(['data' => $fresh]);
     }
 
     private function authorizeQueue(): void

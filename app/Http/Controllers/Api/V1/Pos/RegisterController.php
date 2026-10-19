@@ -25,7 +25,7 @@ class RegisterController extends Controller
         $this->authorize('viewAny', Register::class);
 
         $registers = $this->scopeToAccessibleBranches($tenant->registers())
-            ->with('openSession')
+            ->with('openSession.openedBy:id,name')
             ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', $request->integer('branch_id')))
             ->orderBy('branch_id')->orderBy('code')
             ->get();
@@ -81,7 +81,10 @@ class RegisterController extends Controller
             'name' => $register->name,
             'is_active' => $register->is_active,
             'open_session' => $register->relationLoaded('openSession') && $register->openSession
-                ? ['id' => $register->openSession->id, 'opened_by' => $register->openSession->opened_by, 'opened_at' => $register->openSession->opened_at]
+                ? [
+                    'id' => $register->openSession->id, 'opened_by' => $register->openSession->opened_by,
+                    'opened_by_name' => $register->openSession->openedBy?->name, 'opened_at' => $register->openSession->opened_at,
+                ]
                 : null,
         ];
     }

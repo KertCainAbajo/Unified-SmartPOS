@@ -183,7 +183,7 @@ export interface Register {
   code: string;
   name: string;
   is_active: boolean;
-  open_session: { id: number; opened_by: number; opened_at: string } | null;
+  open_session: { id: number; opened_by: number; opened_by_name?: string | null; opened_at: string } | null;
 }
 
 export interface ShiftSummary {

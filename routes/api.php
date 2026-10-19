@@ -83,6 +83,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::middleware('auth:customer')->group(function () {
             Route::post('logout', [CustomerShopController::class, 'logout'])->name('logout');
             Route::get('me', [CustomerShopController::class, 'me'])->name('me');
+            Route::patch('me', [CustomerShopController::class, 'updateProfile'])->name('me.update');
+            Route::put('me/password', [CustomerShopController::class, 'changePassword'])->middleware('throttle:login')->name('me.password');
             Route::get('orders', [CustomerShopController::class, 'orders'])->name('orders.index');
             Route::get('purchases', [CustomerShopController::class, 'purchases'])->name('purchases.index');
             Route::post('orders', [CustomerShopController::class, 'placeOrder'])->middleware('throttle:checkout')->name('orders.store');
@@ -268,6 +270,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                     Route::get('sales-by-branch', [ReportController::class, 'salesByBranch'])->name('sales-by-branch');
                     Route::get('sales-by-cashier', [ReportController::class, 'salesByCashier'])->name('sales-by-cashier');
                     Route::get('sales-by-payment-method', [ReportController::class, 'salesByPaymentMethod'])->name('sales-by-payment-method');
+                    Route::get('sales-by-channel', [ReportController::class, 'salesByChannel'])->name('sales-by-channel');
                     Route::get('best-sellers', [ReportController::class, 'bestSellers'])->name('best-sellers');
                     Route::get('low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
                     Route::get('inventory-movements', [ReportController::class, 'inventoryMovements'])->name('inventory-movements');

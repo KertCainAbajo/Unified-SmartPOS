@@ -22,7 +22,7 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
       {list.isPending ? (
         <Spinner />
       ) : !list.data?.data.length ? (
-        <EmptyState title="No notifications" description="Low-stock alerts and refund approvals appear here." />
+        <EmptyState title="No notifications" description="New online orders, deliveries, low-stock alerts and refund approvals appear here." />
       ) : (
         <ul className="divide-y divide-slate-100">
           {list.data.data.map((n) => (

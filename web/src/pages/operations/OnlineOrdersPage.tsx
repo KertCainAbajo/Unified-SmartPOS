@@ -39,7 +39,9 @@ function ago(iso: string, now: number) {
 }
 
 export function OnlineOrdersPage() {
-  const { scopeBranchId, can, tenantId, tenant } = useTenant();
+  const { scopeBranchId, can, tenantId, tenant, viewAll, setBranchId, branchName, branch } = useTenant();
+  // New orders at every reachable branch (shared with the menu badge), to point out ones hidden by the branch filter.
+  const everywhere = useTenantQuery<Paginated<OnlineOrder>>('/online-orders', { status: 'pending', per_page: 1 }, { refetchInterval: 30000 });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('active');
@@ -63,8 +65,14 @@ export function OnlineOrdersPage() {
     onSuccess: () => { setDispatching(null); setCancelling(null); void queryClient.invalidateQueries({ queryKey: ['t'] }); },
     toastErrors: true,
   });
-  const ringUp = (order: OnlineOrder) => navigate(`/t/${tenantId}/pos?online_order_id=${order.id}`);
+  // The payment is recorded on a register at the order's own branch, so the POS opens there.
+  const ringUp = (order: OnlineOrder) => {
+    if (order.branch.id !== branch?.id) setBranchId(order.branch.id);
+    navigate(`/t/${tenantId}/pos?online_order_id=${order.id}`);
+  };
   const canAct = can('sales.create');
+  // Customer service can cancel an order for a customer who calls, but does not prepare or ring up orders.
+  const canCancel = canAct || can('customers.manage');
 
   const all = list.data?.data ?? [];
   const term = search.trim().toLowerCase();
@@ -93,6 +101,15 @@ export function OnlineOrdersPage() {
           <Button variant="secondary" icon={<RefreshCw className={cx('size-4', list.isFetching && 'animate-spin')} />} onClick={() => queryClient.invalidateQueries({ queryKey: ['t', tenantId, '/online-orders'] })}>Refresh</Button>
         </div>
       </div>
+
+      {/* New orders hidden by the branch currently selected */}
+      {view === 'active' && !viewAll && (everywhere.data?.total ?? 0) > counts.pending && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          <Inbox className="size-5 shrink-0 text-rose-600" />
+          <span className="flex-1"><b>{(everywhere.data?.total ?? 0) - counts.pending} new {(everywhere.data?.total ?? 0) - counts.pending === 1 ? 'order is' : 'orders are'} waiting at another branch.</b> You are viewing {branchName(scopeBranchId)} only.</span>
+          <Button size="sm" onClick={() => setBranchId('all')}>Show all branches</Button>
+        </div>
+      )}
 
       {/* Stage cards (active view) */}
       {view === 'active' && (
@@ -148,6 +165,7 @@ export function OnlineOrdersPage() {
                     now={now}
                     busy={status.isPending && status.variables?.id === order.id}
                     canAct={canAct}
+                    canCancel={canCancel}
                     onConfirm={() => status.mutate({ id: order.id, status: 'confirmed' })}
                     onReady={() => status.mutate({ id: order.id, status: 'ready' })}
                     onDispatch={() => setDispatching(order)}
@@ -181,8 +199,8 @@ function StageCard({ label, count, icon: Icon, tile, active, onClick, pulse }: {
   );
 }
 
-function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, onRingUp, onCancel, onMap }: {
-  order: OnlineOrder; now: number; busy: boolean; canAct: boolean;
+function OrderCard({ order, now, busy, canAct, canCancel, onConfirm, onReady, onDispatch, onRingUp, onCancel, onMap }: {
+  order: OnlineOrder; now: number; busy: boolean; canAct: boolean; canCancel: boolean;
   onConfirm: () => void; onReady: () => void; onDispatch: () => void; onRingUp: () => void; onCancel: () => void; onMap: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -289,16 +307,16 @@ function OrderCard({ order, now, busy, canAct, onConfirm, onReady, onDispatch, o
       </div>
 
       {/* Actions */}
-      {canAct && open && (
+      {canCancel && open && (
         <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/60 py-3 pl-5 pr-4">
           <button onClick={onCancel} disabled={busy} className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"><X className="size-4" /> Cancel</button>
-          <div className="ml-auto">
+          {canAct ? <div className="ml-auto">
             {order.status === 'pending' && <Button loading={busy} icon={<Check className="size-4" />} onClick={onConfirm}>Confirm order</Button>}
             {order.status === 'confirmed' && <Button loading={busy} icon={<PackageCheck className="size-4" />} onClick={onReady}>{delivery ? 'Packed, ready to send' : 'Ready for pickup'}</Button>}
             {order.status === 'ready' && delivery && <Button loading={busy} icon={<Bike className="size-4" />} onClick={onDispatch}>Send out for delivery</Button>}
             {order.status === 'ready' && !delivery && <Button icon={<Wallet className="size-4" />} onClick={onRingUp}>Customer is here · ring up</Button>}
             {order.status === 'out_for_delivery' && <Button icon={<Wallet className="size-4" />} onClick={onRingUp}>{order.delivered_at ? 'Record payment' : 'Delivered · record payment'}</Button>}
-          </div>
+          </div> : <span className="ml-auto text-xs text-slate-500">Branch staff prepare this order.</span>}
         </div>
       )}
     </article>

@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from '
 import { Navigate, useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { DeliveryMap, toLatLng } from '../../components/maps';
+import { CustomerAccountDialog } from './CustomerAccountDialog';
 import { CustomerAuthDialog } from './CustomerAuthDialog';
 import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './CustomerOrders';
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
@@ -66,6 +67,7 @@ export function ShopPage() {
   const deliveryPin = deliveryLocation.pin;
   const [trackingId, setTrackingId] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [authOpen, setAuthOpen] = useState(false);
   const [error, setError] = useState('');
@@ -194,10 +196,10 @@ export function ShopPage() {
           </a>
           {signedIn ? <>
             <button onClick={() => setHistoryOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"><Receipt size={17} /> <span className="hidden md:inline">My orders</span>{openOrders > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950">{openOrders}</span>}</button>
-            <div className="hidden items-center gap-2.5 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-3.5 sm:flex">
+            <button type="button" onClick={() => setAccountOpen(true)} title="My account" aria-label="My account" className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white p-1 text-left transition hover:border-emerald-300 sm:pr-3.5">
               <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-emerald-600 to-emerald-900 text-xs font-bold text-white">{initials(account.data!.name)}</span>
-              <div className="leading-tight"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Signed in</p><p className="text-sm font-semibold">{firstName}</p></div>
-            </div>
+              <span className="hidden leading-tight sm:block"><span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">My account</span><span className="block text-sm font-semibold">{firstName}</span></span>
+            </button>
             <button onClick={() => logoutMutation.mutate()} aria-label="Sign out" title="Sign out" className="grid size-11 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"><LogOut size={17} /></button>
           </> : <>
             <button onClick={() => openAuth('register')} className="hidden h-11 items-center rounded-full px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:inline-flex">Create account</button>
@@ -428,6 +430,7 @@ export function ShopPage() {
       <span className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-4 text-sm font-bold text-emerald-950">View basket <ArrowRight size={15} /></span>
     </a>}
 
+    {accountOpen && account.data && <CustomerAccountDialog base={base} business={business} account={account.data} onClose={() => setAccountOpen(false)} />}
     {pickingLocation && (
       <DeliveryLocationDialog
         initial={deliveryLocation}

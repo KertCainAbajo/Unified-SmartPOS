@@ -130,6 +130,23 @@ class ReportService
         })->all();
     }
 
+    /** Completed sales split by where they came from: the counter, online pickup, or online delivery. */
+    public function salesByChannel(): array
+    {
+        $channel = "COALESCE(online_orders.fulfilment, 'in_store')";
+        $rows = $this->completedSales()
+            ->leftJoin('online_orders', 'online_orders.sale_id', '=', 'sales.id')
+            ->groupByRaw($channel)
+            ->selectRaw("{$channel} as channel, COUNT(*) as sales, SUM(sales.total) as total")
+            ->get()->keyBy('channel');
+
+        return collect(['in_store', 'pickup', 'delivery'])->map(fn (string $c) => [
+            'channel' => $c,
+            'sales' => (int) ($rows[$c]->sales ?? 0),
+            'total' => Money::fromDatabase($rows[$c]->total ?? null),
+        ])->all();
+    }
+
     public function bestSellers(int $limit = 20): array
     {
         return $this->completedSales()
