@@ -244,12 +244,12 @@ export function ShopPage() {
             {basketCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950 ring-2 ring-white">{basketCount}</span>}
           </a>
           {signedIn ? <>
-            <button onClick={() => setHistoryOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"><Receipt size={17} /> <span className="hidden md:inline">My orders</span>{openOrders > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950">{openOrders}</span>}</button>
+            <button onClick={() => setHistoryOpen(true)} aria-label="My orders" className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"><Receipt size={17} /> <span className="hidden md:inline">My orders</span>{openOrders > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950">{openOrders}</span>}</button>
             <button type="button" onClick={() => setAccountOpen(true)} title="My account" aria-label="My account" className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white p-1 text-left transition hover:border-emerald-300 sm:pr-3.5">
               <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-emerald-600 to-emerald-900 text-xs font-bold text-white">{initials(account.data!.name)}</span>
               <span className="hidden leading-tight sm:block"><span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">My account</span><span className="block text-sm font-semibold">{firstName}</span></span>
             </button>
-            <button onClick={() => logoutMutation.mutate()} aria-label="Sign out" title="Sign out" className="grid size-11 place-items-center rounded-full border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"><LogOut size={17} /></button>
+            <button onClick={() => logoutMutation.mutate()} aria-label="Sign out" title="Sign out" className="hidden size-11 place-items-center sm:grid rounded-full border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"><LogOut size={17} /></button>
           </> : <>
             <button onClick={() => openAuth('register')} className="hidden h-11 items-center rounded-full px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:inline-flex">Create account</button>
             <button onClick={() => openAuth('login')} className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-800 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-900/20 transition hover:bg-emerald-900 sm:px-5">Sign in <ArrowRight size={15} className="hidden sm:block" /></button>
@@ -482,7 +482,7 @@ export function ShopPage() {
       <span className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-4 text-sm font-bold text-emerald-950">View basket <ArrowRight size={15} /></span>
     </a>}
 
-    {accountOpen && account.data && <CustomerAccountDialog base={base} business={business} account={account.data} onClose={() => setAccountOpen(false)} />}
+    {accountOpen && account.data && <CustomerAccountDialog base={base} business={business} account={account.data} onClose={() => setAccountOpen(false)} onSignOut={() => { setAccountOpen(false); logoutMutation.mutate(); }} />}
     {pickingLocation && (
       <DeliveryLocationDialog
         initial={deliveryLocation}

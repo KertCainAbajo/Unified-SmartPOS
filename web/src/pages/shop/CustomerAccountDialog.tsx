@@ -1,12 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Eye, EyeOff, KeyRound, LoaderCircle, Mail, Phone, ShieldCheck, TriangleAlert, UserRound, X } from 'lucide-react';
+import { Check, Eye, LogOut, EyeOff, KeyRound, LoaderCircle, Mail, Phone, ShieldCheck, TriangleAlert, UserRound, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, api, errorMessage } from '../../lib/api';
 
 interface Account { id: number; name: string; email: string; phone: string }
 
 /** The shopper's own account: name and mobile number the store and rider use, and changing the password. */
-export function CustomerAccountDialog({ base, business, account, onClose }: { base: string; business: string; account: Account; onClose: () => void }) {
+export function CustomerAccountDialog({ base, business, account, onClose, onSignOut }: { base: string; business: string; account: Account; onClose: () => void; onSignOut?: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(account.name);
   const [phone, setPhone] = useState(account.phone);
@@ -101,6 +101,12 @@ export function CustomerAccountDialog({ base, business, account, onClose }: { ba
                 {passwordState.busy ? <LoaderCircle className="size-4 animate-spin" /> : <KeyRound className="size-4" />} Change password
               </button>
             </form>
+
+            {onSignOut && (
+              <button type="button" onClick={onSignOut} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50">
+                <LogOut className="size-4" /> Sign out
+              </button>
+            )}
           </div>
         </div>
       </div>
