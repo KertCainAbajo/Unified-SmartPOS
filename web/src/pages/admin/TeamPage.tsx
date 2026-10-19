@@ -1,4 +1,4 @@
-import { AtSign, BarChart3, Bike, Boxes, LayoutGrid, List, Briefcase, Calculator, Check, CheckCircle2, ClipboardList, Headset, ShoppingCart, ChevronRight, Clock, Copy, Crown, KeyRound, Layers, MailCheck, Package, Printer, Receipt, RotateCcw, Settings, ShieldAlert, ShieldCheck, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AtSign, BarChart3, Bike, Boxes, Briefcase, Calculator, Check, CheckCircle2, ChevronRight, ClipboardList, Clock, Copy, Crown, DoorOpen, Headset, KeyRound, Layers, LayoutGrid, List, MailCheck, Package, PauseCircle, PlayCircle, Printer, Receipt, RotateCcw, Settings, ShieldCheck, ShoppingCart, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
@@ -160,14 +160,14 @@ function MembersTab() {
         <StatCard tone="featured" icon={Users} label="Team members" value={total} hint={viewAll ? 'Across all branches' : 'Including all-branch staff'} />
         <StatCard tone="brand" icon={UserCheck} label="Active" value={active} hint="Can sign in and work" />
         <StatCard tone="sky" icon={MailCheck} label="Invited" value={invited} hint="Waiting for first sign-in" />
-        <StatCard tone={suspended ? 'warn' : 'default'} icon={UserX} label="Suspended" value={suspended} hint={suspended ? 'Access paused' : 'No one suspended'} />
+        <StatCard tone={suspended ? 'warn' : 'default'} icon={UserX} label="Paused" value={suspended} hint={suspended ? 'Access paused for now' : 'No one paused'} />
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center">
           <SearchField className="lg:w-80" value={term} onChange={(v) => { setTerm(v); setPage(1); }} placeholder="Search name, username or employee ID" />
           <Segmented label="Status" value={status} onChange={(v) => { setStatus(v); setPage(1); }}
-            options={[{ value: '', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'invited', label: 'Invited' }, { value: 'suspended', label: 'Suspended' }, { value: 'offboarded', label: 'Offboarded' }]} />
+            options={[{ value: '', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'invited', label: 'Invited' }, { value: 'suspended', label: 'Paused' }, { value: 'offboarded', label: 'Left' }]} />
           <div className="flex items-center gap-2 lg:ml-auto">
             <div className="inline-flex rounded-xl bg-slate-100 p-1" role="group" aria-label="Layout">
               {([['cards', LayoutGrid, 'Cards'], ['list', List, 'List']] as const).map(([v, Icon, label]) => (
@@ -312,8 +312,8 @@ const soft = (r?: Role) => (r ? ROLE_SOFT[r.key] ?? ROLE_SOFT.default : ROLE_SOF
 const STATUS_LOOK: Record<StaffMember['status'], { label: string; cls: string; dot: string }> = {
   active: { label: 'Active', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
   invited: { label: 'Invited', cls: 'bg-sky-50 text-sky-700 ring-sky-200', dot: 'bg-sky-500' },
-  suspended: { label: 'Suspended', cls: 'bg-amber-50 text-amber-800 ring-amber-200', dot: 'bg-amber-500' },
-  offboarded: { label: 'Offboarded', cls: 'bg-slate-100 text-slate-500 ring-slate-200', dot: 'bg-slate-400' },
+  suspended: { label: 'Paused', cls: 'bg-amber-50 text-amber-800 ring-amber-200', dot: 'bg-amber-500' },
+  offboarded: { label: 'Left', cls: 'bg-slate-100 text-slate-500 ring-slate-200', dot: 'bg-slate-400' },
 };
 
 /** "Today, 3:42 PM", "Yesterday", "5 days ago", or the date. */
@@ -411,6 +411,96 @@ function StaffCard({ m, groupRole, isOwner, isMe, onOpen }: { m: StaffMember; gr
         </div>
       </div>
     </button>
+  );
+}
+
+/* --------------------------------------------------------------------------- Work status */
+
+const PAUSE_REASONS = ['On leave', 'Under review', 'Not on the schedule'];
+const LEAVE_REASONS = ['Resigned', 'End of contract', 'Let go', 'Retired'];
+
+/**
+ * Plain-language staff status: pause access for a while (suspend), or record that the person left the job (offboard).
+ * A reason is required for both; quick picks fill the common ones.
+ */
+function WorkStatus({ member, canPause, canLeave, canRehire, busy, onPause, onResume, onRehire, onLeave }: {
+  member: StaffMember; canPause: boolean; canLeave: boolean; canRehire: boolean; busy: boolean;
+  onPause: (reason: string) => void; onResume: () => void; onRehire: () => void; onLeave: (reason: string) => void;
+}) {
+  const [choice, setChoice] = useState<'pause' | 'leave' | null>(null);
+  const [reason, setReason] = useState('');
+  const name = member.name?.split(' ')[0] ?? 'This person';
+  const now = {
+    active: { text: `${name} is working and can sign in.`, cls: 'bg-emerald-50 text-emerald-800 ring-emerald-200', dot: 'bg-emerald-500' },
+    invited: { text: `${name} has not signed in for the first time yet.`, cls: 'bg-sky-50 text-sky-800 ring-sky-200', dot: 'bg-sky-500' },
+    suspended: { text: `${name}'s access is paused. They cannot sign in.`, cls: 'bg-amber-50 text-amber-900 ring-amber-200', dot: 'bg-amber-500' },
+    offboarded: { text: `${name} no longer works here. Their login is closed.`, cls: 'bg-slate-100 text-slate-700 ring-slate-200', dot: 'bg-slate-400' },
+  }[member.status];
+  const working = ['active', 'invited'].includes(member.status);
+  const options = [
+    ...(canPause && working ? [{ value: 'pause' as const, icon: PauseCircle, title: 'Pause access', text: 'On leave or under review. You can turn it back on any time.', tone: 'amber' }] : []),
+    ...(canLeave && member.status !== 'offboarded' ? [{ value: 'leave' as const, icon: DoorOpen, title: 'Left the job', text: 'Resigned or contract ended. Login closes; records are kept.', tone: 'rose' }] : []),
+  ];
+  const picks = choice === 'leave' ? LEAVE_REASONS : PAUSE_REASONS;
+
+  return (
+    <section className="space-y-4 rounded-2xl p-4 ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Briefcase className="size-4 text-brand-600" />Work status</p>
+        <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1', now.cls)}><span className={cx('size-1.5 rounded-full', now.dot)} />{now.text}</span>
+      </div>
+      {member.status_reason && !working && <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-100"><strong>Reason:</strong> {member.status_reason}</p>}
+
+      {member.status === 'suspended' && canPause && (
+        <Button size="sm" icon={<PlayCircle className="size-4" />} loading={busy} onClick={onResume}>Turn access back on</Button>
+      )}
+      {member.status === 'offboarded' && canRehire && (
+        <Button size="sm" icon={<UserPlus className="size-4" />} loading={busy} onClick={onRehire}>Rehire {name}</Button>
+      )}
+
+      {options.length > 0 && (
+        <>
+          <div className={cx('grid gap-2', options.length > 1 && 'sm:grid-cols-2')}>
+            {options.map((o) => {
+              const on = choice === o.value;
+              return (
+                <button key={o.value} type="button" aria-pressed={on} onClick={() => { setChoice(on ? null : o.value); setReason(''); }}
+                  className={cx('flex items-start gap-3 rounded-xl p-3 text-left ring-1 transition duration-200',
+                    on ? (o.tone === 'rose' ? 'bg-rose-50 ring-2 ring-rose-400' : 'bg-amber-50 ring-2 ring-amber-400') : 'bg-white ring-slate-200 hover:bg-slate-50')}>
+                  <span className={cx('grid size-9 shrink-0 place-items-center rounded-lg', o.tone === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700')}><o.icon className="size-5" /></span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">{o.title}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{o.text}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {choice && (
+            <div className="sp-rise space-y-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-slate-700">Why? <span className="font-normal text-slate-400">Pick one or type your own</span></p>
+                <div className="flex flex-wrap gap-1.5">
+                  {picks.map((p) => (
+                    <button key={p} type="button" onClick={() => setReason(p)}
+                      className={cx('rounded-full px-3 py-1 text-xs font-medium ring-1 transition', reason === p ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-600 ring-slate-200 hover:ring-slate-300')}>{p}</button>
+                  ))}
+                </div>
+              </div>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={choice === 'leave' ? 'e.g. Resigned, last day Oct 31' : 'e.g. On leave until Nov 5'} aria-label="Reason" />
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => { setChoice(null); setReason(''); }}>Cancel</Button>
+                <Button size="sm" variant={choice === 'leave' ? 'danger' : 'primary'} loading={busy} disabled={!reason.trim()}
+                  onClick={() => (choice === 'leave' ? onLeave(reason.trim()) : onPause(reason.trim()))}>
+                  {choice === 'leave' ? `Mark ${name} as left` : `Pause ${name}'s access`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -736,7 +826,6 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   const member = detail.data?.data;
   const [tab, setTab] = useState<DetailTab>('account');
   const [issued, setIssued] = useState<Credentials | null>(null);
-  const [reason, setReason] = useState('');
   const [profile, setProfile] = useState<StaffProfile>(emptyProfile);
   const [roleIds, setRoleIds] = useState<number[]>([]);
   const [all, setAll] = useState(false);
@@ -754,7 +843,7 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
 
   const action = (a: string) => `/staff/${id}/${a}`;
   const credentials = useTenantMutation<{ action: string; delivery: string; require_password_change: boolean }, IssuedResponse>('POST', (b) => action(b.action), { success: 'New sign-in details issued.', onSuccess: (r) => setIssued(toCredentials(r)) });
-  const status = useTenantMutation<{ action: string; reason?: string; delivery?: string }, IssuedResponse>('POST', (b) => action(b.action), { success: 'Account updated.', onSuccess: (r) => (r.temporary_password || r.activation_code ? setIssued(toCredentials(r)) : setReason('')) });
+  const status = useTenantMutation<{ action: string; reason?: string; delivery?: string }, IssuedResponse>('POST', (b) => action(b.action), { success: 'Work status updated.', onSuccess: (r) => { if (r.temporary_password || r.activation_code) setIssued(toCredentials(r)); } });
   const saveProfile = useTenantMutation<{ profile: Record<string, unknown> }>('PATCH', `/staff/${id}`, { success: 'Personal information saved.', toastErrors: false });
   const roles = useTenantMutation<{ role_ids: number[] }>('POST', action('change-role'), { toastErrors: false });
   const branchesM = useTenantMutation<{ all_branches: boolean; branch_ids: number[] }>('POST', action('transfer-branches'), { toastErrors: false });
@@ -864,17 +953,12 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
           {!managed && <p className="text-xs text-slate-500">Personal accounts reset their own password with "Forgot password" on the sign-in page.</p>}
 
           {manageable && (can('staff.status') || can('staff.offboard')) && (
-            <section className="space-y-3 rounded-xl border border-rose-100 bg-rose-50/30 p-4">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-700"><ShieldAlert className="size-3.5" />Account status</p>
-              <Field label="Reason (required to suspend or offboard)">{(fid) => <Input id={fid} value={reason} onChange={(e) => setReason(e.target.value)} />}</Field>
-              <div className="flex flex-wrap gap-2">
-                {can('staff.status') && ['active', 'invited'].includes(member.status) && <Button size="sm" variant="secondary" disabled={!reason} onClick={() => status.mutate({ action: 'suspend', reason })}>Suspend</Button>}
-                {can('staff.status') && member.status === 'suspended' && <Button size="sm" variant="secondary" onClick={() => status.mutate({ action: 'reactivate' })}>Reactivate</Button>}
-                {can('staff.status') && can('staff.credentials') && member.status === 'offboarded' && <Button size="sm" variant="secondary" onClick={() => status.mutate({ action: 'reactivate', delivery: 'temporary_password' })}>Rehire</Button>}
-                {can('staff.offboard') && member.status !== 'offboarded' && <Button size="sm" variant="danger" disabled={!reason} onClick={async () => { if (await ask({ title: 'Offboard this employee?', message: 'All their sessions end immediately and their login is disabled.', confirmLabel: 'Offboard' })) status.mutate({ action: 'offboard', reason }); }}>Offboard</Button>}
-              </div>
-              {member.status_reason && <p className="text-xs text-slate-500">Status note: {member.status_reason}</p>}
-            </section>
+            <WorkStatus member={member} canPause={can('staff.status')} canLeave={can('staff.offboard')} canRehire={can('staff.status') && can('staff.credentials')}
+              busy={status.isPending}
+              onPause={(why) => status.mutate({ action: 'suspend', reason: why })}
+              onResume={() => status.mutate({ action: 'reactivate' })}
+              onRehire={() => status.mutate({ action: 'reactivate', delivery: 'temporary_password' })}
+              onLeave={async (why) => { if (await ask({ title: `Mark ${member.name ?? 'this employee'} as left?`, message: 'Their login stops working right away and they are signed out everywhere. Their sales and records are kept. You can rehire them later.', confirmLabel: 'Yes, they left' })) status.mutate({ action: 'offboard', reason: why }); }} />
           )}
         </div>
       )}

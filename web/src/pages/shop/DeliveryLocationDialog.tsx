@@ -58,14 +58,26 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
     setFlyTo({ ...point });
     setPinNotice(notice);
   };
+  const [resolving, setResolving] = useState(false);
+  /** True while the street field holds what the map found (not something the customer typed). */
+  const streetFromMap = useRef(!initial.street);
   const onPinChange = (point: LatLng) => {
     setPin(point);
+    setResolving(true);
     if (Date.now() > automaticUntil.current) { setPinByHand(true); setPinNotice(''); }
   };
   const [street, setStreet] = useState(initial.street);
   const [postal, setPostal] = useState(initial.postal);
   const [note, setNote] = useState(initial.note);
   const [suggestion, setSuggestion] = useState('');
+  const onResolved = (address: string) => {
+    setSuggestion(address);
+    setResolving(false);
+    // Fill the street from where the pin stopped, unless the customer typed their own.
+    const streetPart = address.split(', ').slice(0, 2).join(', ');
+    if (streetPart && streetFromMap.current) setStreet(streetPart);
+  };
+  const typeStreet = (value: string) => { streetFromMap.current = value.trim() === ''; setStreet(value); };
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -113,7 +125,7 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
 
   const pick = (place: PlaceResult) => {
     moveTo(place.point);
-    if (!street.trim()) setStreet(place.label);
+    if (!street.trim() || streetFromMap.current) { setStreet(place.label); streetFromMap.current = false; }
     setQuery('');
     setResults([]);
   };
@@ -135,8 +147,20 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
           onChange={onPinChange}
           start={store}
           flyTo={flyTo}
-          onResolvedAddress={setSuggestion}
+          onResolvedAddress={onResolved}
           overlay={
+            <>
+            {/* Live address bubble above the centre pin. */}
+            {pin && (
+              <div className="pointer-events-none absolute left-1/2 top-1/2 z-[550] -translate-x-1/2 -translate-y-[4.75rem]">
+                <div key={resolving ? 'finding' : suggestion} className="sp-alert-in max-w-[min(80vw,22rem)] rounded-xl bg-slate-900/90 px-3 py-2 text-center text-xs text-white shadow-xl backdrop-blur">
+                  {resolving
+                    ? <span className="inline-flex items-center gap-1.5"><LoaderCircle className="size-3.5 animate-spin" />Finding address…</span>
+                    : <><span className="block font-semibold">{suggestion.split(', ').slice(0, 2).join(', ') || 'Pinned here'}</span>{suggestion.split(', ').length > 2 && <span className="block truncate text-[11px] text-slate-300">{suggestion.split(', ').slice(2).join(', ')}</span>}</>}
+                </div>
+                <span className="mx-auto block size-2 -translate-y-1 rotate-45 bg-slate-900/90" />
+              </div>
+            )}
             <div className="absolute inset-x-3 top-3 z-[600] sm:inset-x-5 sm:top-5 lg:right-auto lg:w-[460px]">
               <div className="flex items-center gap-2 rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200">
                 <button type="button" onClick={onClose} aria-label="Back to basket" className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"><ArrowLeft className="size-5" /></button>
@@ -162,6 +186,7 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
               )}
               {locatingArea && <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow ring-1 ring-slate-200"><LoaderCircle className="size-3.5 animate-spin" /> Moving the map to your barangay…</p>}
             </div>
+            </>
           }
         />
       </div>
@@ -191,7 +216,7 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
 
           <StreetField
             value={street}
-            onChange={setStreet}
+            onChange={typeStreet}
             area={area}
             near={pin ?? store}
             mapSuggestion={suggestion}
@@ -204,7 +229,8 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
             <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${pin ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-400'}`}><Home className="size-5" /></span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-slate-500">{pin ? 'Pin on the map' : 'No pin yet'}</p>
-              <p className="text-sm font-semibold text-slate-900">{pin ? 'Drag the map if the pin is not exactly on your door.' : 'Choose your barangay, or move the map, search, or use your location.'}</p>
+              <p className="text-sm font-semibold text-slate-900">{!pin ? 'Choose your barangay, or move the map, search, or use your location.' : resolving ? 'Finding the address at the pin…' : suggestion || 'Drag the map if the pin is not exactly on your door.'}</p>
+              {pin && suggestion && !resolving && <p className="mt-0.5 text-xs text-slate-500">Drag the map if the pin is not exactly on your door.</p>}
               {km != null && <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500"><Store className="size-3.5" /> {formatKm(km)} from {storeName ?? 'the store'}{km > 15 && <b className="ml-1 text-amber-700">· far from this branch</b>}</p>}
             </div>
             {pin && <Check className="size-5 shrink-0 text-emerald-600" />}

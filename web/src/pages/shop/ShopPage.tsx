@@ -4,7 +4,7 @@ import {
   MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { DeliveryMap, toLatLng } from '../../components/maps';
@@ -57,13 +57,16 @@ export function ShopPage() {
   const [branchId, setBranchId] = useState<number | ''>('');
   const [fulfilment, setFulfilment] = useState<'pickup' | 'delivery'>('pickup');
   const [cashAmount, setCashAmount] = useState('');
-  const locationKey = `shop-delivery:${business}`;
-  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation>(() => { try { return loadLocation(localStorage.getItem(locationKey)); } catch { return emptyLocation; } });
+  // The delivery address is remembered per customer account, so the next person to sign in on this device never
+  // sees someone else's address. (The old per-shop copy, shared by everyone on the device, is removed.)
+  const [locationOwner, setLocationOwner] = useState<number | null>(null);
+  const locationKey = (owner: number) => `shop-delivery:${business}:${owner}`;
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation>(emptyLocation);
   const [pickingLocation, setPickingLocation] = useState(false);
   const saveLocation = (location: DeliveryLocation) => {
     setDeliveryLocation(location);
     setPickingLocation(false);
-    try { localStorage.setItem(locationKey, JSON.stringify(location)); } catch { /* remembered for this visit only */ }
+    if (locationOwner) { try { localStorage.setItem(locationKey(locationOwner), JSON.stringify(location)); } catch { /* remembered for this visit only */ } }
   };
   const deliveryAddress = composeAddress(deliveryLocation);
   const deliveryPin = deliveryLocation.pin;
@@ -98,6 +101,14 @@ export function ShopPage() {
       }
     },
   });
+  const accountId = account.data?.id ?? null;
+  useEffect(() => {
+    try { localStorage.removeItem(`shop-delivery:${business}`); } catch { /* nothing to clean */ }
+    setLocationOwner(accountId);
+    let saved = emptyLocation;
+    if (accountId) { try { saved = loadLocation(localStorage.getItem(locationKey(accountId))); } catch { /* start empty */ } }
+    setDeliveryLocation(saved);
+  }, [accountId, business]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when the customer changes
   // Poll faster while a rider is on the way so the map follows them.
   const orders = useQuery({
     queryKey: ['shop-orders', business],
