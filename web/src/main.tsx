@@ -9,6 +9,7 @@ import { RouterProvider } from 'react-router';
 import { ApiError } from './lib/api';
 import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/Toast';
+import { ConfirmProvider } from './components/Confirm';
 import { router } from './router';
 import './index.css';
 
@@ -33,9 +34,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
+        <ConfirmProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

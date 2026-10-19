@@ -62,6 +62,12 @@ class OperationsTest extends TestCase
 
         $logs = $this->getJson($this->tenantUrl($tenant, 'audit-logs?action=sale.*'))->assertOk()->json('data');
         $this->assertSame(['sale.completed'], array_column($logs, 'action'));
+        $this->assertNotEmpty($logs[0]['subject_name'], 'A sale entry carries its receipt number for people to read.');
+
+        // Entries name the record, not just its number.
+        $this->actingAsUser($owner)->postJson($this->tenantUrl($tenant, 'products'), ['sku' => 'NEW-1', 'name' => 'Named product', 'price' => '5.00'])->assertCreated();
+        $product = collect($this->getJson($this->tenantUrl($tenant, 'audit-logs?action=product.created'))->json('data'))->first();
+        $this->assertSame('Named product', $product['subject_name']);
 
         $this->actingAsUser($this->addMember($tenant, 'cashier'))->getJson($this->tenantUrl($tenant, 'audit-logs'))->assertForbidden();
 

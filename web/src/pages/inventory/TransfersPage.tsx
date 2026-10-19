@@ -7,6 +7,7 @@ import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Branch, Paginated, Product, StockTransfer } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
+import { useConfirm } from '../../components/Confirm';
 
 const STATUS_ICON: Record<StockTransfer['status'], { icon: LucideIcon; tile: string }> = {
   draft: { icon: CircleDashed, tile: 'bg-slate-100 text-slate-500' },
@@ -139,6 +140,7 @@ function Stepper({ status }: { status: StockTransfer['status'] }) {
 }
 
 function TransferDetail({ id, onClose, nameOf }: { id: number | null; onClose: () => void; nameOf: (id: number) => string }) {
+  const ask = useConfirm();
   const { can, branches } = useTenant();
   const detail = useTenantQuery<{ data: StockTransfer }>(`/stock-transfers/${id}`, undefined, { enabled: id !== null });
   const action = useTenantMutation<{ id: number; action: 'dispatch' | 'receive' | 'cancel' }>('POST', (b) => `/stock-transfers/${b.id}/${b.action}`, { success: 'Transfer updated.' });
@@ -160,7 +162,7 @@ function TransferDetail({ id, onClose, nameOf }: { id: number | null; onClose: (
           <>
             {t.status === 'draft' && atSource && <Button variant="secondary" onClick={() => action.mutate({ id: t.id, action: 'cancel' })}>Cancel transfer</Button>}
             {t.status === 'draft' && atSource && <Button icon={<Truck className="size-4" />} loading={action.isPending} onClick={() => action.mutate({ id: t.id, action: 'dispatch' })}>Dispatch</Button>}
-            {t.status === 'in_transit' && atSource && <Button variant="secondary" onClick={() => confirm('Cancel this transfer and return the stock to the source branch?') && action.mutate({ id: t.id, action: 'cancel' })}>Cancel & return stock</Button>}
+            {t.status === 'in_transit' && atSource && <Button variant="secondary" onClick={async () => { if (await ask({ title: 'Cancel this transfer?', message: 'The stock goes back to the source branch.', confirmLabel: 'Cancel transfer', cancelLabel: 'Keep it' })) action.mutate({ id: t.id, action: 'cancel' }); }}>Cancel & return stock</Button>}
             {t.status === 'in_transit' && atDestination && <Button icon={<PackageCheck className="size-4" />} loading={action.isPending} onClick={() => action.mutate({ id: t.id, action: 'receive' })}>Receive all</Button>}
           </>
         ) : undefined

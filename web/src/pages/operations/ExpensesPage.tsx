@@ -24,6 +24,7 @@ import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Expense, Paginated } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
+import { useConfirm } from '../../components/Confirm';
 
 interface ExpenseCategory {
   id: number;
@@ -67,6 +68,7 @@ const dayParts = (iso: string) => {
 };
 
 export function ExpensesPage() {
+  const ask = useConfirm();
   const { can, branchName, scopeBranchId } = useTenant();
   const [page, setPage] = useState(1);
   const [from, setFrom] = useState(firstOfMonthManila());
@@ -185,7 +187,7 @@ export function ExpensesPage() {
                         <td className="pr-4 text-right">
                           {can('expenses.manage') && (
                             <span className="opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                              <IconButton label="Delete expense" icon={Trash2} tone="danger" onClick={() => confirm('Delete this expense? It stays in the audit log.') && remove.mutate(e.id)} />
+                              <IconButton label="Delete expense" icon={Trash2} tone="danger" onClick={async () => { if (await ask({ title: 'Delete this expense?', message: 'It stays in the audit log.', confirmLabel: 'Delete' })) remove.mutate(e.id); }} />
                             </span>
                           )}
                         </td>

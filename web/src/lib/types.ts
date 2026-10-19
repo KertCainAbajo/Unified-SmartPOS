@@ -446,6 +446,10 @@ export interface AuditLogEntry {
   metadata: Record<string, unknown> | null;
   ip_address: string | null;
   created_at: string;
+  /** The record's own name or number, e.g. a staff member or product name. */
+  subject_name?: string | null;
+  /** Names of staff referred to by id in the values (user id → name). */
+  people?: Record<string, string>;
 }
 
 export interface ReportResponse<T> {

@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
+import { ConfirmProvider } from '../../../components/Confirm';
+import { ToastProvider } from '../../../components/Toast';
 import { ShopPage } from '../ShopPage';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -29,7 +31,9 @@ function serve(signedIn: boolean) {
   vi.stubGlobal('fetch', fetchMock);
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={['/shop/test-mart']}><Routes><Route path="/shop/:business" element={<ShopPage />} /></Routes></MemoryRouter>
+      <ToastProvider><ConfirmProvider>
+        <MemoryRouter initialEntries={['/shop/test-mart']}><Routes><Route path="/shop/:business" element={<ShopPage />} /></Routes></MemoryRouter>
+      </ConfirmProvider></ToastProvider>
     </QueryClientProvider>,
   );
   return fetchMock;

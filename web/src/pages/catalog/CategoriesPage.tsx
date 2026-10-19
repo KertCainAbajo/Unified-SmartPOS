@@ -7,10 +7,12 @@ import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
 import type { Category } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
+import { useConfirm } from '../../components/Confirm';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export function CategoriesPage() {
+  const ask = useConfirm();
   const { can } = useTenant();
   const list = useTenantQuery<{ data: Category[] }>('/categories');
   const [editing, setEditing] = useState<Category | 'new' | null>(null);
@@ -117,7 +119,7 @@ export function CategoriesPage() {
                           <span className="inline-flex gap-1 opacity-70 transition group-hover:opacity-100">
                             <IconButton label={`Edit ${c.name}`} icon={Pencil} onClick={() => setEditing(c)} />
                             <IconButton label={count === 0 ? `Delete ${c.name}` : 'Move or archive its products first'} icon={Trash2} tone="danger" disabled={count > 0}
-                              onClick={() => confirm(`Delete the “${c.name}” category?`) && remove.mutate(c)} />
+                              onClick={async () => { if (await ask({ title: `Delete the “${c.name}” category?`, message: 'This cannot be undone. A category that still has products cannot be deleted; deactivate it instead.', confirmLabel: 'Delete' })) remove.mutate(c); }} />
                           </span>
                         )}
                       </td>

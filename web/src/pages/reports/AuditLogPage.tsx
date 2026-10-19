@@ -1,7 +1,9 @@
 import {
   ArrowRight,
+  Bike,
   Boxes,
   CalendarDays,
+  Clock,
   ClipboardList,
   Globe,
   KeyRound,
@@ -10,6 +12,7 @@ import {
   RotateCcw,
   Settings,
   ShieldCheck,
+  Store,
   Truck,
   Users,
   Wallet,
@@ -18,7 +21,8 @@ import {
 import { useState } from 'react';
 import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
 import { Avatar, DateRange, EmptyState, ErrorBanner, LoadingRows, Modal, PageHeader, Pagination, SearchField, Segmented, cx } from '../../components/ui';
-import { formatDateTime, titleCase } from '../../lib/format';
+import { formatDateTime } from '../../lib/format';
+import { actionTitle, fieldLabel, formatValue, recordTitle, splitChanges } from './auditText';
 import { useDebounced, useTenantQuery } from '../../lib/hooks';
 import type { AuditLogEntry, Paginated } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
@@ -42,6 +46,12 @@ const DOMAIN: Record<string, { icon: LucideIcon; tone: string }> = {
   staff: { icon: Users, tone: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
   auth: { icon: KeyRound, tone: 'bg-slate-100 text-slate-700 ring-slate-300' },
   tenant: { icon: Settings, tone: 'bg-slate-100 text-slate-700 ring-slate-300' },
+  online_order: { icon: Bike, tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  rider: { icon: Bike, tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  shift: { icon: Clock, tone: 'bg-brand-50 text-brand-700 ring-brand-200' },
+  user: { icon: KeyRound, tone: 'bg-slate-100 text-slate-700 ring-slate-300' },
+  role: { icon: Users, tone: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+  supplier: { icon: Truck, tone: 'bg-violet-50 text-violet-700 ring-violet-200' },
 };
 const domainOf = (action: string) => DOMAIN[action.split('.')[0]] ?? { icon: ShieldCheck, tone: 'bg-slate-100 text-slate-700 ring-slate-300' };
 
@@ -65,7 +75,6 @@ const dayLabel = (iso: string) => {
   return new Date(iso).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 };
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
-const show = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 export function AuditLogPage() {
   const { can, viewAll, scopeBranchId } = useTenant();
@@ -130,14 +139,13 @@ export function AuditLogPage() {
                           <span className={cx('relative z-[1] grid size-8 shrink-0 place-items-center rounded-full ring-4 ring-white', dm.tone.split(' ').slice(0, 2).join(' '))}><dm.icon className="size-4" /></span>
                           <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-center gap-2">
-                              <code className={cx('rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold ring-1 ring-inset', dm.tone)}>{r.action}</code>
-                              {r.auditable_type && <span className="text-xs text-slate-500">{r.auditable_type.split('\\').pop()} #{r.auditable_id}</span>}
+                              <span className="text-sm font-semibold text-slate-900" title={r.action}>{actionTitle(r.action)}</span>
+                              {r.auditable_type && <span className={cx('rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset', dm.tone)}>{recordTitle(r)}</span>}
                               {viewAll && (r.branch_id === null ? <span className="text-[11px] text-slate-400">Business-wide</span> : <BranchTag id={r.branch_id} />)}
                             </span>
                             <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               <span className="inline-flex items-center gap-1.5">{r.user ? <Avatar name={r.user.name} size="sm" /> : <ShieldCheck className="size-4 text-slate-400" />}<span className="font-medium text-slate-700">{r.user?.name ?? 'System'}</span></span>
-                              {changed > 0 && <span>{changed} {changed === 1 ? 'field' : 'fields'} changed</span>}
-                              {r.ip_address && <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-400"><Globe className="size-3" />{r.ip_address}</span>}
+                              {changed > 0 && <span>{changed} {changed === 1 ? 'detail' : 'details'}</span>}
                             </span>
                           </span>
                           <span className="shrink-0 text-xs tabular-nums text-slate-400">{timeOf(r.created_at)}</span>
@@ -153,8 +161,8 @@ export function AuditLogPage() {
         <Pagination page={page} data={list.data} onPage={setPage} />
       </section>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.action ?? ''} icon={selected ? domainOf(selected.action).icon : undefined} size="lg"
-        description={selected ? <>{formatDateTime(selected.created_at)} · {selected.user?.name ?? 'System'}{selected.ip_address && <> · {selected.ip_address}</>}</> : undefined}>
+      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? actionTitle(selected.action) : ''} icon={selected ? domainOf(selected.action).icon : undefined} size="lg"
+        description={selected ? <>{formatDateTime(selected.created_at)} · by {selected.user?.name ?? 'the system'}</> : undefined}>
         {selected && <AuditDetail entry={selected} />}
       </Modal>
     </>
@@ -162,49 +170,77 @@ export function AuditLogPage() {
 }
 
 function AuditDetail({ entry }: { entry: AuditLogEntry }) {
-  const keys = [...new Set([...Object.keys(entry.old_values ?? {}), ...Object.keys(entry.new_values ?? {})])];
+  const { branchName } = useTenant();
+  const { changes, facts, before, after } = splitChanges(entry);
+  const value = (k: string, v: unknown) => formatValue(k, v, (id) => branchName(id), entry.people);
+  const metadata = Object.entries(entry.metadata ?? {}).filter(([k, v]) => v !== null && v !== '' && !(k in after) && !(k in before));
+  const record = recordTitle(entry);
+  const title = actionTitle(entry.action);
+
   return (
     <div className="space-y-5 text-sm">
-      {entry.auditable_type && (
-        <p className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-600 ring-1 ring-slate-100">
-          <ClipboardList className="size-4 text-brand-600" />
-          Record <strong className="text-slate-900">{entry.auditable_type.split('\\').pop()} #{entry.auditable_id}</strong>
-        </p>
-      )}
-      {keys.length > 0 && (
-        <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">Changes</p>
-          <div className="overflow-hidden rounded-xl ring-1 ring-slate-200">
-            <table className="w-full text-sm">
-              <thead><tr className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-4 py-2 text-left font-semibold">Field</th><th className="px-4 py-2 text-left font-semibold">Before</th><th className="w-6" /><th className="px-4 py-2 text-left font-semibold">After</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {keys.map((k) => (
-                  <tr key={k} className="align-top">
-                    <td className="px-4 py-2 font-medium text-slate-700">{titleCase(k)}</td>
-                    <td className="max-w-48 break-words px-4 py-2 text-rose-600"><span className="rounded bg-rose-50 px-1">{show(entry.old_values?.[k])}</span></td>
-                    <td className="py-2 text-slate-300"><ArrowRight className="size-3.5" /></td>
-                    <td className="max-w-48 break-words px-4 py-2 text-emerald-700"><span className="rounded bg-emerald-50 px-1">{show(entry.new_values?.[k])}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Plain summary: who did what, to which record, where and when. */}
+      <div className="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-brand-50 to-white p-4 ring-1 ring-brand-100">
+        {entry.user ? <Avatar name={entry.user.name} /> : <span className="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500"><ShieldCheck className="size-4" /></span>}
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] text-slate-800"><strong className="text-slate-900">{entry.user?.name ?? 'The system'}</strong> {title.charAt(0).toLowerCase() + title.slice(1)}.</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            {record && <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 font-medium text-slate-700 ring-1 ring-slate-200"><ClipboardList className="size-3.5 text-brand-600" />{record}</span>}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 font-medium text-slate-700 ring-1 ring-slate-200"><Store className="size-3.5 text-brand-600" />{entry.branch_id === null ? 'Whole business' : branchName(entry.branch_id)}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 font-medium text-slate-700 ring-1 ring-slate-200"><Clock className="size-3.5 text-brand-600" />{formatDateTime(entry.created_at)}</span>
           </div>
         </div>
+      </div>
+
+      {changes.length > 0 && (
+        <section>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">What changed</p>
+          <ul className="space-y-2">
+            {changes.map((k) => (
+              <li key={k} className="rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200">
+                <p className="text-xs font-semibold text-slate-500">{fieldLabel(k)}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-rose-50 px-2 py-0.5 text-rose-700 line-through decoration-rose-300">{value(k, before[k])}</span>
+                  <ArrowRight className="size-3.5 text-slate-400" />
+                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800">{value(k, after[k])}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
-      {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-        <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">Details</p>
+
+      {(facts.length > 0 || metadata.length > 0) && (
+        <section>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700">{changes.length > 0 ? 'Other details' : 'Details'}</p>
           <dl className="grid gap-2 sm:grid-cols-2">
-            {Object.entries(entry.metadata).map(([k, v]) => (
-              <div key={k} className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
-                <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{titleCase(k)}</dt>
-                <dd className="mt-0.5 break-words text-slate-800">{typeof v === 'object' && v !== null ? <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(v, null, 2)}</pre> : show(v)}</dd>
+            {facts.map((k) => (
+              <div key={k} className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                <dt className="text-xs text-slate-500">{fieldLabel(k)}</dt>
+                <dd className="mt-0.5 break-words font-semibold text-slate-900">{value(k, after[k])}</dd>
+              </div>
+            ))}
+            {metadata.map(([k, v]) => (
+              <div key={k} className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                <dt className="text-xs text-slate-500">{fieldLabel(k)}</dt>
+                <dd className="mt-0.5 break-words font-semibold text-slate-900">{value(k, v)}</dd>
               </div>
             ))}
           </dl>
-        </div>
+        </section>
       )}
-      {keys.length === 0 && !entry.metadata && <p className="text-center text-slate-400">No additional details were recorded for this action.</p>}
+
+      {changes.length === 0 && facts.length === 0 && metadata.length === 0 && <p className="rounded-xl bg-slate-50 px-4 py-3 text-center text-slate-500">Nothing else was recorded for this action.</p>}
+
+      <details className="rounded-xl bg-slate-50/60 px-4 py-2.5 text-xs text-slate-500 ring-1 ring-slate-100">
+        <summary className="cursor-pointer select-none font-semibold text-slate-600">Technical details</summary>
+        <dl className="mt-2 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1">
+          <dt>Action code</dt><dd className="font-mono text-slate-700">{entry.action}</dd>
+          {entry.auditable_type && <><dt>Record</dt><dd className="font-mono text-slate-700">{entry.auditable_type.split('\\').pop()} #{entry.auditable_id}</dd></>}
+          {entry.ip_address && <><dt>IP address</dt><dd className="inline-flex items-center gap-1 font-mono text-slate-700"><Globe className="size-3" />{entry.ip_address}</dd></>}
+          <dt>Entry no.</dt><dd className="font-mono text-slate-700">{entry.id}</dd>
+        </dl>
+      </details>
     </div>
   );
 }

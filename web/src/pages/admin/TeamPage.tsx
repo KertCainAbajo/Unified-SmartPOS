@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, Briefcase, Calculator, Check, ClipboardList, Headset, ShoppingCart, ChevronRight, Clock, Copy, Crown, KeyRound, Layers, MailCheck, Package, Printer, Receipt, RotateCcw, Settings, ShieldAlert, ShieldCheck, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { BarChart3, Boxes, Briefcase, Calculator, Check, CheckCircle2, ClipboardList, Headset, ShoppingCart, ChevronRight, Clock, Copy, Crown, KeyRound, Layers, MailCheck, Package, Printer, Receipt, RotateCcw, Settings, ShieldAlert, ShieldCheck, Store, Truck, UserCheck, UserPlus, UserRound, UserX, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { BranchTag, ScopeChip } from '../../components/BranchSwitcher';
@@ -10,6 +10,7 @@ import { useDebounced, useTenantMutation, useTenantQuery } from '../../lib/hooks
 import type { Paginated, Role, StaffMember, StaffProfile } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { NoAccess } from '../NotFoundPage';
+import { useConfirm } from '../../components/Confirm';
 
 /**
  * Staff accounts. The server enforces every rule (owner-only admin roles, branch scope, no self-edits);
@@ -588,6 +589,7 @@ function CreateStaff({ open, onClose }: { open: boolean; onClose: () => void }) 
 type DetailTab = 'account' | 'personal' | 'access';
 
 function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
+  const ask = useConfirm();
   const { can, tenant } = useTenant();
   const { user } = useAuth();
   const detail = useTenantQuery<{ data: StaffMember }>(`/staff/${id}`);
@@ -600,6 +602,7 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   const [all, setAll] = useState(false);
   const [branchIds, setBranchIds] = useState<number[]>([]);
   const [resetRequireChange, setResetRequireChange] = useState(false);
+  const [accessSaved, setAccessSaved] = useState(false);
 
   useEffect(() => {
     if (!member) return;
@@ -613,8 +616,8 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   const credentials = useTenantMutation<{ action: string; delivery: string; require_password_change: boolean }, IssuedResponse>('POST', (b) => action(b.action), { success: 'New sign-in details issued.', onSuccess: (r) => setIssued(toCredentials(r)) });
   const status = useTenantMutation<{ action: string; reason?: string; delivery?: string }, IssuedResponse>('POST', (b) => action(b.action), { success: 'Account updated.', onSuccess: (r) => (r.temporary_password || r.activation_code ? setIssued(toCredentials(r)) : setReason('')) });
   const saveProfile = useTenantMutation<{ profile: Record<string, unknown> }>('PATCH', `/staff/${id}`, { success: 'Personal information saved.', toastErrors: false });
-  const roles = useTenantMutation<{ role_ids: number[] }>('POST', action('change-role'), { success: 'Roles updated.' });
-  const branchesM = useTenantMutation<{ all_branches: boolean; branch_ids: number[] }>('POST', action('transfer-branches'), { success: 'Branch access updated.' });
+  const roles = useTenantMutation<{ role_ids: number[] }>('POST', action('change-role'), { toastErrors: false });
+  const branchesM = useTenantMutation<{ all_branches: boolean; branch_ids: number[] }>('POST', action('transfer-branches'), { toastErrors: false });
 
   if (!member) return <Modal open onClose={onClose} title="Staff" icon={Users}>{detail.error ? <ErrorBanner error={detail.error} /> : <LoadingRows rows={3} />}</Modal>;
 
@@ -622,6 +625,17 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
   const isSelf = member.user_id === user?.id;
   const isOwner = member.user_id === tenant.owner_user_id;
   const manageable = !isSelf && !isOwner;
+  const canSaveRoles = can('staff.assign_roles');
+  const canSaveBranches = can('staff.assign_branches');
+  const saveAccess = async () => {
+    try {
+      if (canSaveRoles) await roles.mutateAsync({ role_ids: roleIds });
+      if (canSaveBranches) await branchesM.mutateAsync({ all_branches: all, branch_ids: all ? [] : branchIds });
+      setAccessSaved(true);
+    } catch {
+      // Mutation errors stay available below the fields so the administrator can correct and retry.
+    }
+  };
   const info = (label: string, value: string | null | undefined) => (
     <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100"><dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</dt><dd className="mt-0.5 text-sm font-medium text-slate-900">{value || '—'}</dd></div>
   );
@@ -630,6 +644,20 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
     return (
       <Modal open onClose={onClose} title="New sign-in details" icon={KeyRound} size="md" footer={<><Button variant="secondary" icon={<Printer className="size-4" />} onClick={() => printDocument()}>Print slip</Button><Button onClick={() => setIssued(null)}>Done</Button></>}>
         <CredentialSlip credentials={issued} />
+      </Modal>
+    );
+  }
+
+  if (accessSaved) {
+    return (
+      <Modal open onClose={onClose} title="Changes saved" icon={CheckCircle2} size="sm" footer={<Button onClick={onClose}>Done</Button>}>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          {canSaveRoles && canSaveBranches
+            ? 'Roles and branch access have been updated successfully.'
+            : canSaveRoles
+              ? 'Roles have been updated successfully.'
+              : 'Branch access has been updated successfully.'}
+        </div>
       </Modal>
     );
   }
@@ -681,8 +709,8 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
               </span>
             </div>
             {can('staff.credentials') && managed && manageable && ['active', 'invited'].includes(member.status) && (
-              <Button size="sm" variant="secondary" loading={credentials.isPending} onClick={() => {
-                if (member.status === 'invited' || confirm(`Reset ${member.name}'s password? Their current password stops working and they are signed out everywhere.`)) {
+              <Button size="sm" variant="secondary" loading={credentials.isPending} onClick={async () => {
+                if (member.status === 'invited' || await ask({ title: `Reset ${member.name}'s password?`, message: 'Their current password stops working and they are signed out everywhere.', confirmLabel: 'Reset password' })) {
                   credentials.mutate({ action: member.status === 'invited' ? 'resend-invitation' : 'recovery', delivery: 'temporary_password', require_password_change: resetRequireChange });
                 }
               }}>
@@ -703,7 +731,7 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
                 {can('staff.status') && ['active', 'invited'].includes(member.status) && <Button size="sm" variant="secondary" disabled={!reason} onClick={() => status.mutate({ action: 'suspend', reason })}>Suspend</Button>}
                 {can('staff.status') && member.status === 'suspended' && <Button size="sm" variant="secondary" onClick={() => status.mutate({ action: 'reactivate' })}>Reactivate</Button>}
                 {can('staff.status') && can('staff.credentials') && member.status === 'offboarded' && <Button size="sm" variant="secondary" onClick={() => status.mutate({ action: 'reactivate', delivery: 'temporary_password' })}>Rehire</Button>}
-                {can('staff.offboard') && member.status !== 'offboarded' && <Button size="sm" variant="danger" disabled={!reason} onClick={() => confirm('Offboard this employee? All their sessions end immediately and their login is disabled.') && status.mutate({ action: 'offboard', reason })}>Offboard</Button>}
+                {can('staff.offboard') && member.status !== 'offboarded' && <Button size="sm" variant="danger" disabled={!reason} onClick={async () => { if (await ask({ title: 'Offboard this employee?', message: 'All their sessions end immediately and their login is disabled.', confirmLabel: 'Offboard' })) status.mutate({ action: 'offboard', reason }); }}>Offboard</Button>}
               </div>
               {member.status_reason && <p className="text-xs text-slate-500">Status note: {member.status_reason}</p>}
             </section>
@@ -736,10 +764,11 @@ function StaffDetail({ id, onClose }: { id: number; onClose: () => void }) {
       {tab === 'access' && member.status !== 'offboarded' && (
         <section className="space-y-4">
           <RoleAndBranchFields roleIds={roleIds} onRolesChange={setRoleIds} all={all} setAll={setAll} branchIds={branchIds} setBranchIds={setBranchIds} />
-          <div className="flex gap-2">
-            {can('staff.assign_roles') && <Button size="sm" variant="secondary" loading={roles.isPending} disabled={roleIds.length === 0} onClick={() => roles.mutate({ role_ids: roleIds })}>Save roles</Button>}
-            {can('staff.assign_branches') && <Button size="sm" variant="secondary" loading={branchesM.isPending} onClick={() => branchesM.mutate({ all_branches: all, branch_ids: all ? [] : branchIds })}>Save branches</Button>}
-          </div>
+          {roles.error && <ErrorBanner error={roles.error} />}
+          {branchesM.error && <ErrorBanner error={branchesM.error} />}
+          {(canSaveRoles || canSaveBranches) && <div className="flex justify-end">
+            <Button size="sm" loading={roles.isPending || branchesM.isPending} disabled={canSaveRoles && roleIds.length === 0} className="from-emerald-500 to-emerald-700 shadow-emerald-700/20 ring-emerald-800/20 hover:to-emerald-600 focus-visible:outline-emerald-600" onClick={() => void saveAccess()}>Save</Button>
+          </div>}
         </section>
       )}
     </Modal>

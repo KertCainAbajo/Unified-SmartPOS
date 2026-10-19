@@ -24,6 +24,7 @@ import type { Paginated, Role } from '../../lib/types';
 import { useTenant } from '../../tenant/TenantProvider';
 import { CredentialSlip, toCredentials, type Credentials, type IssuedResponse } from '../admin/TeamPage';
 import { NoAccess } from '../NotFoundPage';
+import { useConfirm } from '../../components/Confirm';
 
 const DOCUMENT_TYPES: Record<string, string> = {
   resume: 'Resume / CV',
@@ -350,6 +351,7 @@ function History({ app }: { app: JobApplication }) {
 /* --------------------------------------------------------------------------- Next step (actions) */
 
 function NextStep({ app, onProvisioned }: { app: JobApplication; onProvisioned: (c: Credentials) => void }) {
+  const ask = useConfirm();
   const { can, membershipId } = useTenant();
   const hr = can('recruitment.hr');
   const finalAuthority = can('recruitment.final_approval');
@@ -387,7 +389,7 @@ function NextStep({ app, onProvisioned }: { app: JobApplication; onProvisioned: 
     body = (
       <div className="space-y-2 text-sm">
         <p>Offer sent {formatDateTime(app.offer?.sent_at)}. The applicant can accept or decline from their application page.</p>
-        {hr && <div className="flex gap-2"><Button size="sm" variant="secondary" onClick={() => run('offer-response', { accepted: true, note: 'Accepted in person' })}>Record: accepted</Button><Button size="sm" variant="secondary" onClick={() => confirm('Record that the applicant declined?') && run('offer-response', { accepted: false, note: 'Declined' })}>Record: declined</Button></div>}
+        {hr && <div className="flex gap-2"><Button size="sm" variant="secondary" onClick={() => run('offer-response', { accepted: true, note: 'Accepted in person' })}>Record: accepted</Button><Button size="sm" variant="secondary" onClick={async () => { if (await ask({ title: 'Record that the applicant declined?', confirmLabel: 'Record declined' })) run('offer-response', { accepted: false, note: 'Declined' }); }}>Record: declined</Button></div>}
       </div>
     );
   } else if (status === 'offer_accepted') {
@@ -506,6 +508,7 @@ function ScheduleForm({ app, stage }: { app: JobApplication; stage: InterviewSta
 }
 
 function OpenInterview({ app, interview, mine, canManage }: { app: JobApplication; interview: Interview; mine: boolean; canManage: boolean }) {
+  const ask = useConfirm();
   const [mode, setMode] = useState<'view' | 'reschedule' | 'result'>('view');
   const act = useTenantMutation<{ action: string } & Record<string, unknown>>('POST', (b) => `/applications/${app.id}/interviews/${interview.id}/${b.action}`, { success: 'Saved.', toastErrors: false });
   const [when, setWhen] = useState('');
@@ -524,7 +527,7 @@ function OpenInterview({ app, interview, mine, canManage }: { app: JobApplicatio
           {!mine && <span className="self-center text-slate-500">Only {interview.interviewer_name} can record the result.</span>}
           {canManage && <Button size="sm" variant="secondary" onClick={() => setMode('reschedule')}>Reschedule</Button>}
           {canManage && <Button size="sm" variant="secondary" onClick={() => { const r = prompt('Why is this interview cancelled?'); if (r) act.mutate({ action: 'cancel', reason: r }); }}>Cancel interview</Button>}
-          {(mine || canManage) && interview.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={() => confirm('Mark the applicant as a no-show?') && act.mutate({ action: 'no-show' })}>Applicant did not show up</Button>}
+          {(mine || canManage) && interview.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={async () => { if (await ask({ title: 'Mark the applicant as a no-show?', confirmLabel: 'Mark no-show' })) act.mutate({ action: 'no-show' }); }}>Applicant did not show up</Button>}
         </div>
       )}
       {mode === 'reschedule' && (

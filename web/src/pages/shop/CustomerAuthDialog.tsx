@@ -171,12 +171,12 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
 
               <form key={`form-${mode}`} onSubmit={(e) => { setNotice(''); onSubmit(e); }} className="auth-fade mt-6 space-y-4">
                 {notice && !error && (
-                  <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
+                  <p role="status" className="sp-alert-in flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> {notice}
                   </p>
                 )}
                 {error && (
-                  <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+                  <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
                   </p>
                 )}
@@ -422,7 +422,7 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
           onSubmit={(e) => { e.preventDefault(); if (step === 'email') void sendCode(); else if (step === 'code') void verify(); else void save(); }}
         >
           {error && (
-            <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
             </p>
           )}

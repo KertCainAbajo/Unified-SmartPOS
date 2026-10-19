@@ -37,7 +37,7 @@ export function Button({ variant = 'primary', size = 'md', loading, icon, classN
       type={type}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-xl font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
+        'inline-flex shrink-0 items-center justify-center rounded-xl font-semibold transition duration-150 ease-out enabled:active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed',
         sizes[size],
         variants[variant],
         className,
@@ -381,9 +381,12 @@ export function EmptyState({ title, description, action, icon: Icon = Inbox }: {
 export function ErrorBanner({ error, className }: { error: unknown; className?: string }) {
   if (!error) return null;
   return (
-    <div role="alert" className={cx('flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800', className)}>
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{errorMessage(error)}</span>
+    <div role="alert" key={errorMessage(error)} className={cx('sp-alert-in sp-alert-error flex items-start gap-3 rounded-2xl bg-gradient-to-r from-rose-50 to-white p-3 text-sm ring-1 ring-rose-200/80', className)}>
+      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-rose-500 text-white shadow-sm shadow-rose-500/30"><AlertCircle className="size-4" /></span>
+      <span className="min-w-0 pt-0.5">
+        <span className="block font-semibold text-rose-900">Something needs your attention</span>
+        <span className="mt-0.5 block text-rose-800/90">{errorMessage(error)}</span>
+      </span>
     </div>
   );
 }

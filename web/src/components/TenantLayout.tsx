@@ -449,8 +449,8 @@ function Shell() {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden print:hidden">
-          <div className="absolute inset-0 bg-brand-900/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="auth-fade absolute inset-y-0 left-0 w-72 shadow-2xl">
+          <div className="sp-fade-in absolute inset-0 bg-brand-900/50" onClick={() => setMobileOpen(false)} />
+          <aside className="sp-drawer-in absolute inset-y-0 left-0 w-72 shadow-2xl">
             <button className="absolute right-3 top-5 z-10 grid size-8 place-items-center rounded-lg text-brand-100/70 hover:bg-white/10" onClick={() => setMobileOpen(false)} aria-label="Close menu">
               <X className="size-5" />
             </button>

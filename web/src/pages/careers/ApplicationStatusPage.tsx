@@ -7,12 +7,14 @@ import { api } from '../../lib/api';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/format';
 import { MODE_LABELS, type PublicApplication } from '../../lib/recruitment';
 import { PublicLayout } from './CareersPage';
+import { useConfirm } from '../../components/Confirm';
 
 /**
  * The applicant's view of their application (reference + secret token from the confirmation email).
  * Shows the stage, interview schedule and offer — never internal notes, scores or reasons.
  */
 export function ApplicationStatusPage() {
+  const ask = useConfirm();
   const [params, setParams] = useSearchParams();
   const [reference, setReference] = useState(params.get('ref') ?? '');
   const [token, setToken] = useState(params.get('token') ?? '');
@@ -107,7 +109,7 @@ export function ApplicationStatusPage() {
             {data.can_respond_to_offer && (
               <div className="mt-4 flex gap-2">
                 <Button loading={busy} onClick={() => void call('offer-response', { accept: true })}>Accept offer</Button>
-                <Button variant="secondary" disabled={busy} onClick={() => confirm('Decline this job offer? This cannot be undone.') && void call('offer-response', { accept: false })}>Decline</Button>
+                <Button variant="secondary" disabled={busy} onClick={async () => { if (await ask({ title: 'Decline this job offer?', message: 'This cannot be undone.', confirmLabel: 'Decline offer' })) void call('offer-response', { accept: false }); }}>Decline</Button>
               </div>
             )}
           </section>

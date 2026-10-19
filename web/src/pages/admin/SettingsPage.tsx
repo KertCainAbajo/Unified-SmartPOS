@@ -1,7 +1,15 @@
 import {
+  AtSign,
   Building2,
   Check,
+  ChevronRight,
+  Circle,
   Copy,
+  ExternalLink,
+  Hash,
+  Landmark,
+  Mail,
+  ShoppingBag,
   Loader2,
   MapPin,
   Monitor,
@@ -21,7 +29,7 @@ import { useSearchParams } from 'react-router';
 import { AccountSettings } from './AccountSettings';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, EmptyState, ErrorBanner, Field, FormSection, Input, LoadingRows, Modal, PageHeader, Select, Switch, cx } from '../../components/ui';
+import { Badge, Button, EmptyState, ErrorBanner, Field, Input, LoadingRows, Modal, PageHeader, Select, Switch, cx } from '../../components/ui';
 import { ApiError } from '../../lib/api';
 import { formatMoney } from '../../lib/format';
 import { useTenantMutation, useTenantQuery } from '../../lib/hooks';
@@ -32,20 +40,23 @@ import { LocationPicker, toLatLng, type LatLng } from '../../components/maps';
 type Tab = 'profile' | 'tax' | 'policies' | 'branches' | 'registers' | 'account';
 const BUSINESS_TABS: Tab[] = ['profile', 'tax', 'policies'];
 
+type TabDef = { value: Tab; label: string; icon: LucideIcon; note: string; group: 'Business' | 'Operations' | 'You' };
+
 export function SettingsPage() {
-  const { can, tenant } = useTenant();
-  const tabs: { value: Tab; label: string; icon: LucideIcon; note: string }[] = [
+  const { can, tenant, branches } = useTenant();
+  const tabs: TabDef[] = [
     ...(can('tenant.manage')
       ? [
-          { value: 'profile' as Tab, label: 'Business profile', icon: Store, note: 'Name, contact, receipts' },
-          { value: 'tax' as Tab, label: 'Tax & pricing', icon: Percent, note: 'VAT and price display' },
-          { value: 'policies' as Tab, label: 'Policies', icon: ShieldCheck, note: 'Refunds, stock, hiring' },
+          { value: 'profile' as Tab, label: 'Business profile', icon: Store, note: 'Name, contact, receipts', group: 'Business' as const },
+          { value: 'tax' as Tab, label: 'Tax & pricing', icon: Percent, note: 'VAT and price display', group: 'Business' as const },
+          { value: 'policies' as Tab, label: 'Policies', icon: ShieldCheck, note: 'Refunds, stock, hiring', group: 'Business' as const },
         ]
       : []),
-    ...(can('branches.manage') ? [{ value: 'branches' as Tab, label: 'Branches', icon: Building2, note: 'Store locations' }] : []),
-    ...(can('registers.manage') ? [{ value: 'registers' as Tab, label: 'Registers', icon: Monitor, note: 'Checkout counters' }] : []),
-    { value: 'account' as Tab, label: 'Account & security', icon: UserCog, note: 'Your email and password' },
+    ...(can('branches.manage') ? [{ value: 'branches' as Tab, label: 'Branches', icon: Building2, note: 'Store locations', group: 'Operations' as const }] : []),
+    ...(can('registers.manage') ? [{ value: 'registers' as Tab, label: 'Registers', icon: Monitor, note: 'Checkout counters', group: 'Operations' as const }] : []),
+    { value: 'account' as Tab, label: 'Account & security', icon: UserCog, note: 'Your email and password', group: 'You' },
   ];
+  const groups = (['Business', 'Operations', 'You'] as const).map((g) => ({ name: g, items: tabs.filter((t) => t.group === g) })).filter((g) => g.items.length > 0);
   const [params, setParams] = useSearchParams();
   const requested = tabs.find((t) => t.value === params.get('tab'))?.value;
   const [tabState, setTabState] = useState<Tab>(requested ?? tabs[0].value);
@@ -58,25 +69,58 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader eyebrow="Business" title="Settings" description={`Configure how ${tenant.name} runs: business details, tax, policies, branches and registers.`} />
-      <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
-        <nav aria-label="Settings sections" className="h-fit rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-900/5 lg:sticky lg:top-4">
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col">
-            {tabs.map((t) => {
-              const active = tab === t.value;
-              return (
-                <li key={t.value} className="shrink-0">
-                  <button type="button" onClick={() => setTab(t.value)} aria-current={active ? 'page' : undefined}
-                    className={cx('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition', active ? 'bg-brand-700 text-white shadow-sm shadow-brand-900/20' : 'text-slate-600 hover:bg-slate-50')}>
-                    <span className={cx('grid size-8 shrink-0 place-items-center rounded-lg', active ? 'bg-white/15 text-sun-300' : 'bg-slate-100 text-slate-500')}><t.icon className="size-4" /></span>
-                    <span className="min-w-0">
-                      <span className="block whitespace-nowrap text-sm font-medium">{t.label}</span>
-                      <span className={cx('hidden truncate text-[11px] lg:block', active ? 'text-brand-100/80' : 'text-slate-400')}>{t.note}</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+      {/* Business card */}
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-800 to-[#082419] p-5 text-white shadow-xl shadow-brand-900/20 sm:p-6">
+        <span aria-hidden className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full bg-sun-400/20 blur-3xl" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 size-72 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-center">
+          <img src="/brand/minimart-logo.svg" alt="" className="size-20 shrink-0 rounded-2xl bg-white object-contain p-1.5 shadow-lg ring-4 ring-white/15" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate font-display text-2xl font-bold tracking-tight sm:text-3xl">{tenant.name}</h2>
+            <p className="mt-0.5 truncate text-sm text-brand-100/80">{[tenant.legal_name, tenant.tin && `TIN ${tenant.tin}`].filter(Boolean).join(' · ') || 'Add your registered name and TIN in the business profile'}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/15"><Building2 className="size-3.5 text-sun-300" />{branches.length} {branches.length === 1 ? 'branch' : 'branches'}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/15"><Percent className="size-3.5 text-sun-300" />{tenant.vat_registered ? `VAT ${Number(tenant.vat_rate)}%` : 'Non-VAT'}</span>
+              {tenant.address && <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/15"><MapPin className="size-3.5 shrink-0 text-sun-300" /><span className="truncate">{tenant.address}</span></span>}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <BusinessCode code={tenant.slug} />
+            <a href={`/shop/${tenant.slug}`} target="_blank" rel="noreferrer" className="inline-flex h-[52px] items-center gap-2 rounded-xl bg-sun-400 px-4 text-sm font-bold text-brand-900 shadow-sm transition hover:bg-sun-300">
+              <ShoppingBag className="size-4" /> Online shop <ExternalLink className="size-3.5" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <nav aria-label="Settings sections" className="h-fit min-w-0 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-900/5">
+          <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-2">
+            {groups.map((g) => (
+              <div key={g.name} className="shrink-0">
+                <p className="hidden px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 lg:block">{g.name}</p>
+                <ul className="flex gap-1 lg:block lg:space-y-0.5">
+                  {g.items.map((t) => {
+                    const active = tab === t.value;
+                    return (
+                      <li key={t.value} className="shrink-0">
+                        <button type="button" onClick={() => setTab(t.value)} aria-current={active ? 'page' : undefined}
+                          className={cx('group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition', active ? 'bg-brand-50 text-brand-900' : 'text-slate-600 hover:bg-slate-50')}>
+                          {active && <span aria-hidden className="absolute inset-y-2 left-0 hidden w-1 rounded-full bg-brand-600 lg:block" />}
+                          <span className={cx('grid size-9 shrink-0 place-items-center rounded-xl transition', active ? 'bg-brand-700 text-sun-300 shadow-sm shadow-brand-900/20' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:ring-1 group-hover:ring-slate-200')}><t.icon className="size-4" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className={cx('block whitespace-nowrap text-sm', active ? 'font-semibold' : 'font-medium')}>{t.label}</span>
+                            <span className={cx('hidden truncate text-[11px] lg:block', active ? 'text-brand-700/70' : 'text-slate-400')}>{t.note}</span>
+                          </span>
+                          <ChevronRight className={cx('hidden size-4 shrink-0 transition lg:block', active ? 'text-brand-600' : 'text-slate-300 group-hover:translate-x-0.5')} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </nav>
 
         <div className="min-w-0">
@@ -120,8 +164,8 @@ function BusinessSettings({ section }: { section: Tab }) {
   });
   const err = (f: string) => (save.error instanceof ApiError ? save.error.field(f) : undefined);
   const set = <K extends keyof Tenant>(k: K, v: Tenant[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const text = (k: 'name' | 'legal_name' | 'tin' | 'address' | 'phone' | 'email', label: string, extra: { placeholder?: string; className?: string; hint?: string } = {}) => (
-    <Field label={label} error={err(k)} className={extra.className} hint={extra.hint}>{(id) => <Input id={id} placeholder={extra.placeholder} value={form[k] ?? ''} onChange={(e) => set(k, e.target.value)} />}</Field>
+  const text = (k: 'name' | 'legal_name' | 'tin' | 'address' | 'phone' | 'email', label: string, extra: { icon: LucideIcon; placeholder?: string; className?: string; hint?: string }) => (
+    <Field label={label} error={err(k)} className={extra.className} hint={extra.hint}>{(id) => <IconInput id={id} icon={extra.icon} placeholder={extra.placeholder} value={form[k] ?? ''} onChange={(v) => set(k, v)} />}</Field>
   );
   const dirty = SAVED_KEYS.some((k) => String(form[k] ?? '') !== String(tenant[k] ?? ''));
   const submit = () =>
@@ -142,33 +186,44 @@ function BusinessSettings({ section }: { section: Tab }) {
       {save.error instanceof ApiError && Object.keys(save.error.errors).length === 0 && <ErrorBanner error={save.error} />}
 
       {section === 'profile' && (
-        <Panel title="Business profile" description="Shown on receipts, purchase orders and staff invitations." icon={Store}>
-          <div className="mb-6 flex items-center gap-4 rounded-2xl bg-gradient-to-br from-brand-50 to-cream/70 p-4 ring-1 ring-brand-100">
-            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 font-display text-xl font-bold text-white shadow-md">{(form.name || '?').slice(0, 1).toUpperCase()}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-lg font-semibold text-slate-900">{form.name || 'Business name'}</p>
-              <p className="truncate text-xs text-slate-500">{[form.legal_name, form.tin && `TIN ${form.tin}`].filter(Boolean).join(' · ') || 'Registered name and TIN appear here'}</p>
-            </div>
-            <BusinessCode code={tenant.slug} />
-          </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-6">
-            <FormSection title="Identity">
+            <Panel title="Identity" description="Who the business is. Printed on receipts and purchase orders." icon={Store}>
               <div className="grid gap-4 sm:grid-cols-2">
-                {text('name', 'Business name')}
-                {text('legal_name', 'Registered name', { placeholder: 'As registered with DTI / SEC' })}
-                {text('tin', 'TIN', { placeholder: '000-000-000-000' })}
-                <Field label="Staff email domain" error={err('staff_email_domain')} hint="Used to suggest staff emails. Only set a domain whose mailboxes you control.">{(id) => <Input id={id} placeholder="yourcompany.com" value={form.staff_email_domain ?? ''} onChange={(e) => set('staff_email_domain', e.target.value)} />}</Field>
+                {text('name', 'Business name', { icon: Store })}
+                {text('legal_name', 'Registered name', { icon: Landmark, placeholder: 'As registered with DTI / SEC' })}
+                {text('tin', 'TIN', { icon: Hash, placeholder: '000-000-000-000', hint: 'Tax Identification Number, printed on every receipt.' })}
+                <Field label="Staff email domain" error={err('staff_email_domain')} hint="Used to suggest staff emails. Only set a domain whose mailboxes you control.">
+                  {(id) => <IconInput id={id} icon={AtSign} placeholder="yourcompany.com" value={form.staff_email_domain ?? ''} onChange={(v) => set('staff_email_domain', v)} />}
+                </Field>
               </div>
-            </FormSection>
-            <FormSection title="Contact">
+            </Panel>
+            <Panel title="Contact" description="How customers and suppliers reach you. Shown on receipts and staff invitations." icon={Phone}>
               <div className="grid gap-4 sm:grid-cols-2">
-                {text('address', 'Address', { className: 'sm:col-span-2' })}
-                {text('phone', 'Phone', { placeholder: '09XX XXX XXXX' })}
-                {text('email', 'Email', { placeholder: 'hello@yourstore.com' })}
+                {text('address', 'Address', { icon: MapPin, className: 'sm:col-span-2', placeholder: 'Street, barangay, city' })}
+                {text('phone', 'Phone', { icon: Phone, placeholder: '09XX XXX XXXX' })}
+                {text('email', 'Email', { icon: Mail, placeholder: 'hello@yourstore.com' })}
               </div>
-            </FormSection>
+            </Panel>
           </div>
-        </Panel>
+
+          <aside className="space-y-6">
+            <ProfileChecklist form={form} />
+            <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700"><ReceiptText className="size-3.5" /> Receipt header preview</p>
+              <div className="mt-3 rounded-xl bg-[#fffdf7] px-4 pb-4 pt-4 text-center font-mono text-[11px] leading-relaxed text-slate-600 shadow-sm ring-1 ring-slate-900/5">
+                <p className="text-[13px] font-bold uppercase tracking-wide text-slate-900">{form.name || 'Business name'}</p>
+                {form.legal_name && <p>{form.legal_name}</p>}
+                <p className={cx(!form.address && 'text-slate-300')}>{form.address || 'Address'}</p>
+                <p className={cx(!form.tin && 'text-slate-300')}>{form.vat_registered ? 'VAT' : 'NON-VAT'} REG TIN: {form.tin || '000-000-000-000'}</p>
+                {(form.phone || form.email) && <p>{[form.phone, form.email].filter(Boolean).join(' · ')}</p>}
+                <p className="my-2 border-t border-dashed border-slate-300" />
+                <p className="flex justify-between"><span>SALES INVOICE</span><span>#000123</span></p>
+              </div>
+              <p className="mt-3 text-[11px] text-slate-500">Updates as you type. Save to use it on new receipts.</p>
+            </section>
+          </aside>
+        </div>
       )}
 
       {section === 'tax' && (
@@ -248,15 +303,63 @@ function BusinessSettings({ section }: { section: Tab }) {
 function BusinessCode({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button type="button" title="Staff sign in with this code"
+    <button type="button" title="Staff sign in with this code. Click to copy."
       onClick={() => { void navigator.clipboard?.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-      className="hidden shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-left shadow-sm ring-1 ring-slate-900/5 transition hover:ring-brand-200 sm:flex">
+      className="flex h-[52px] shrink-0 items-center gap-3 rounded-xl bg-white/10 px-3.5 text-left ring-1 ring-white/20 backdrop-blur transition hover:bg-white/15">
       <span>
-        <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Business code</span>
-        <span className="block font-mono text-sm font-semibold text-brand-800">{code}</span>
+        <span className="block text-[10px] font-semibold uppercase tracking-wider text-brand-100/70">{copied ? 'Copied' : 'Business code'}</span>
+        <span className="block font-mono text-sm font-semibold text-white">{code}</span>
       </span>
-      {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4 text-slate-400" />}
+      {copied ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4 text-brand-100/70" />}
     </button>
+  );
+}
+
+/** Text input with a leading icon, matching the standard input style. */
+function IconInput({ id, icon: Icon, value, placeholder, onChange }: { id: string; icon: LucideIcon; value: string; placeholder?: string; onChange: (value: string) => void }) {
+  return (
+    <div className="relative">
+      <Icon aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      <Input id={id} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-9" />
+    </div>
+  );
+}
+
+/** How complete the business profile is, with the missing details listed. */
+function ProfileChecklist({ form }: { form: Tenant }) {
+  const items = [
+    { label: 'Business name', done: !!form.name?.trim() },
+    { label: 'Registered name', done: !!form.legal_name?.trim() },
+    { label: 'TIN', done: !!form.tin?.trim() },
+    { label: 'Address', done: !!form.address?.trim() },
+    { label: 'Phone', done: !!form.phone?.trim() },
+    { label: 'Email', done: !!form.email?.trim() },
+  ];
+  const done = items.filter((i) => i.done).length;
+  const pct = Math.round((done / items.length) * 100);
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+      <div className="flex items-center gap-4">
+        <svg viewBox="0 0 64 64" className="size-16 shrink-0 -rotate-90" aria-hidden>
+          <circle cx="32" cy="32" r={r} fill="none" strokeWidth="7" className="stroke-slate-100" />
+          <circle cx="32" cy="32" r={r} fill="none" strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} className={cx('transition-all duration-500', pct === 100 ? 'stroke-emerald-500' : 'stroke-sun-400')} />
+        </svg>
+        <div>
+          <p className="font-display text-2xl font-bold text-slate-900">{pct}%</p>
+          <p className="text-xs text-slate-500">{pct === 100 ? 'Profile complete' : `${items.length - done} detail${items.length - done === 1 ? '' : 's'} missing`}</p>
+        </div>
+      </div>
+      <ul className="mt-4 space-y-2">
+        {items.map((i) => (
+          <li key={i.label} className="flex items-center gap-2.5 text-sm">
+            <span className={cx('grid size-5 shrink-0 place-items-center rounded-full', i.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-300')}>{i.done ? <Check className="size-3" /> : <Circle className="size-2 fill-current" />}</span>
+            <span className={i.done ? 'text-slate-700' : 'text-slate-400'}>{i.label}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

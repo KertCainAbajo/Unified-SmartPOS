@@ -122,7 +122,7 @@ function Field({ icon, label, hint, children }: { icon: ReactNode; label: string
 }
 
 function Status({ state, doneText }: { state: { done?: boolean; error?: string }; doneText: string }) {
-  if (state.error) return <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200"><TriangleAlert className="mt-0.5 size-4 shrink-0" /> {state.error}</p>;
-  if (state.done) return <p className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200"><Check className="size-4" /> {doneText}</p>;
+  if (state.error) return <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200"><TriangleAlert className="mt-0.5 size-4 shrink-0" /> {state.error}</p>;
+  if (state.done) return <p role="status" className="sp-alert-in flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200"><Check className="size-4" /> {doneText}</p>;
   return null;
 }

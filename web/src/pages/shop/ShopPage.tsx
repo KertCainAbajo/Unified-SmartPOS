@@ -14,6 +14,8 @@ import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './Customer
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
+import { useToast } from '../../components/Toast';
+import { useConfirm } from '../../components/Confirm';
 
 interface Branch { id: number; code: string; name: string; address: string | null; latitude?: number | null; longitude?: number | null }
 interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null; track_inventory: boolean; reorder_level: string; stock_by_branch: Record<number, { quantity: string; reorder_level: string | null }> }
@@ -66,6 +68,8 @@ export function ShopPage() {
   const deliveryAddress = composeAddress(deliveryLocation);
   const deliveryPin = deliveryLocation.pin;
   const [trackingId, setTrackingId] = useState<number | null>(null);
+  const toast = useToast();
+  const ask = useConfirm();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -98,10 +102,10 @@ export function ShopPage() {
   });
   const authMutation = useMutation({
     mutationFn: (payload: Record<string, string>) => api(`${base}/${mode}`, { method: 'POST', body: payload }),
-    onSuccess: async () => { setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); setAuthOpen(false); },
+    onSuccess: async () => { setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); setAuthOpen(false); toast.success(mode === 'register' ? 'Welcome! Your account is ready.' : 'Welcome back! You are signed in.'); },
     onError: (e) => setError(errorMessage(e)),
   });
-  const logoutMutation = useMutation({ mutationFn: () => api(`${base}/logout`, { method: 'POST' }), onSuccess: async () => { setCart({}); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); } });
+  const logoutMutation = useMutation({ mutationFn: () => api(`${base}/logout`, { method: 'POST' }), onSuccess: async () => { setCart({}); await queryClient.invalidateQueries({ queryKey: ['shop-account', business] }); toast.info('You are signed out. See you again!'); } });
   const placeOrder = useMutation({
     mutationFn: () => api<{ data: Order }>(`${base}/orders`, { method: 'POST', body: {
       branch_id: branchId, fulfilment,
@@ -110,12 +114,13 @@ export function ShopPage() {
       contact_phone: account.data?.phone,
       items: Object.values(cart).map(({ product, quantity }) => ({ product_id: product.id, quantity })),
     } }),
-    onSuccess: async (result) => { setCart({}); setError(''); await queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }); if (result.data.fulfilment === 'delivery') setTrackingId(result.data.id); },
+    onSuccess: async (result) => { setCart({}); setError(''); toast.success(`Order ${result.data.order_number} placed. We will let you know when the store confirms it.`); await queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }); if (result.data.fulfilment === 'delivery') setTrackingId(result.data.id); },
     onError: (e) => setError(errorMessage(e)),
   });
   const cancelOrder = useMutation({
     mutationFn: (id: number) => api(`${base}/orders/${id}/cancel`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }),
+    onSuccess: () => { toast.info('Your order was cancelled.'); return queryClient.invalidateQueries({ queryKey: ['shop-orders', business] }); },
+    onError: (e) => toast.error(errorMessage(e)),
   });
   const total = useMemo(() => Object.values(cart).reduce((sum, line) => sum + Number(line.product.price) * line.quantity, 0), [cart]);
 
@@ -376,7 +381,7 @@ export function ShopPage() {
                   <button onClick={() => openAuth('login')} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 font-bold text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-900"><Lock size={16} /> Sign in to place order</button>
                   <p className="mt-2.5 text-center text-xs text-slate-500">New customer? <button onClick={() => openAuth('register')} className="font-semibold text-emerald-800 hover:underline">Create an account</button></p>
                 </>}
-              {error && !authOpen && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
+              {error && !authOpen && <p key={error} role="alert" className="sp-alert-in sp-alert-error mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200">{error}</p>}
               <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">Prices are estimates and are confirmed at the {fulfilment === 'pickup' ? 'store' : 'store before dispatch'}.</p>
             </div>
           </section>
@@ -391,7 +396,7 @@ export function ShopPage() {
             <div className="p-5">
               {orders.isPending ? <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}</div>
                 : orders.data?.data.length ? <>
-                  <ul className="space-y-3">{orders.data.data.slice(0, 3).map((order) => <OrderCard key={order.id} order={order} cancelling={cancelOrder.isPending && cancelOrder.variables === order.id} onCancel={() => cancelOrder.mutate(order.id)} onTrack={() => setTrackingId(order.id)} />)}</ul>
+                  <ul className="space-y-3">{orders.data.data.slice(0, 3).map((order) => <OrderCard key={order.id} order={order} cancelling={cancelOrder.isPending && cancelOrder.variables === order.id} onCancel={async () => { if (await ask({ title: `Cancel order ${order.order_number}?`, message: 'The store stops preparing it. You can order again any time.', confirmLabel: 'Cancel order', cancelLabel: 'Keep order' })) cancelOrder.mutate(order.id); }} onTrack={() => setTrackingId(order.id)} />)}</ul>
                   <button onClick={() => setHistoryOpen(true)} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-50"><Receipt size={15} /> All orders &amp; purchase history</button>
                 </>
                   : <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No orders yet. Your pickups and deliveries will appear here.</p>}
