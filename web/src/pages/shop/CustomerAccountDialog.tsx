@@ -57,16 +57,26 @@ export function CustomerAccountDialog({ base, business, account, onClose, onSign
       <div className="fixed inset-0 bg-[#062a1d]/55 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative flex min-h-full items-end justify-center sm:items-center sm:p-6">
         <div role="dialog" aria-modal="true" aria-label="My account" className="auth-fade relative w-full max-w-lg overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
-          <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-5">
-            <span className="grid size-12 place-items-center rounded-full bg-gradient-to-br from-emerald-600 to-emerald-900 font-display text-lg font-bold text-white">{account.name.charAt(0).toUpperCase()}</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">My account</p>
-              <p className="truncate font-display text-lg font-bold text-slate-900">{account.name}</p>
+          {/* Profile header */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-800 to-[#062a1d] px-6 pb-6 pt-6 text-white">
+            <span aria-hidden className="pointer-events-none absolute -right-14 -top-16 size-48 rounded-full bg-amber-300/25 blur-3xl" />
+            <span aria-hidden className="mx-auto mb-3 block h-1.5 w-10 rounded-full bg-white/30 sm:hidden" />
+            <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/25 hover:bg-white/25"><X className="size-5" /></button>
+            <div className="relative flex items-center gap-4 pr-10">
+              <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-500 font-display text-2xl font-extrabold text-emerald-950 shadow-lg ring-4 ring-white/15">{account.name.charAt(0).toUpperCase()}</span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">My account</p>
+                <p className="truncate font-display text-xl font-bold">{account.name}</p>
+                <p className="truncate text-xs text-emerald-100/80">{account.email}</p>
+              </div>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="size-5" /></button>
+            <div className="relative mt-4 flex flex-wrap gap-2 text-[11px] font-semibold">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 ring-1 ring-white/20"><ShieldCheck className="size-3.5 text-amber-300" />Email confirmed</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 ring-1 ring-white/20"><Phone className="size-3.5 text-amber-300" />{account.phone || 'No mobile yet'}</span>
+            </div>
           </div>
 
-          <div className="max-h-[75vh] space-y-6 overflow-y-auto p-6">
+          <div className="max-h-[68vh] space-y-6 overflow-y-auto p-6">
             <form onSubmit={saveProfile} className="space-y-4">
               <h2 className="font-display text-base font-bold text-slate-900">Your details</h2>
               <Field icon={<Mail />} label="Email" hint="Used to sign in. Contact the store to change it.">

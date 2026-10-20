@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
-  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, ShoppingCart, Soup, SprayCan, Trash2, Wheat, X,
+  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -224,11 +224,11 @@ export function ShopPage() {
     {/* ───────── Header ───────── */}
     <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
-        <a href="#top" className="flex min-w-0 items-center gap-3 md:shrink-0">
+        <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-700">Pickup and delivery</p>
-            <h1 className="truncate font-display text-base font-bold leading-tight sm:text-lg">{shop.business.name}</h1>
+            <h1 className="truncate font-display text-[15px] font-bold leading-tight tracking-tight sm:text-lg">{shop.business.name}</h1>
           </div>
         </a>
 
@@ -239,7 +239,7 @@ export function ShopPage() {
         </label>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <a href="#basket" className="relative grid size-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 lg:hidden" aria-label={`Basket, ${basketCount} items`}>
+          <a href="#basket" className="relative hidden size-11 place-items-center sm:grid rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800 lg:hidden" aria-label={`Basket, ${basketCount} items`}>
             <ShoppingBasket size={19} />
             {basketCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950 ring-2 ring-white">{basketCount}</span>}
           </a>
@@ -281,7 +281,16 @@ export function ShopPage() {
     </header>
 
     <div id="top" className="mx-auto max-w-[1920px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-      <ShopHero photos={shop.data} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
+      {signedIn && (
+        <div className="mb-4 flex items-center gap-3 sm:hidden">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 font-display text-lg font-extrabold text-emerald-950 shadow-sm">{firstName.charAt(0).toUpperCase()}</span>
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-bold text-slate-900">Hi, {firstName}!</p>
+            <p className="text-xs text-slate-500">{openOrders ? `You have ${openOrders} ${openOrders === 1 ? 'order' : 'orders'} in progress.` : 'What would you like today?'}</p>
+          </div>
+        </div>
+      )}
+      <ShopHero photos={shop.data} products={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} onAdd={(id) => { const p = shop.data.find((x) => x.id === id); if (p) setQuantity(p, (cart[id]?.quantity ?? 0) + 1); }} />
 
       {/* ───────── Shop + basket ───────── */}
       <main className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -455,31 +464,31 @@ export function ShopPage() {
 
     {/* ───────── Footer ───────── */}
     <footer className="bg-[#0a3d2c] text-emerald-50/80">
-      <div className="mx-auto grid max-w-[1920px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1920px] gap-5 px-4 pb-6 pt-7 sm:gap-10 sm:px-6 sm:py-12 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1" /><p className="font-display text-lg font-bold text-white">{shop.business.name}</p></div>
-          <p className="mt-4 max-w-sm text-sm leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
+          <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-9 rounded-xl bg-white object-contain p-1 sm:size-11" /><p className="font-display text-base font-bold text-white sm:text-lg">{shop.business.name}</p></div>
+          <p className="mt-2.5 max-w-sm text-xs leading-5 sm:mt-4 sm:text-sm sm:leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
         </div>
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">Pickup locations</p>
-          <ul className="mt-4 space-y-3 text-sm">{shop.branches.map((branch) => <li key={branch.id} className="flex gap-2"><MapPin size={15} className="mt-0.5 shrink-0 text-emerald-300" /><span><span className="font-semibold text-white">{branch.name}</span>{branch.address && <span className="block text-xs text-emerald-50/60">{branch.address}</span>}</span></li>)}</ul>
+          <p className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-300 sm:text-[11px]">Pickup locations</p>
+          <ul className="mt-2.5 flex flex-wrap gap-1.5 text-sm sm:mt-4 sm:block sm:space-y-3">{shop.branches.map((branch) => <li key={branch.id} className="flex items-center gap-1.5 rounded-full bg-white/[.07] px-2.5 py-1 ring-1 ring-white/10 sm:items-start sm:gap-2 sm:rounded-none sm:bg-transparent sm:p-0 sm:ring-0"><MapPin size={14} className="shrink-0 text-emerald-300 sm:mt-0.5" /><span><span className="text-xs font-semibold text-white sm:text-sm">{branch.name}</span>{branch.address && <span className="hidden text-xs text-emerald-50/60 sm:block">{branch.address}</span>}</span></li>)}</ul>
         </div>
-        <div>
+        <div className="hidden sm:block">
           <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">Order status</p>
           <ul className="mt-4 space-y-2.5 text-sm">{statusFlow.map((status) => <li key={status} className="flex items-center gap-2"><PackageCheck size={15} className="text-emerald-300" />{statusNames[status]}</li>)}</ul>
         </div>
       </div>
-      <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-emerald-50/50">
+      <div className={`border-t border-white/10 px-4 pt-4 text-center text-[11px] text-emerald-50/50 sm:py-5 sm:text-xs lg:pb-5 ${lines.length ? 'pb-24' : 'pb-5'}`}>
         {shop.business.name} · Online orders powered by SmartPOS
-        <span className="mt-1 block text-[11px] text-emerald-50/35">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
+        <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
       </div>
     </footer>
 
     {/* Mobile basket bar */}
-    {lines.length > 0 && <a href="#basket" className="fixed inset-x-3 bottom-3 z-30 flex items-center gap-3 rounded-2xl bg-emerald-950 p-2 pl-3 text-white shadow-2xl shadow-emerald-950/40 lg:hidden">
-      <span className="relative grid size-10 place-items-center rounded-xl bg-white/10"><ShoppingBasket size={19} /><span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950">{basketCount}</span></span>
-      <span className="flex-1"><span className="block text-xs text-emerald-100/70">Estimated total</span><span className="font-display font-bold">{peso(total)}</span></span>
-      <span className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-4 text-sm font-bold text-emerald-950">View basket <ArrowRight size={15} /></span>
+    {lines.length > 0 && <a href="#basket" key={basketCount} className="sp-toast-in fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex items-center gap-3 rounded-full bg-gradient-to-r from-emerald-800 to-emerald-950 p-1.5 pl-2 text-white shadow-2xl shadow-emerald-950/40 ring-1 ring-white/10 lg:hidden">
+      <span className="relative grid size-11 place-items-center rounded-full bg-white/12"><ShoppingBasket size={20} /><span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-emerald-950 ring-2 ring-emerald-900">{basketCount}</span></span>
+      <span className="min-w-0 flex-1"><span className="block text-[11px] text-emerald-100/75">{basketCount} {basketCount === 1 ? 'item' : 'items'} · estimated</span><span className="font-display text-lg font-extrabold leading-tight">{peso(total)}</span></span>
+      <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-amber-400 px-5 text-sm font-extrabold text-emerald-950 shadow-sm">Checkout <ArrowRight size={16} /></span>
     </a>}
 
     {accountOpen && account.data && <CustomerAccountDialog base={base} business={business} account={account.data} onClose={() => setAccountOpen(false)} onSignOut={() => { setAccountOpen(false); logoutMutation.mutate(); }} />}
@@ -527,6 +536,11 @@ function cartLines(cart: Record<number, CartLine>): CartLine[] { return Object.v
 
 type ProductStock = { label: string; level: 'available' | 'low' | 'none' | 'untracked' };
 
+/** All stock of a product across branches (used to rank best sellers by availability). */
+function totalStock(product: ShopProduct): number {
+  return Object.values(product.stock_by_branch ?? {}).reduce((sum, s) => sum + Number(s.quantity), 0);
+}
+
 function productStock(product: ShopProduct, selectedBranch: number | '', branches: Branch[]): ProductStock {
   if (!product.track_inventory) return { label: 'Stock not tracked', level: 'untracked' };
   const entries = selectedBranch ? [product.stock_by_branch[selectedBranch] ?? { quantity: '0', reorder_level: null }] : Object.values(product.stock_by_branch);
@@ -535,9 +549,8 @@ function productStock(product: ShopProduct, selectedBranch: number | '', branche
   const lowAt = entries.reduce((sum, stock) => sum + Number(stock.reorder_level ?? defaultLowAt), 0);
   const amount = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 3 }).format(quantity);
   const branch = branches.find((item) => item.id === selectedBranch);
-  const place = branch ? `${branch.name}: ` : '';
-  const suffix = branch ? ' in stock' : ' available across branches';
-  return { label: `${place}${amount}${suffix}`, level: quantity <= 0 ? 'none' : quantity <= lowAt ? 'low' : 'available' };
+  const label = quantity <= 0 ? `Out of stock${branch ? ` at ${branch.name}` : ''}` : `${amount} in stock${branch ? ` · ${branch.name}` : ''}`;
+  return { label, level: quantity <= 0 ? 'none' : quantity <= lowAt ? 'low' : 'available' };
 }
 
 /**
@@ -582,36 +595,44 @@ function CategoryRail({ children }: { children: ReactNode }) {
 }
 
 function ProductCard({ product, stock, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; stock: ProductStock; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {
-  return <article className={`group relative flex flex-col rounded-2xl bg-white p-3 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(6,60,40,.35)] sm:p-4 ${quantity ? 'ring-2 ring-emerald-600' : 'shadow-[0_1px_2px_rgba(15,23,42,.05)] ring-1 ring-slate-200'}`}>
-    <div className="flex items-start justify-between gap-2">
-      <span className="truncate rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{product.category ?? 'Essentials'}</span>
-      <button onClick={onToggleSaved} aria-pressed={saved} aria-label={saved ? `Remove ${product.name} from saved` : `Save ${product.name}`} className={`-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-full transition ${saved ? 'text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:bg-slate-100 hover:text-rose-500'}`}>
-        <Heart size={18} className={saved ? 'fill-rose-500' : ''} />
-      </button>
-    </div>
-
-    {/* Fixed-height frame that clips: the photo always fits inside and never covers the text below. */}
-    <div className="relative mt-1 grid h-36 shrink-0 place-items-center overflow-hidden rounded-xl sm:h-44">
+  const out = stock.level === 'none';
+  return <article className={`group relative flex flex-col overflow-hidden rounded-[22px] bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_45px_-24px_rgba(6,60,40,.45)] ${quantity ? 'ring-2 ring-emerald-600 shadow-[0_14px_30px_-18px_rgba(5,150,105,.55)]' : 'shadow-[0_1px_3px_rgba(15,23,42,.06)] ring-1 ring-slate-200/80'}`}>
+    {/* Photo on a soft tinted square, with the save heart, badges and the quick-add button floating on it. */}
+    <div className={`relative m-1.5 aspect-square overflow-hidden rounded-[18px] sm:m-2 ${tone.bg}`}>
+      <span aria-hidden className="pointer-events-none absolute -bottom-10 left-1/2 h-20 w-[85%] -translate-x-1/2 rounded-full bg-white/70 blur-2xl" />
       {product.image_url
-        ? <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 size-full object-contain p-1 mix-blend-multiply transition duration-500 group-hover:scale-105" />
-        : <span className={`grid size-20 place-items-center rounded-full ${tone.bg} ${tone.fg}`}><Icon className="size-9" strokeWidth={1.6} /></span>}
+        ? <img src={product.image_url} alt={product.name} loading="lazy" className={`absolute inset-0 size-full object-contain p-4 mix-blend-multiply transition duration-500 group-hover:scale-[1.07] sm:p-5 ${out ? 'opacity-50 grayscale' : ''}`} />
+        : <span className={`absolute inset-0 grid place-items-center ${tone.fg}`}><Icon className="size-14" strokeWidth={1.4} /></span>}
+
+      <span className={`absolute left-2 top-2 max-w-[70%] truncate rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold backdrop-blur ${tone.label}`}>{product.category ?? 'Essentials'}</span>
+      <button onClick={onToggleSaved} aria-pressed={saved} aria-label={saved ? `Remove ${product.name} from saved` : `Save ${product.name}`}
+        className={`absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur transition active:scale-90 ${saved ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+        <Heart size={16} className={saved ? 'fill-rose-500' : ''} />
+      </button>
+      {stock.level === 'low' && <span className="absolute bottom-2 left-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950 shadow-sm">Few left</span>}
+      {out && <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-bold text-white">Out of stock</span>}
+
+      <div className="absolute bottom-2 right-2">
+        {quantity
+          ? <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-lg shadow-emerald-950/15 ring-1 ring-emerald-600/20">
+            <button aria-label={`Remove one ${product.name}`} onClick={() => onChange(quantity - 1)} className="grid size-8 place-items-center rounded-full bg-slate-100 text-slate-700 transition active:scale-90"><Minus size={14} strokeWidth={2.8} /></button>
+            <span className="min-w-6 text-center font-display text-sm font-extrabold tabular-nums text-emerald-900" aria-label={`${quantity} in basket`}>{quantity}</span>
+            <button aria-label={`Add one ${product.name}`} onClick={() => onChange(quantity + 1)} className="grid size-8 place-items-center rounded-full bg-emerald-700 text-white transition active:scale-90"><Plus size={14} strokeWidth={2.8} /></button>
+          </div>
+          : <button onClick={() => onChange(1)} aria-label={`Add ${product.name}`} className="grid size-10 place-items-center rounded-full bg-emerald-700 text-white shadow-lg shadow-emerald-900/30 ring-4 ring-white/70 transition hover:bg-emerald-800 active:scale-90"><Plus size={20} strokeWidth={2.6} /></button>}
+      </div>
     </div>
 
-    <h3 className="relative mt-3 line-clamp-1 text-[15px] font-bold leading-snug text-slate-900" title={product.name}>{product.name}</h3>
-    <p className="mt-0.5 line-clamp-2 min-h-10 text-[13px] leading-5 text-slate-500" title={product.description ?? undefined}>{product.description || `Sold per ${product.unit}`}</p>
-    <p className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900">{peso(product.price)}<span className="ml-1 text-xs font-medium text-slate-400">/ {product.unit}</span></p>
-    <p className={`mt-2 inline-flex min-h-7 w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${stock.level === 'available' ? 'bg-emerald-100 text-emerald-800' : stock.level === 'low' ? 'bg-amber-100 text-amber-900' : stock.level === 'none' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
-      <span aria-hidden className={`size-2 rounded-full ${stock.level === 'available' ? 'bg-emerald-600' : stock.level === 'low' ? 'bg-amber-500' : stock.level === 'none' ? 'bg-red-600' : 'bg-slate-400'}`} />{stock.label}
-    </p>
-
-    <div className="mt-3">
-      {quantity
-        ? <div className="flex h-10 items-center justify-between rounded-xl bg-emerald-50 px-1 ring-1 ring-emerald-600/30">
-          <button aria-label={`Remove one ${product.name}`} onClick={() => onChange(quantity - 1)} className="grid size-8 place-items-center rounded-lg bg-white text-emerald-800 shadow-sm transition hover:bg-red-50 hover:text-red-600"><Minus size={15} strokeWidth={2.6} /></button>
-          <span className="text-sm font-bold text-emerald-900">{quantity} in basket</span>
-          <button aria-label={`Add one ${product.name}`} onClick={() => onChange(quantity + 1)} className="grid size-8 place-items-center rounded-lg bg-emerald-800 text-white shadow-sm transition hover:bg-emerald-900"><Plus size={15} strokeWidth={2.6} /></button>
-        </div>
-        : <button onClick={() => onChange(1)} aria-label={`Add ${product.name}`} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 active:scale-[.98]"><ShoppingCart size={16} /> Add to basket</button>}
+    <div className="flex flex-1 flex-col px-3 pb-3 pt-1 sm:px-4 sm:pb-4">
+      <h3 className="line-clamp-2 min-h-[2.5rem] text-[14px] font-bold leading-5 text-slate-900 sm:text-[15px]" title={product.name}>{product.name}</h3>
+      <p className="mt-0.5 hidden truncate text-xs text-slate-500 sm:block" title={product.description ?? undefined}>{product.description || `Sold per ${product.unit}`}</p>
+      <div className="mt-auto pt-2">
+        <p className="font-display text-lg font-extrabold leading-none tracking-tight text-slate-900 sm:text-xl">{peso(product.price)}<span className="ml-1 text-[11px] font-semibold text-slate-400">/ {product.unit}</span></p>
+        <p className={`mt-1.5 flex items-center gap-1.5 truncate text-[11px] font-semibold ${stock.level === 'available' ? 'text-emerald-700' : stock.level === 'low' ? 'text-amber-700' : out ? 'text-red-600' : 'text-slate-500'}`}>
+          <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${stock.level === 'available' ? 'bg-emerald-500' : stock.level === 'low' ? 'bg-amber-500' : out ? 'bg-red-500' : 'bg-slate-400'}`} />
+          <span className="truncate">{stock.label}</span>
+        </p>
+      </div>
     </div>
   </article>;
 }

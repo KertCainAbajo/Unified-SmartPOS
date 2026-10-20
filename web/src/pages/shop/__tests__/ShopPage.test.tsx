@@ -42,7 +42,7 @@ function serve(signedIn: boolean) {
 it('lets a guest fill a basket and asks them to sign in before ordering', async () => {
   serve(false);
   fireEvent.click(await screen.findByRole('button', { name: 'Add Bath Soap' }));
-  expect(screen.getByText('1 in basket')).toBeTruthy();
+  expect(screen.getByLabelText('1 in basket')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /Sign in to place order/ }));
   expect(await screen.findByRole('dialog')).toBeTruthy();
   expect(screen.getByText('Your basket is saved')).toBeTruthy();

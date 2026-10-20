@@ -75,8 +75,9 @@ test.describe.serial('customer app, end to end', () => {
       await page.getByRole('button', { name: /^All products/ }).click();
 
       await page.getByRole('textbox', { name: 'Search products' }).last().fill('soap');
-      await expect(page.getByText('Bath Soap 90g').first()).toBeVisible();
-      await expect(page.getByText('Coca-Cola 1L')).toHaveCount(0);
+      const list = page.locator('#products');
+      await expect(list.getByText('Bath Soap 90g').first()).toBeVisible();
+      await expect(list.getByText('Coca-Cola 1L')).toHaveCount(0);
       await page.getByRole('textbox', { name: 'Search products' }).last().fill('');
 
       await page.getByRole('button', { name: 'Save Bath Soap 90g' }).click();
@@ -84,7 +85,7 @@ test.describe.serial('customer app, end to end', () => {
 
       await page.getByRole('button', { name: /^Add Coca-Cola/ }).first().click();
       await page.getByRole('button', { name: /^Add one Coca-Cola/ }).first().click();
-      await expect(page.getByText('2 in basket').first()).toBeVisible();
+      await expect(page.getByLabel('2 in basket').first()).toBeVisible();
     });
 
     test('signs up and gets the email code step', async ({ page }) => {
