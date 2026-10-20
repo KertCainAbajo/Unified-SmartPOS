@@ -34,7 +34,7 @@ const config: CapacitorConfig = {
   },
   // Lets the shop know it is running inside the app (it then hides everything that is not the customer shop).
   appendUserAgent: 'AlingNenaShopApp/1.0',
-  backgroundColor: '#0b3b2c',
+  backgroundColor: '#fbf7ec',
   android: {
     allowMixedContent: SHOP_URL.startsWith('http://'),
   },
@@ -45,13 +45,13 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: '#0b3b2c',
+      backgroundColor: '#fbf7ec',
       showSpinner: false,
       androidScaleType: 'CENTER_INSIDE',
     },
     StatusBar: {
-      backgroundColor: '#0b3b2c',
-      style: 'DARK',
+      backgroundColor: '#ffffff',
+      style: 'LIGHT',
       overlaysWebView: false,
     },
   },
