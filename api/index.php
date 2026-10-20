@@ -29,4 +29,10 @@ foreach ($defaults as $key => $value) {
     }
 }
 
+// This file lives in /api, so PHP reports the script as /api/index.php and Laravel would treat /api as the site's
+// base folder, turning /api/v1/me into /v1/me (404). Present it as the site root's index.php, as on a normal server.
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+$_SERVER['SCRIPT_FILENAME'] = realpath(__DIR__.'/../public/index.php') ?: __DIR__.'/../public/index.php';
+
 require __DIR__.'/../public/index.php';
