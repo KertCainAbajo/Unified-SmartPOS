@@ -73,6 +73,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
           <aside className="relative hidden flex-col overflow-hidden bg-[#0b3b2c] p-8 text-white lg:flex">
             <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-emerald-400/20 blur-3xl" />
             <span aria-hidden className="pointer-events-none absolute -bottom-28 -left-20 size-72 rounded-full bg-amber-300/10 blur-3xl" />
+            <span aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(180deg,transparent,#000_40%,#000_70%,transparent)]" />
 
             <div className="relative flex items-center gap-3">
               <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1" />
@@ -102,6 +103,36 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 </li>
               ))}
             </ul>
+
+
+            {/* A sample of what signed-in customers see: their order moving through the steps. */}
+            <div aria-hidden className="relative mt-8">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-200/60">How your order shows up</p>
+              <div className="rounded-2xl bg-white/[.07] p-4 ring-1 ring-white/10 backdrop-blur-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-semibold text-white">ON-20261021-0042</p>
+                    <p className="text-[11px] text-emerald-50/55">Pickup · Main Branch</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-300 px-2.5 py-1 text-[10px] font-bold text-[#0b3b2c]">Ready for pickup</span>
+                </div>
+                <ol className="mt-4 grid grid-cols-4">
+                  {['Placed', 'Confirmed', 'Preparing', 'Ready'].map((step, i) => (
+                    <li key={step} className="relative flex flex-col items-center text-center">
+                      {i > 0 && <span className="absolute right-1/2 top-[11px] h-0.5 w-full bg-emerald-400/70" />}
+                      <span className={`relative grid size-6 place-items-center rounded-full ${i === 3 ? 'bg-amber-300 text-[#0b3b2c] ring-4 ring-amber-300/20' : 'bg-emerald-400 text-[#0b3b2c]'}`}>
+                        <Check className="size-3.5" strokeWidth={3} />
+                      </span>
+                      <span className="mt-1.5 text-[10px] font-medium text-emerald-50/70">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
+                  <span className="text-emerald-50/60">3 items</span>
+                  <span className="font-display font-bold text-white">₱186.50</span>
+                </div>
+              </div>
+            </div>
 
             <div className="relative mt-auto pt-8">
               {basketCount > 0 ? (
