@@ -15,6 +15,7 @@ import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './Customer
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
+import { AppDownloadBanner } from './AppDownloadBanner';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
 import { platformInfo } from '../../lib/platformInfo';
@@ -232,6 +233,7 @@ export function ShopPage() {
         Demo store for testing only: orders are not real, nothing is delivered and no payment is taken. <Link to={legalHref('terms')} className="underline underline-offset-2">Learn more</Link>
       </p>
     )}
+    <AppDownloadBanner />
     <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
