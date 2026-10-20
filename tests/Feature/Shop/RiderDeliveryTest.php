@@ -34,6 +34,7 @@ class RiderDeliveryTest extends TestCase
     private function readyDeliveryOrder(): int
     {
         $product = $this->createProduct($this->tenant, ['price' => '50.00']);
+        $this->setStock($product, $this->tenant->branches()->findOrFail($this->branchId), '50');
         $id = $this->actingAs($this->customer, 'customer')->postJson("/api/v1/shop/{$this->tenant->slug}/orders", [
             'branch_id' => $this->branchId, 'contact_name' => 'Ana Reyes', 'contact_phone' => '0917', 'fulfilment' => 'delivery',
             'delivery_address' => 'Blk 4 Lot 12, Mahogany St., Davao City', 'delivery_lat' => 7.0731, 'delivery_lng' => 125.6128,

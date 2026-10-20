@@ -88,8 +88,8 @@ export function OnlineOrdersPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-brand-700">Pickup &amp; delivery</p>
-          <h1 className="mt-1 font-display text-[28px] font-bold leading-tight text-slate-900">Online orders</h1>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700 shadow-sm ring-1 ring-brand-900/10 backdrop-blur"><span className="size-1.5 rounded-full bg-gradient-to-br from-brand-400 to-brand-600" />Pickup &amp; delivery</p>
+          <h1 className="mt-2.5 font-display text-[1.75rem] font-extrabold leading-[1.1] tracking-[-0.02em] text-brand-900 sm:text-[2.15rem]">Online orders</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">Confirm and prepare orders, send deliveries out with a rider, then record the payment at the POS.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

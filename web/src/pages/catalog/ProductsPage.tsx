@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, Pagination, Select, cx } from '../../components/ui';
+import { StatCard, Button, Checkbox, DataTable, ErrorBanner, Field, Input, Modal, Pagination, Select, cx } from '../../components/ui';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../components/Toast';
@@ -121,8 +121,8 @@ export function ProductsPage() {
       {/* Header */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">Stock</p>
-          <h1 className="mt-1 font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand-900">Products</h1>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700 shadow-sm ring-1 ring-brand-900/10 backdrop-blur"><span className="size-1.5 rounded-full bg-gradient-to-br from-brand-400 to-brand-600" />Stock</p>
+          <h1 className="mt-2.5 font-display text-[1.75rem] font-extrabold leading-[1.1] tracking-[-0.02em] text-brand-900 sm:text-[2.15rem]">Products</h1>
           <p className="mt-1 text-sm text-slate-500">One catalog for every branch. Stock levels are for <span className="font-medium text-slate-700">{scopeName}</span>.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -321,20 +321,8 @@ const TINTS = {
 };
 
 function Stat({ Icon, label, value, note, tint }: { Icon: LucideIcon; label: string; value: string | null; note: string; tint: keyof typeof TINTS }) {
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5 transition hover:shadow-md">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-        <span className={cx('grid size-9 place-items-center rounded-xl', TINTS[tint])}><Icon className="size-4" /></span>
-      </div>
-      {value === null ? (
-        <span className="mt-3 block h-8 w-16 animate-pulse rounded-lg bg-slate-100" />
-      ) : (
-        <p className="mt-2 font-display text-[1.65rem] font-bold leading-tight tabular-nums text-slate-900">{value}</p>
-      )}
-      <p className="mt-1 truncate text-xs text-slate-400">{note}</p>
-    </div>
-  );
+  const tone = ({ brand: 'brand', emerald: 'brand', amber: 'warn', slate: 'default', rose: 'rose', sun: 'sun', sky: 'sky', violet: 'sky' } as const as Record<string, 'brand' | 'warn' | 'default' | 'rose' | 'sun' | 'sky'>)[tint] ?? 'default';
+  return <StatCard icon={Icon} label={label} value={value} hint={note} tone={tone} />;
 }
 
 /** Quantity with a small bar against twice the reorder level, and a Low / Out badge. */

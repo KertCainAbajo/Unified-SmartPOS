@@ -12,6 +12,7 @@ import { ChangePasswordPage } from './pages/auth/ChangePasswordPage';
 import { ApplicationStatusPage } from './pages/careers/ApplicationStatusPage';
 import { CareersIndexPage, CareersPage } from './pages/careers/CareersPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { LegalPage } from './pages/LegalPages';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([{ errorElement: <ErrorPage />, childr
   { path: '/careers', element: <CareersIndexPage /> },
   { path: '/careers/:code', element: <CareersPage /> },
   { path: '/applications/status', element: <ApplicationStatusPage /> },
+  { path: '/legal/:policy', element: <LegalPage /> },
   { path: '/shop', lazy: page(() => import('./pages/shop/ShopDirectory'), 'ShopIndexPage') },
   { path: '/shop/:business', lazy: page(() => import('./pages/shop/ShopPage'), 'ShopPage') },
   {

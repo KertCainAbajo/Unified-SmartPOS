@@ -16,7 +16,6 @@ import {
   RotateCcw,
   ShoppingCart,
   Smartphone,
-  Sparkles,
   Wallet,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -74,42 +73,54 @@ function StoreDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-6 text-white shadow-xl shadow-brand-900/15 sm:p-8">
-        <div className="pointer-events-none absolute -right-10 -top-24 size-80 rounded-full bg-sun-400/25 blur-3xl" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage: 'repeating-conic-gradient(from 0deg at 85% -20%, #fff 0deg 1.5deg, transparent 1.5deg 9deg)' }}
-        />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+      <section className="relative isolate overflow-hidden rounded-[28px] bg-[#062a1d] p-6 text-white shadow-[0_40px_80px_-40px_rgba(2,44,34,.9)] sm:p-8">
+        <span aria-hidden className="absolute -left-24 -top-32 -z-10 size-[24rem] rounded-full bg-emerald-500/35 blur-[90px]" />
+        <span aria-hidden className="absolute -bottom-40 right-10 -z-10 size-[26rem] rounded-full bg-sun-400/25 blur-[100px]" />
+        <span aria-hidden className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(#fff_1px,transparent_1px),linear-gradient(90deg,#fff_1px,transparent_1px)] [background-size:40px_40px] [mask-image:radial-gradient(ellipse_at_20%_20%,#000_15%,transparent_70%)]" />
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-brand-50 ring-1 ring-white/15">
-              <Sparkles className="size-3.5 text-sun-300" /> {tenant.name} · {viewAll ? `All ${branches.length} branches` : branch?.name ?? 'All branches'}
+            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-brand-50 ring-1 ring-white/15 backdrop-blur">
+              <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-emerald-400" /></span>
+              {tenant.name} · {viewAll ? `All ${branches.length} branches` : branch?.name ?? 'All branches'}
             </p>
-            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              {greeting()}, <span className="text-sun-300">{firstName}</span>
+            <h1 className="mt-4 font-display text-[2rem] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-5xl">
+              {greeting()},{' '}
+              <span className="bg-gradient-to-r from-sun-300 via-yellow-200 to-lime-300 bg-clip-text text-transparent">{firstName}</span>
             </h1>
-            <p className="mt-1.5 text-sm text-brand-100/80">
-              {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} — here's how the store is doing.
+            <p className="mt-2 text-sm text-brand-100/75">
+              {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · here is how the store is doing.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {can('sales.create') && (
-              <Link to={`${base}/pos`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-sun-400 px-5 text-sm font-semibold text-brand-900 shadow-lg shadow-black/15 transition hover:bg-sun-300">
-                <ShoppingCart className="size-4" /> Open POS
-              </Link>
-            )}
-            {canSales && (
-              <Link to={`${base}/sales`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/15">
-                <Receipt className="size-4" /> Sales
-              </Link>
-            )}
-            {(can('reports.view') || can('reports.financial')) && (
-              <Link to={`${base}/reports`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/15">
-                <BarChart3 className="size-4" /> Reports
-              </Link>
-            )}
-          </div>
+          {canReports && (
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
+                <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-brand-100/70">Today</p>
+                <p className="font-display text-xl font-extrabold tabular-nums">{todaySummary.isPending ? '…' : formatMoney(t?.net_after_refunds ?? '0.00')}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
+                <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-brand-100/70">This month</p>
+                <p className="font-display text-xl font-extrabold tabular-nums">{monthSummary.isPending ? '…' : formatMoney(m?.net_after_refunds ?? '0.00')}</p>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Quick actions: the places this person uses most, in one tap. */}
+        <nav aria-label="Quick actions" className="mt-7 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {[
+            { show: can('sales.create'), to: 'pos', label: 'Open POS', icon: ShoppingCart, tone: 'from-sun-300 to-sun-500 text-brand-900' },
+            { show: can('sales.create') || can('sales.view_all'), to: 'online-orders', label: 'Online orders', icon: ShoppingBag, tone: 'from-rose-400 to-rose-600 text-white' },
+            { show: canSales, to: 'sales', label: 'Sales', icon: Receipt, tone: 'from-emerald-400 to-emerald-600 text-white' },
+            { show: can('products.view'), to: 'products', label: 'Products', icon: Package, tone: 'from-sky-400 to-sky-600 text-white' },
+            { show: can('inventory.view'), to: 'inventory', label: 'Inventory', icon: PackageSearch, tone: 'from-amber-400 to-orange-500 text-white' },
+            { show: can('reports.view') || can('reports.financial'), to: 'reports', label: 'Reports', icon: BarChart3, tone: 'from-violet-400 to-violet-600 text-white' },
+          ].filter((a) => a.show).slice(0, 6).map((a) => (
+            <Link key={a.to} to={`${base}/${a.to}`} className="group flex flex-col items-center gap-2 rounded-2xl bg-white/[.07] px-2 py-3 text-center ring-1 ring-white/10 backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:bg-white/[.12] sm:flex-row sm:px-3 sm:text-left">
+              <span className={`grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br shadow-lg shadow-black/25 transition group-hover:scale-105 ${a.tone}`}><a.icon className="size-5" /></span>
+              <span className="text-xs font-semibold leading-tight text-white/90">{a.label}</span>
+            </Link>
+          ))}
+        </nav>
       </section>
 
       {(can('sales.create') || can('sales.view_all')) && <NewOnlineOrders base={base} />}
@@ -202,29 +213,30 @@ function StoreDashboard() {
 /* --------------------------------------------------------------------------- Building blocks */
 
 const TONES = {
-  green: 'bg-brand-50 text-brand-600 ring-brand-100',
-  rose: 'bg-rose-50 text-rose-600 ring-rose-100',
-  sun: 'bg-sun-400/15 text-sun-500 ring-sun-400/30',
-  amber: 'bg-amber-50 text-amber-600 ring-amber-100',
-  slate: 'bg-slate-100 text-slate-500 ring-slate-200',
+  green: { icon: 'from-brand-500 to-brand-700 shadow-brand-600/30', glow: 'bg-brand-300/35' },
+  rose: { icon: 'from-rose-400 to-rose-600 shadow-rose-500/30', glow: 'bg-rose-300/35' },
+  sun: { icon: 'from-sun-400 to-amber-500 shadow-amber-500/30', glow: 'bg-sun-300/40' },
+  amber: { icon: 'from-amber-400 to-orange-500 shadow-amber-500/30', glow: 'bg-amber-300/40' },
+  slate: { icon: 'from-slate-400 to-slate-600 shadow-slate-500/30', glow: 'bg-slate-300/30' },
 } as const;
 
 function Kpi({ icon, tone, label, value, hint, loading }: { icon: ReactNode; tone: keyof typeof TONES; label: string; value: string; hint: string; loading?: boolean }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5 transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <span className={`grid size-10 place-items-center rounded-xl ring-1 [&>svg]:size-5 ${TONES[tone]}`}>{icon}</span>
+    <div className="group relative min-w-0 overflow-hidden rounded-[22px] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,.04),0_12px_32px_-24px_rgba(15,23,42,.35)] ring-1 ring-slate-900/[.06] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-24px_rgba(15,23,42,.45)] sm:p-5">
+      <span aria-hidden className={`pointer-events-none absolute -right-12 -top-12 size-32 rounded-full blur-2xl transition duration-500 group-hover:scale-125 ${TONES[tone].glow}`} />
+      <div className="relative flex items-start justify-between gap-3">
+        <p className="min-w-0 text-xs font-semibold text-slate-500 sm:text-sm">{label}</p>
+        <span className={`grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-lg sm:size-10 [&>svg]:size-[18px] ${TONES[tone].icon}`}>{icon}</span>
       </div>
-      {loading ? <div className="mt-2 h-8 w-32 animate-pulse rounded-lg bg-slate-100" /> : <p className="mt-1 font-display text-[1.75rem] font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>}
-      <p className="mt-1 text-xs text-slate-500">{hint}</p>
+      {loading ? <div className="relative mt-3 h-8 w-32 animate-pulse rounded-lg bg-slate-100" /> : <p className="relative mt-2 truncate font-display text-xl font-extrabold tracking-tight text-slate-900 tabular-nums sm:text-[1.85rem]">{value}</p>}
+      <p className="relative mt-1 truncate text-[11px] text-slate-500 sm:text-xs">{hint}</p>
     </div>
   );
 }
 
 function Panel({ title, subtitle, icon, action, className = '', children }: { title: string; subtitle?: string; icon?: ReactNode; action?: ReactNode; className?: string; children: ReactNode }) {
   return (
-    <section className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5 ${className}`}>
+    <section className={`overflow-hidden rounded-[22px] bg-white shadow-[0_1px_2px_rgba(15,23,42,.04),0_16px_40px_-30px_rgba(15,23,42,.4)] ring-1 ring-slate-900/[.06] ${className}`}>
       <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 font-display text-[0.95rem] font-semibold text-slate-900">{icon}{title}</h2>

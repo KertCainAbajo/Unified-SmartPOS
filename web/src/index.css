@@ -211,3 +211,15 @@ dialog[open]::backdrop { animation: sp-fade-in 0.2s ease-out both; }
   /* Tables inside scrolling boxes no longer need to scroll sideways. */
   .overflow-x-auto:has(> table.sp-cards) { overflow-x: visible; }
 }
+
+/* Staff pages: soft colour blends and a faint dot grid behind the content (scrolls with the page). */
+.sp-staff-bg {
+  background-color: #f4f6f1;
+  background-image:
+    radial-gradient(60rem 30rem at 0% 0%, rgb(16 185 129 / 0.10), transparent 60%),
+    radial-gradient(50rem 26rem at 100% 0%, rgb(250 204 21 / 0.12), transparent 60%),
+    radial-gradient(circle, rgb(15 23 42 / 0.045) 1px, transparent 1px);
+  background-size: auto, auto, 22px 22px;
+  background-attachment: local, local, local;
+}
+@media print { .sp-staff-bg { background: #fff; } }

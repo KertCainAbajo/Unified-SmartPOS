@@ -72,7 +72,7 @@ export function SelectBusinessPage() {
         <div className="auth-fade">
           <PanelLogo />
           <p className="mt-7 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-brand-50 ring-1 ring-white/20">
-            <ShieldCheck className="size-3.5 text-sun-300" /> Signed in securely
+            <ShieldCheck className="size-3.5 text-sun-300" /> Signed in
           </p>
           <h2 className="mt-3 max-w-md font-display text-[1.95rem] font-bold leading-[1.15] tracking-tight xl:text-[2.2rem]">
             Welcome back, <span className="text-sun-400">{firstName}</span>.

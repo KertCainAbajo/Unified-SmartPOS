@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatMoney, formatQty, titleCase } from '../lib/format';
 import type { Receipt } from '../lib/types';
+import { platformInfo } from '../lib/platformInfo';
 
 const money = (v: string) => formatMoney(v, '');
 const methodLabel = (m: string) => (m === 'gcash' ? 'GCASH' : m === 'bank_transfer' ? 'BANK TRANSFER' : m.toUpperCase());
@@ -50,6 +51,7 @@ export function ReceiptView({ receipt }: { receipt: Receipt }) {
         {h.phone && <p>Tel. No.: {h.phone}</p>}
         {h.tin && <p>{h.vat_status.toUpperCase()} TIN: {h.tin}</p>}
         <p className="mt-2 font-bold">SALES INVOICE</p>
+        {platformInfo.demo && <p className="mt-1 border border-dashed border-current px-1 py-0.5 text-[11px] font-bold">DEMO · NOT AN OFFICIAL RECEIPT</p>}
         {receipt.reprint && <p className="font-bold">** REPRINT **</p>}
         {receipt.status === 'voided' && <p className="text-[13px] font-bold">*** VOID ***</p>}
       </div>

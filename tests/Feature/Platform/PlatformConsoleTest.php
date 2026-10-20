@@ -109,7 +109,7 @@ class PlatformConsoleTest extends TestCase
         // The email no longer signs in to the shop, and cannot sign up again as a customer.
         $this->postJson("/api/v1/shop/{$tenant->slug}/login", ['email' => 'lea@example.com', 'password' => 'shop-password-1'])
             ->assertUnprocessable()->assertJsonPath('code', 'MOVED_TO_ADMIN');
-        $this->postJson("/api/v1/shop/{$tenant->slug}/register", ['name' => 'Lea', 'email' => 'lea@example.com', 'phone' => '0917', 'password' => 'shop-password-2', 'password_confirmation' => 'shop-password-2'])
+        $this->postJson("/api/v1/shop/{$tenant->slug}/register", ['name' => 'Lea', 'email' => 'lea@example.com', 'phone' => '0917', 'password' => 'shop-password-2', 'password_confirmation' => 'shop-password-2', 'accept_terms' => true])
             ->assertUnprocessable()->assertJsonValidationErrors('email');
     }
 

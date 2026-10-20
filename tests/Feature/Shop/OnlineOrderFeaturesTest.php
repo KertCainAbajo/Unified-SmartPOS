@@ -45,6 +45,7 @@ class OnlineOrderFeaturesTest extends TestCase
     private function placeDelivery(): int
     {
         $product = $this->createProduct($this->tenant, ['price' => '50.00']);
+        $this->setStock($product, $this->tenant->branches()->findOrFail($this->branchId), '50');
 
         return $this->actingAs($this->customer, 'customer')->postJson("/api/v1/shop/{$this->tenant->slug}/orders", [
             'branch_id' => $this->branchId, 'contact_name' => 'Ana Reyes', 'contact_phone' => '0917', 'fulfilment' => 'delivery',

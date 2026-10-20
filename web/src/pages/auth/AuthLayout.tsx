@@ -1,11 +1,13 @@
 import { Boxes, ScanBarcode, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BrandLogo } from '../../components/BrandLogo';
+import { LegalLinks } from '../../components/LegalLinks';
+import { platformInfo } from '../../lib/platformInfo';
 
 const FEATURES = [
-  { icon: <ScanBarcode className="size-5" />, title: 'Fast checkout', text: 'Scan, discount and take any payment in seconds.' },
+  { icon: <ScanBarcode className="size-5" />, title: 'Checkout', text: 'Scan items, apply discounts and record payment tenders.' },
   { icon: <Boxes className="size-5" />, title: 'Live stock', text: 'Inventory, transfers and purchasing across every branch.' },
-  { icon: <ShieldCheck className="size-5" />, title: 'Secure team access', text: 'Roles, branch limits and a full audit trail.' },
+  { icon: <ShieldCheck className="size-5" />, title: 'Team access controls', text: 'Roles, branch limits and an audit trail for key actions.' },
 ];
 
 /**
@@ -23,6 +25,7 @@ export function AuthLayout({ title, subtitle, children, footer, below, panel }: 
 }) {
   return (
     <div className="relative flex min-h-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-cream via-[#f4f6ef] to-brand-100/70 px-3 py-6 sm:px-6 lg:py-8">
+      <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-brand-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
       {/* Background decoration behind the card. */}
       <div className="pointer-events-none absolute -left-40 -top-40 size-[32rem] rounded-full bg-sun-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-48 -right-32 size-[36rem] rounded-full bg-brand-300/30 blur-3xl" />
@@ -34,7 +37,7 @@ export function AuthLayout({ title, subtitle, children, footer, below, panel }: 
       <div className="relative grid w-full max-w-6xl grid-cols-1 overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_80px_-20px_rgba(14,49,33,0.35)] ring-1 ring-brand-900/10 lg:min-h-[min(52rem,calc(100vh-4rem))] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <BrandPanel>{panel}</BrandPanel>
 
-        <main className="flex min-w-0 flex-col justify-center px-5 py-8 sm:px-10 lg:px-14 lg:py-10">
+        <main id="main-content" className="flex min-w-0 flex-col justify-center px-5 py-8 sm:px-10 lg:px-14 lg:py-10">
           <div className="mx-auto w-full max-w-[25rem]">
             <div className="mx-auto mb-6 w-32 rounded-2xl bg-cream p-3 ring-1 ring-brand-900/5 lg:hidden">
               <BrandLogo />
@@ -52,7 +55,10 @@ export function AuthLayout({ title, subtitle, children, footer, below, panel }: 
           </div>
         </main>
       </div>
-
+      <footer className="relative z-10 mt-5 text-slate-600">
+        <p className="mb-2 text-center text-[11px]">(c) {new Date().getFullYear()} {platformInfo.legalName || 'Unified SmartPOS'} | {platformInfo.supportEmail || 'Platform operator contact must be configured before launch.'}</p>
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

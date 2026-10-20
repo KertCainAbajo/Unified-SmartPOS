@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Sparkles, ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowDownAZ,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, useParams } from 'react-router';
+import { Navigate, useParams, Link } from 'react-router';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { DeliveryMap, toLatLng } from '../../components/maps';
 import { CustomerAccountDialog } from './CustomerAccountDialog';
@@ -17,10 +17,12 @@ import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
+import { platformInfo } from '../../lib/platformInfo';
+import { LegalLinks, useLegalHref } from '../../components/LegalLinks';
 
 interface Branch { id: number; code: string; name: string; address: string | null; latitude?: number | null; longitude?: number | null }
 interface ShopProduct { id: number; sku: string; name: string; description: string | null; unit: string; price: string; category: string | null; image_url: string | null; track_inventory: boolean; reorder_level: string; stock_by_branch: Record<number, { quantity: string; reorder_level: string | null }> }
-interface Catalog { business: { name: string; code: string }; branches: Branch[]; data: ShopProduct[] }
+interface Catalog { business: { name: string; legal_name: string | null; code: string; address: string | null; phone: string | null; email: string | null }; branches: Branch[]; data: ShopProduct[] }
 interface Account { id: number; name: string; email: string; phone: string }
 type Order = ShopOrder;
 interface CartLine { product: ShopProduct; quantity: number }
@@ -79,6 +81,7 @@ export function ShopPage() {
   const deliveryPin = deliveryLocation.pin;
   const [trackingId, setTrackingId] = useState<number | null>(null);
   const toast = useToast();
+  const legalHref = useLegalHref();
   const ask = useConfirm();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -95,7 +98,8 @@ export function ShopPage() {
     try { localStorage.setItem(savedKey, JSON.stringify(next)); } catch { /* storage unavailable: keep it for this visit */ }
     return next;
   });
-  const catalog = useQuery({ queryKey: ['shop-catalog', business], queryFn: () => api<Catalog>(base) });
+  // Fresh products and stock whenever the shop (or the app) comes back into view, and every 2 minutes while open.
+  const catalog = useQuery({ queryKey: ['shop-catalog', business], queryFn: () => api<Catalog>(base), refetchOnWindowFocus: true, refetchInterval: 120_000 });
   const account = useQuery({
     queryKey: ['shop-account', business],
     queryFn: async () => {
@@ -222,6 +226,12 @@ export function ShopPage() {
 
   return <div className={`min-h-screen bg-[#f5f7f4] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
+    <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
+    {platformInfo.demo && (
+      <p role="note" className="bg-sky-700 px-4 py-1.5 text-center text-[11px] font-semibold text-white sm:text-xs">
+        Demo store for testing only: orders are not real, nothing is delivered and no payment is taken. <Link to={legalHref('terms')} className="underline underline-offset-2">Learn more</Link>
+      </p>
+    )}
     <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
@@ -293,7 +303,7 @@ export function ShopPage() {
       <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={shop.data} products={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} onAdd={(id) => { const p = shop.data.find((x) => x.id === id); if (p) setQuantity(p, (cart[id]?.quantity ?? 0) + 1); }} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <main id="main-content" className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <section id="products" className="min-w-0 scroll-mt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -470,6 +480,9 @@ export function ShopPage() {
       </div>
       <div className={`border-t border-white/10 px-4 pt-4 text-center text-[11px] text-emerald-50/50 sm:py-5 sm:text-xs lg:pb-5 ${lines.length ? 'pb-24' : 'pb-5'}`}>
         {shop.business.name} · Online orders powered by SmartPOS
+        {(shop.business.legal_name || shop.business.address || shop.business.phone || shop.business.email) && <span className="mt-2 block">{[shop.business.legal_name, shop.business.address, shop.business.phone, shop.business.email].filter(Boolean).join(' · ')}</span>}
+        <span className="mt-1 block text-[10px]">For order or refund questions, contact this store using the details above.</span>
+        <LegalLinks tone="dark" className="mt-3" />
         <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
       </div>
     </footer>
@@ -664,7 +677,7 @@ function ProductCard({ product, stock, quantity, saved, tone, Icon, onChange, on
             <span className="min-w-6 text-center font-display text-sm font-extrabold tabular-nums text-emerald-900" aria-label={`${quantity} in basket`}>{quantity}</span>
             <button aria-label={`Add one ${product.name}`} onClick={() => onChange(quantity + 1)} className="grid size-8 place-items-center rounded-full bg-emerald-700 text-white transition active:scale-90"><Plus size={14} strokeWidth={2.8} /></button>
           </div>
-          : <button onClick={() => onChange(1)} aria-label={`Add ${product.name}`} className="grid size-10 place-items-center rounded-full bg-emerald-700 text-white shadow-lg shadow-emerald-900/30 ring-4 ring-white/70 transition hover:bg-emerald-800 active:scale-90"><Plus size={20} strokeWidth={2.6} /></button>}
+          : <button onClick={() => onChange(1)} disabled={out} aria-label={out ? `${product.name} is out of stock` : `Add ${product.name}`} title={out ? 'Out of stock' : undefined} className="grid size-10 place-items-center rounded-full bg-emerald-700 text-white shadow-lg shadow-emerald-900/30 ring-4 ring-white/70 transition hover:bg-emerald-800 active:scale-90 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"><Plus size={20} strokeWidth={2.6} /></button>}
       </div>
     </div>
 

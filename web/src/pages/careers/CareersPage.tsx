@@ -3,9 +3,11 @@ import { Briefcase, MapPin } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Button, Checkbox, ErrorBanner, Field, Input, Spinner, Textarea } from '../../components/ui';
+import { LegalLinks } from '../../components/LegalLinks';
 import { api, ApiError } from '../../lib/api';
 import { titleCase } from '../../lib/format';
 import type { DocumentType } from '../../lib/recruitment';
+import { useLegalHref } from '../../components/LegalLinks';
 
 interface PublicVacancy {
   id: number;
@@ -26,13 +28,18 @@ interface CareersResponse {
 export function PublicLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="min-h-full bg-slate-100 px-4 py-10">
+      <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-6 flex items-center gap-2">
           <span className="grid size-9 place-items-center rounded-lg bg-teal-700 text-sm font-bold text-white">SP</span>
           <span className="text-lg font-semibold text-slate-900">{title}</span>
         </div>
         {subtitle && <p className="-mt-4 mb-6 text-sm text-slate-600">{subtitle}</p>}
-        {children}
+        <main id="main-content">{children}</main>
+        <footer className="mt-8 border-t border-slate-200 pt-4 text-slate-500">
+          <p className="mb-2 text-center text-[11px]">(c) {new Date().getFullYear()} Unified SmartPOS</p>
+          <LegalLinks />
+        </footer>
       </div>
     </div>
   );
@@ -120,6 +127,7 @@ export function CareersPage() {
 }
 
 function ApplyForm({ business, vacancy, documentTypes, onCancel }: { business: { code: string }; vacancy: PublicVacancy; documentTypes: DocumentType[]; onCancel: () => void }) {
+  const legalHref = useLegalHref();
   const navigate = useNavigate();
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '', birth_date: '', work_experience: '', availability: '', cover_letter: '' });
   const [files, setFiles] = useState<Record<string, File | null>>({});
@@ -204,7 +212,8 @@ function ApplyForm({ business, vacancy, documentTypes, onCancel }: { business: {
       </div>
 
       <div>
-        <Checkbox label="I agree that this business may process my personal data to evaluate my application (Data Privacy Act of 2012)." checked={consent} onChange={setConsent} />
+        <Checkbox label="I agree that this business may process my personal data to evaluate my application." checked={consent} onChange={setConsent} />
+        <p className="ml-7 mt-1 text-xs leading-5 text-slate-500">Read the <Link to={legalHref('privacy')} className="font-semibold text-brand-700 underline underline-offset-2">privacy notice</Link> and <Link to={legalHref('terms')} className="font-semibold text-brand-700 underline underline-offset-2">terms</Link> before submitting. The business named above handles this application.</p>
         {err('privacy_consent') && <p className="mt-1 text-xs text-red-600">{err('privacy_consent')}</p>}
       </div>
 

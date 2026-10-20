@@ -139,9 +139,13 @@ export function PageHeader({ title, description, actions, eyebrow }: { title: st
   return (
     <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">{eyebrow}</p>}
-        <h1 className={cx('font-display text-[1.75rem] font-bold leading-tight tracking-tight text-brand-900', eyebrow && 'mt-1')}>{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-slate-500">{description}</p>}
+        {eyebrow && (
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700 shadow-sm ring-1 ring-brand-900/10 backdrop-blur">
+            <span className="size-1.5 rounded-full bg-gradient-to-br from-brand-400 to-brand-600" />{eyebrow}
+          </p>
+        )}
+        <h1 className={cx('font-display text-[1.75rem] font-extrabold leading-[1.1] tracking-[-0.02em] text-brand-900 sm:text-[2.15rem]', eyebrow && 'mt-2.5')}>{title}</h1>
+        {description && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -178,6 +182,15 @@ const statTints = {
   rose: 'bg-rose-50 text-rose-600',
   warn: 'bg-amber-50 text-amber-600',
 };
+/** Per tone: the gradient icon tile and the faint glow in the card's corner. */
+const statLook: Record<keyof typeof statTints, { icon: string; glow: string }> = {
+  default: { icon: 'from-slate-500 to-slate-700 shadow-slate-500/30', glow: 'bg-slate-300/30' },
+  brand: { icon: 'from-brand-500 to-brand-700 shadow-brand-600/30', glow: 'bg-brand-300/35' },
+  sun: { icon: 'from-sun-400 to-amber-500 shadow-amber-500/30', glow: 'bg-sun-300/40' },
+  sky: { icon: 'from-sky-400 to-sky-600 shadow-sky-500/30', glow: 'bg-sky-300/35' },
+  rose: { icon: 'from-rose-400 to-rose-600 shadow-rose-500/30', glow: 'bg-rose-300/35' },
+  warn: { icon: 'from-amber-400 to-orange-500 shadow-amber-500/30', glow: 'bg-amber-300/40' },
+};
 
 /**
  * KPI tile. `tone="featured"` renders the brand-green headline card; `value={null}` shows a loading placeholder.
@@ -185,30 +198,33 @@ const statTints = {
 export function StatCard({ label, value, hint, tone = 'default', icon: Icon }: { label: string; value: ReactNode | null; hint?: ReactNode; tone?: keyof typeof statTints | 'featured'; icon?: LucideIcon }) {
   if (tone === 'featured') {
     return (
-      <div className="relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-3.5 text-white shadow-md shadow-brand-900/20 sm:p-5">
-        <span aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full bg-sun-400/20 blur-xl" />
-        <span aria-hidden className="pointer-events-none absolute -bottom-12 -left-6 size-28 rounded-full bg-white/5" />
+      <div className="group relative min-w-0 overflow-hidden rounded-[22px] bg-[#0a3424] p-3.5 text-white shadow-[0_24px_48px_-28px_rgba(6,60,40,.9)] ring-1 ring-white/10 transition duration-300 hover:-translate-y-0.5 sm:p-5">
+        <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 size-40 rounded-full bg-sun-400/30 blur-2xl transition duration-500 group-hover:scale-125" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-16 -left-10 size-40 rounded-full bg-emerald-400/25 blur-2xl" />
+        <span aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:14px_14px]" />
         <div className="relative flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-brand-100 sm:text-[11px]">{label}</p>
-          {Icon && <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-white/15 text-sun-300 sm:size-9"><Icon className="size-4" /></span>}
+          <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[.14em] text-brand-100 sm:text-[11px]">{label}</p>
+          {Icon && <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-sun-300 to-sun-500 text-brand-900 shadow-lg shadow-black/20 sm:size-10"><Icon className="size-4 sm:size-[18px]" /></span>}
         </div>
-        {value === null ? <span className="relative mt-3 block h-8 w-32 animate-pulse rounded-lg bg-white/15" /> : <p className="relative mt-1.5 truncate font-display text-xl font-bold leading-tight tabular-nums sm:mt-2 sm:text-[1.65rem]">{value}</p>}
-        {hint && <p className="relative mt-1 truncate text-xs text-brand-100/80">{hint}</p>}
+        {value === null ? <span className="relative mt-3 block h-8 w-32 animate-pulse rounded-lg bg-white/15" /> : <p className="relative mt-2 truncate font-display text-xl font-extrabold leading-tight tracking-tight tabular-nums sm:mt-3 sm:text-[1.85rem]">{value}</p>}
+        {hint && <p className="relative mt-1 truncate text-[11px] text-brand-100/75 sm:text-xs">{hint}</p>}
       </div>
     );
   }
+  const look = statLook[tone];
   return (
-    <div className={cx('min-w-0 rounded-2xl bg-white p-3.5 shadow-sm ring-1 transition hover:shadow-md sm:p-5', tone === 'warn' ? 'ring-amber-200' : 'ring-slate-900/5')}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">{label}</p>
-        {Icon && <span className={cx('grid size-8 shrink-0 place-items-center rounded-xl sm:size-9', statTints[tone])}><Icon className="size-4" /></span>}
+    <div className={cx('group relative min-w-0 overflow-hidden rounded-[22px] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,.04),0_12px_32px_-24px_rgba(15,23,42,.35)] ring-1 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-24px_rgba(15,23,42,.45)] sm:p-5', tone === 'warn' ? 'ring-amber-200' : 'ring-slate-900/[.06]')}>
+      <span aria-hidden className={cx('pointer-events-none absolute -right-12 -top-12 size-32 rounded-full blur-2xl transition duration-500 group-hover:scale-125', look.glow)} />
+      <div className="relative flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500 sm:text-[11px]">{label}</p>
+        {Icon && <span className={cx('grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-lg sm:size-10', look.icon)}><Icon className="size-4 sm:size-[18px]" /></span>}
       </div>
       {value === null ? (
-        <span className="mt-3 block h-8 w-28 animate-pulse rounded-lg bg-slate-100" />
+        <span className="relative mt-3 block h-8 w-28 animate-pulse rounded-lg bg-slate-100" />
       ) : (
-        <p className={cx('mt-1.5 truncate font-display text-xl font-bold leading-tight tabular-nums sm:mt-2 sm:text-[1.65rem]', tone === 'rose' ? 'text-rose-600' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900')}>{value}</p>
+        <p className={cx('relative mt-2 truncate font-display text-xl font-extrabold leading-tight tracking-tight tabular-nums sm:mt-3 sm:text-[1.85rem]', tone === 'rose' ? 'text-rose-600' : tone === 'warn' ? 'text-amber-700' : 'text-slate-900')}>{value}</p>
       )}
-      {hint && <p className="mt-1 truncate text-[11px] text-slate-400 sm:text-xs">{hint}</p>}
+      {hint && <p className="relative mt-1 truncate text-[11px] text-slate-400 sm:text-xs">{hint}</p>}
     </div>
   );
 }
@@ -394,7 +410,7 @@ export function ErrorBanner({ error, className }: { error: unknown; className?: 
 export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: { value: T; label: string; icon?: LucideIcon; count?: number }[] }) {
   return (
     <div className="mb-5 max-w-full overflow-x-auto">
-      <div className="inline-flex gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-900/5" role="tablist">
+      <div className="inline-flex gap-1 rounded-2xl bg-white/80 p-1 shadow-[0_8px_24px_-18px_rgba(15,23,42,.4)] ring-1 ring-slate-900/[.06] backdrop-blur" role="tablist">
         {tabs.map((t) => {
           const active = value === t.value;
           return (
@@ -406,7 +422,7 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
               onClick={() => onChange(t.value)}
               className={cx(
                 'inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium transition',
-                active ? 'bg-brand-700 text-white shadow-sm shadow-brand-900/20' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                active ? 'bg-gradient-to-b from-brand-600 to-brand-800 text-white shadow-md shadow-brand-900/25' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
               )}
             >
               {t.icon && <t.icon className={cx('size-4', active ? 'text-sun-300' : 'text-slate-400')} />}

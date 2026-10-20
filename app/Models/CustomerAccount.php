@@ -46,7 +46,7 @@ class CustomerAccount extends Authenticatable
 
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'last_login_at' => 'datetime', 'email_verified_at' => 'datetime'];
+        return ['password' => 'hashed', 'last_login_at' => 'datetime', 'email_verified_at' => 'datetime', 'terms_accepted_at' => 'datetime'];
     }
 
     public function isActive(): bool

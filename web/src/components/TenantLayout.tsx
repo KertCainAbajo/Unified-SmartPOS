@@ -358,7 +358,7 @@ function Shell() {
                           <span
                             className={cx(
                               'relative grid size-7 shrink-0 place-items-center rounded-lg transition [&_svg]:size-4',
-                              isActive ? 'bg-sun-400/15 text-sun-300' : 'text-brand-100/50 group-hover:bg-white/[0.06] group-hover:text-brand-50',
+                              isActive ? 'bg-gradient-to-br from-sun-300 to-sun-500 text-brand-900 shadow-md shadow-sun-500/30' : 'text-brand-100/50 group-hover:bg-white/[0.06] group-hover:text-brand-50',
                             )}
                           >
                             <item.icon />
@@ -470,8 +470,8 @@ function Shell() {
       )}
 
       {/* The header scrolls away with the page instead of staying pinned on top. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-        <header className="relative z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+      <div className="sp-staff-bg flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        <header className="relative z-20 mx-2 mt-2 flex h-14 shrink-0 items-center gap-3 rounded-2xl bg-white/75 px-3 shadow-[0_10px_30px_-22px_rgba(15,23,42,.5)] ring-1 ring-slate-900/[.06] backdrop-blur-xl sm:mx-4 sm:mt-3 sm:h-16 sm:px-5 lg:mx-6 2xl:mx-8 print:hidden">
           <button className="grid size-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="size-5" />
           </button>

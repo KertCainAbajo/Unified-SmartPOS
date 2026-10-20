@@ -1,7 +1,9 @@
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShieldCheck, ShoppingBasket, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { BasketVisual, type PhotoItem } from './ShopVisuals';
 import { ApiError, api, errorMessage } from '../../lib/api';
+import { useLegalHref } from '../../components/LegalLinks';
 
 type Mode = 'login' | 'register';
 
@@ -29,6 +31,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
   /** Basket items when there are some, otherwise the catalogue; their photos fill the basket illustration. */
   photos: PhotoItem[];
 }) {
+  const legalHref = useLegalHref();
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [password, setPassword] = useState('');
@@ -180,6 +183,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               <p className="mt-1.5 text-sm leading-6 text-slate-500">
                 {register ? 'It takes a minute. Place pickup orders and follow their status.' : 'Sign in to place your order and track your pickups.'}
               </p>
+              {register && <p className="mt-2 text-xs leading-5 text-slate-500">Your store uses your account details to manage orders. See the <Link to={legalHref('privacy')} className="font-semibold text-emerald-800 underline underline-offset-2">privacy notice</Link> and <Link to={legalHref('terms')} className="font-semibold text-emerald-800 underline underline-offset-2">terms</Link>. The store's own refund rules apply to purchases.</p>}
 
               <div role="radiogroup" aria-label="Account" className="relative mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
                 <span
@@ -281,6 +285,13 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 )}
 
                 {capsLock && <p className="-mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-700"><TriangleAlert className="size-3.5" /> Caps Lock is on</p>}
+
+                {register && (
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-emerald-50/60 p-3 text-sm text-slate-700 ring-1 ring-emerald-100">
+                    <input type="checkbox" name="accept_terms" value="1" required className="mt-0.5 size-4 shrink-0 rounded border-slate-300 accent-emerald-700" />
+                    <span className="text-xs leading-5">I agree to the <Link to={legalHref('terms')} className="font-semibold text-emerald-800 underline underline-offset-2">terms</Link> and allow {storeName} to use my name, mobile number, email and delivery address to process my orders, as described in the <Link to={legalHref('privacy')} className="font-semibold text-emerald-800 underline underline-offset-2">privacy notice</Link>.</span>
+                  </label>
+                )}
 
                 {/* The hidden "0" is sent when the box is unticked; a ticked box's "1" comes later and wins. */}
                 <input type="hidden" name="remember" value="0" />

@@ -122,7 +122,7 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, products 
 
           <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold ring-1 ring-white/15 backdrop-blur">
             <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-emerald-400" /></span>
-            Open now{branchCount ? ` · ${branchCount} branches` : ''}
+            Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
           </span>
           <h2 className="mt-6 max-w-xl font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] xl:text-[60px]">
             Your neighborhood store,{' '}

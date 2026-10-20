@@ -14,7 +14,7 @@ class CustomerEmailVerificationTest extends TestCase
     {
         return $this->withHeaders(['Origin' => 'http://localhost', 'Referer' => 'http://localhost/'])->postJson("/api/v1/shop/{$slug}/register", [
             'name' => 'Ana Reyes', 'email' => $email, 'phone' => '09171234567',
-            'password' => 'long-password-1', 'password_confirmation' => 'long-password-1',
+            'password' => 'long-password-1', 'password_confirmation' => 'long-password-1', 'accept_terms' => true,
         ]);
     }
 
@@ -55,6 +55,20 @@ class CustomerEmailVerificationTest extends TestCase
         $this->assertSame('active', $account->status);
         $this->assertNotNull($account->email_verified_at);
         $this->getJson("/api/v1/shop/{$tenant->slug}/me")->assertOk();
+    }
+
+    /** No account without agreeing to the terms and privacy notice; the moment of agreement is recorded. */
+    public function test_sign_up_needs_consent_and_records_it(): void
+    {
+        Notification::fake();
+        [$tenant] = $this->createTenant();
+        $this->withHeaders(['Origin' => 'http://localhost', 'Referer' => 'http://localhost/'])->postJson("/api/v1/shop/{$tenant->slug}/register", [
+            'name' => 'Ana Reyes', 'email' => 'ana@example.com', 'phone' => '09171234567', 'password' => 'long-password-1', 'password_confirmation' => 'long-password-1',
+        ])->assertUnprocessable()->assertJsonValidationErrors('accept_terms');
+        $this->assertSame(0, CustomerAccount::query()->count());
+
+        $this->signUp($tenant->slug)->assertStatus(202);
+        $this->assertNotNull(CustomerAccount::query()->where('email', 'ana@example.com')->value('terms_accepted_at'));
     }
 
     public function test_an_unconfirmed_email_can_sign_up_again_but_a_confirmed_one_cannot(): void

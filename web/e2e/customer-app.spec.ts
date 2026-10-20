@@ -97,6 +97,7 @@ test.describe.serial('customer app, end to end', () => {
       await page.locator('input[name=email]').fill(EMAIL);
       await page.locator('input[name=password]').fill(PASSWORD);
       await page.locator('input[name=password_confirmation]').fill(PASSWORD);
+      await page.locator('input[name=accept_terms]').check();
       await page.locator('form button[type=submit]').click();
       await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 

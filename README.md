@@ -159,6 +159,8 @@ tests/Unit, tests/Feature
 
 See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md). The most important ones:
 
+- Public policy pages are draft templates; complete the operator and business details in [docs/LEGAL_LAUNCH_CHECKLIST.md](docs/LEGAL_LAUNCH_CHECKLIST.md) before production use.
+
 - Verified on SQLite only so far; MySQL migrations/tests must be run once credentials are configured.
 - Concurrency protection (row locks) needs a parallel load test on MySQL.
 - No product variants, promotions, credit sales, payment-gateway integration or BIR accreditation features yet.

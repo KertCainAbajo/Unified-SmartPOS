@@ -54,7 +54,10 @@ class CustomerShopController extends Controller
                 'image_url' => $product->image_path ? route('api.v1.shop.products.image', [$tenant->slug, $product->id, 'v' => ProductImageService::version($product)], false) : null,
             ]);
 
-        return response()->json(['business' => ['name' => $tenant->name, 'code' => $tenant->slug], 'branches' => $branches, 'data' => $products]);
+        return response()->json(['business' => [
+            'name' => $tenant->name, 'legal_name' => $tenant->legal_name, 'code' => $tenant->slug,
+            'address' => $tenant->address, 'phone' => $tenant->phone, 'email' => $tenant->email,
+        ], 'branches' => $branches, 'data' => $products]);
     }
 
     /** A product photo for the shop. Only products listed online are served. */
@@ -109,7 +112,9 @@ class CustomerShopController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email:rfc', 'max:255'],
             'phone' => ['required', 'string', 'max:30'], 'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed'],
-        ]);
+            // Data Privacy Act: the customer agrees to the terms and the use of their details before an account is made.
+            'accept_terms' => ['accepted'],
+        ], ['accept_terms.accepted' => 'Please agree to the terms and privacy notice to create an account.']);
         $email = mb_strtolower(trim($data['email']));
         if (User::query()->where('email', $email)->where('is_platform_admin', true)->exists()) {
             throw ValidationException::withMessages(['email' => [self::ADMIN_EMAIL_MESSAGE]]);
@@ -122,7 +127,7 @@ class CustomerShopController extends Controller
         // Signing up again before confirming simply updates the details and sends a new code.
         $account = DB::transaction(function () use ($tenant, $data, $email, $existing) {
             if ($existing) {
-                $existing->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone']), 'password' => $data['password']])->save();
+                $existing->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone']), 'password' => $data['password'], 'terms_accepted_at' => now()])->save();
                 $existing->customer?->forceFill(['name' => trim($data['name']), 'phone' => trim($data['phone'])])->save();
 
                 return $existing;
@@ -132,6 +137,7 @@ class CustomerShopController extends Controller
             return $tenant->customerAccounts()->create([
                 'customer_id' => $customer->id, 'name' => trim($data['name']), 'email' => $email,
                 'phone' => trim($data['phone']), 'password' => $data['password'], 'status' => CustomerAccount::STATUS_UNVERIFIED,
+                'terms_accepted_at' => now(),
             ]);
         });
         $wait = $verification->send($tenant, $account);
@@ -314,6 +320,17 @@ class CustomerShopController extends Controller
                 $wholeQuantity = rtrim(rtrim($quantity, '0'), '.');
                 if (! $product->allow_decimal_quantity && str_contains($wholeQuantity, '.')) {
                     throw ValidationException::withMessages(['items' => ["{$product->name} must be ordered in whole units."]]);
+                }
+                // Only what the chosen branch actually has (unless the business allows selling below zero).
+                if ($product->track_inventory && ! $tenant->allow_negative_stock) {
+                    $onHand = (string) (Inventory::query()->where('tenant_id', $tenant->id)->where('branch_id', $branch->id)
+                        ->where('product_id', $product->id)->value('quantity') ?? '0');
+                    if (Money::cmp($onHand, $quantity) < 0) {
+                        $left = rtrim(rtrim(Money::normalize($onHand, 3), '0'), '.');
+                        throw ValidationException::withMessages(['items' => [Money::cmp($onHand, '0') <= 0
+                            ? "{$product->name} is out of stock at {$branch->name}. Remove it or choose another branch."
+                            : "Only {$left} {$product->unit} of {$product->name} left at {$branch->name}. Lower the quantity or choose another branch."]]);
+                    }
                 }
                 $lineTotal = Money::round(Money::mul((string) $product->price, $quantity));
                 $total = Money::add($total, $lineTotal);
