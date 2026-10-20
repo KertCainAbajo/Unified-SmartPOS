@@ -110,7 +110,7 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
       <section aria-label="Store highlights" className="hidden sm:block">
         {/* Store front: awning stripe, headline, aisle signs */}
         <article className="relative overflow-hidden rounded-2xl border border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] shadow-[0_12px_30px_-24px_rgba(6,60,40,.6)]">
-          <div aria-hidden className="h-3 bg-[repeating-linear-gradient(90deg,#0b6b43_0_24px,#ffffff_24px_48px)] shadow-[0_3px_6px_-3px_rgba(6,60,40,.35)]" />
+          <Awning />
           <div className="grid items-center gap-6 px-6 py-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_auto]">
             <div className="min-w-0">
               <p className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[.14em] text-amber-800 ring-1 ring-amber-200">
@@ -163,9 +163,9 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
 }
 
 const BANNERS = [
-  { tag: 'Pickup & delivery', title: 'Order ahead,', accent: 'skip the line.', text: 'Fill your basket, pick a branch, collect when ready.', bg: 'from-emerald-700 via-emerald-800 to-[#063626]', glow: 'bg-amber-300/30', accentText: 'text-amber-300' },
-  { tag: 'Cash on delivery', title: 'Delivered to', accent: 'your door.', text: 'Pay the rider in cash. Track them live on the map.', bg: 'from-amber-500 via-orange-500 to-rose-500', glow: 'bg-yellow-200/40', accentText: 'text-yellow-100' },
-  { tag: 'No online payment', title: 'Reserve now,', accent: 'pay at pickup.', text: 'Pay at the counter when you collect your order.', bg: 'from-sky-600 via-cyan-700 to-emerald-700', glow: 'bg-white/25', accentText: 'text-cyan-100' },
+  { tag: 'Pickup & delivery', title: 'Order ahead,', accent: 'skip the line.', text: 'Fill your basket, pick a branch, collect when ready.', bg: 'from-[#e6f4e4] via-white to-[#fff5dc]', glow: 'bg-emerald-200/50', accentText: 'text-emerald-600' },
+  { tag: 'Cash on delivery', title: 'Delivered to', accent: 'your door.', text: 'Pay the rider in cash. Track them live on the map.', bg: 'from-[#fff1dc] via-white to-[#fde8e0]', glow: 'bg-amber-200/60', accentText: 'text-orange-600' },
+  { tag: 'No online payment', title: 'Reserve now,', accent: 'pay at pickup.', text: 'Pay at the counter when you collect your order.', bg: 'from-[#e3f1fb] via-white to-[#e8f6ec]', glow: 'bg-sky-200/50', accentText: 'text-sky-700' },
 ];
 
 /** Phones: compact swipeable promo cards (the next one peeks in), auto-advancing, instead of the tall banner. */
@@ -187,19 +187,20 @@ function PhoneBanners({ photos, signedIn, onCreateAccount, onStart }: { photos: 
       <div ref={rail} onScroll={(e) => { const el = e.currentTarget; setIndex(Math.round(el.scrollLeft / (el.clientWidth * 0.88))); }}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {BANNERS.map((b, i) => (
-          <article key={b.tag} className={`relative isolate flex w-[88%] shrink-0 snap-start overflow-hidden rounded-[24px] bg-gradient-to-br p-5 text-white shadow-lg shadow-emerald-950/20 ${b.bg}`}>
+          <article key={b.tag} className={`relative isolate flex w-[88%] shrink-0 snap-start overflow-hidden rounded-[20px] border border-emerald-900/10 bg-gradient-to-br p-5 pt-7 text-[#0b3b2c] shadow-sm ${b.bg}`}>
+            <Awning className="absolute inset-x-0 top-0" />
             <span aria-hidden className={`absolute -right-10 -top-12 -z-10 size-40 rounded-full blur-2xl ${b.glow}`} />
             <div className="relative z-[1] min-w-0 flex-1 pr-2">
-              <span className="inline-flex rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/25 backdrop-blur">{b.tag}</span>
+              <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 ring-1 ring-amber-200">{b.tag}</span>
               <p className="mt-3 font-display text-[22px] font-extrabold leading-[1.1]">{b.title}<br /><span className={b.accentText}>{b.accent}</span></p>
-              <p className="mt-2 text-xs leading-relaxed text-white/85">{b.text}</p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">{b.text}</p>
               {i === 0 && !signedIn
-                ? <button onClick={onCreateAccount} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-xs font-bold text-emerald-900 shadow-sm active:scale-95">Create free account <ArrowRight size={14} /></button>
-                : <button type="button" onClick={onStart} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-xs font-bold text-slate-900 shadow-sm active:scale-95">Shop now <ArrowRight size={14} /></button>}
+                ? <button onClick={onCreateAccount} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm active:scale-95">Create free account <ArrowRight size={14} /></button>
+                : <button type="button" onClick={onStart} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm active:scale-95">Shop now <ArrowRight size={14} /></button>}
             </div>
             <div aria-hidden className="relative w-[34%] shrink-0">
               {photos.slice(i * 2, i * 2 + 2).map((p, j) => (
-                <span key={p.name} className="absolute grid size-[4.5rem] place-items-center rounded-2xl bg-white p-1.5 shadow-xl shadow-black/25" style={{ right: j ? 30 : 0, top: j ? 70 : 6, transform: `rotate(${j ? -8 : 7}deg)` }}>
+                <span key={p.name} className="absolute grid size-[4.5rem] place-items-center rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-900/5" style={{ right: j ? 30 : 0, top: j ? 70 : 6, transform: `rotate(${j ? -8 : 7}deg)` }}>
                   {p.image_url ? <img src={p.image_url} alt="" className="size-full object-contain" /> : <ShoppingBasket className="size-7 text-emerald-700" />}
                 </span>
               ))}
@@ -245,4 +246,9 @@ export function EmptyAisle() {
       <p className="mt-1 text-sm text-slate-500">This store hasn't listed products online yet. Please check back soon.</p>
     </div>
   );
+}
+
+/** The mini-mart awning: a green-and-white stripe along the top of customer screens. */
+export function Awning({ className = '' }: { className?: string }) {
+  return <div aria-hidden className={`h-2.5 shrink-0 bg-[repeating-linear-gradient(90deg,#0b6b43_0_22px,#ffffff_22px_44px)] shadow-[0_3px_6px_-3px_rgba(6,60,40,.35)] ${className}`} />;
 }

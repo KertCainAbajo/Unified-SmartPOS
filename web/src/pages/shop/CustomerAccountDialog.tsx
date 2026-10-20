@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Eye, LogOut, EyeOff, KeyRound, LoaderCircle, Mail, Phone, ShieldCheck, TriangleAlert, UserRound, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Awning } from './ShopVisuals';
 import { ApiError, api, errorMessage } from '../../lib/api';
 
 interface Account { id: number; name: string; email: string; phone: string }
@@ -58,21 +59,21 @@ export function CustomerAccountDialog({ base, business, account, onClose, onSign
       <div className="relative flex min-h-full items-end justify-center sm:items-center sm:p-6">
         <div role="dialog" aria-modal="true" aria-label="My account" className="auth-fade relative w-full max-w-lg overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
           {/* Profile header */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-800 to-[#062a1d] px-6 pb-6 pt-6 text-white">
-            <span aria-hidden className="pointer-events-none absolute -right-14 -top-16 size-48 rounded-full bg-amber-300/25 blur-3xl" />
-            <span aria-hidden className="mx-auto mb-3 block h-1.5 w-10 rounded-full bg-white/30 sm:hidden" />
-            <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/25 hover:bg-white/25"><X className="size-5" /></button>
+          <Awning />
+          <div className="relative overflow-hidden border-b border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] px-6 pb-5 pt-5 text-[#0b3b2c]">
+            <span aria-hidden className="mx-auto mb-3 block h-1.5 w-10 rounded-full bg-slate-300 sm:hidden" />
+            <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 hover:text-slate-800"><X className="size-5" /></button>
             <div className="relative flex items-center gap-4 pr-10">
-              <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-500 font-display text-2xl font-extrabold text-emerald-950 shadow-lg ring-4 ring-white/15">{account.name.charAt(0).toUpperCase()}</span>
+              <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-500 font-display text-2xl font-extrabold text-emerald-950 shadow-sm ring-4 ring-white">{account.name.charAt(0).toUpperCase()}</span>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">My account</p>
+                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-700">My account</p>
                 <p className="truncate font-display text-xl font-bold">{account.name}</p>
-                <p className="truncate text-xs text-emerald-100/80">{account.email}</p>
+                <p className="truncate text-xs text-slate-500">{account.email}</p>
               </div>
             </div>
             <div className="relative mt-4 flex flex-wrap gap-2 text-[11px] font-semibold">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 ring-1 ring-white/20"><ShieldCheck className="size-3.5 text-amber-300" />Email confirmed</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 ring-1 ring-white/20"><Phone className="size-3.5 text-amber-300" />{account.phone || 'No mobile yet'}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-slate-700 ring-1 ring-slate-200"><ShieldCheck className="size-3.5 text-emerald-600" />Email confirmed</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-slate-700 ring-1 ring-slate-200"><Phone className="size-3.5 text-emerald-600" />{account.phone || 'No mobile yet'}</span>
             </div>
           </div>
 

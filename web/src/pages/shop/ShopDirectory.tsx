@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, RefreshCw, SearchX, Store } from 'lucide-react';
 import { Link } from 'react-router';
+import { Awning } from './ShopVisuals';
 import { api, errorMessage } from '../../lib/api';
 
 interface DirectoryStore { code: string; name: string; branches: { id: number; name: string }[] }
@@ -19,8 +20,10 @@ export function ShopDirectory({ missing, error, onRetry }: { missing?: string; e
   });
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[#f5f7f4] p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+    <div className="grid min-h-screen place-items-center bg-[#f7f8f7] p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white text-center shadow-sm ring-1 ring-slate-200">
+        <Awning />
+        <div className="bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] p-8">
         <span className={`mx-auto grid size-12 place-items-center rounded-2xl ${missing || failed ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
           {missing ? <SearchX /> : <Store />}
         </span>
@@ -52,6 +55,7 @@ export function ShopDirectory({ missing, error, onRetry }: { missing?: string; e
             {(stores.isError || stores.data?.data.length === 0) && <p className="rounded-2xl bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">Ask the store for its online shop link.</p>}
           </div>
         </>}
+        </div>
       </div>
     </div>
   );

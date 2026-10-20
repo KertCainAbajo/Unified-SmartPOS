@@ -1,7 +1,7 @@
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShieldCheck, ShoppingBasket, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShieldCheck, ShoppingBasket, Store, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import type { PhotoItem } from './ShopVisuals';
+import { Awning, type PhotoItem } from './ShopVisuals';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { useLegalHref } from '../../components/LegalLinks';
 
@@ -69,84 +69,85 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
           aria-labelledby="shop-auth-title"
           className="auth-fade relative grid w-full max-w-[900px] overflow-hidden bg-white shadow-[0_30px_80px_-30px_rgba(2,44,34,0.55)] sm:rounded-2xl lg:grid-cols-[340px_1fr]"
         >
-          {/* ───── Brand side (computers): slim, dark, three reasons to sign up ───── */}
-          <aside className="relative hidden flex-col overflow-hidden bg-[#0b3b2c] p-8 text-white lg:flex">
-            <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-emerald-400/20 blur-3xl" />
-            <span aria-hidden className="pointer-events-none absolute -bottom-28 -left-20 size-72 rounded-full bg-amber-300/10 blur-3xl" />
-            <span aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(180deg,transparent,#000_40%,#000_70%,transparent)]" />
-
-            <div className="relative flex items-center gap-3">
-              <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1" />
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Online shop</p>
-                <p className="truncate font-display text-[15px] font-bold">{storeName}</p>
-              </div>
-            </div>
-
-            <h3 className="relative mt-10 font-display text-[26px] font-bold leading-tight tracking-tight">
-              Your neighborhood store, <span className="text-amber-300">on your phone.</span>
-            </h3>
-            <p className="relative mt-2 text-sm leading-6 text-emerald-50/70">One account for pickup and delivery orders at every branch.</p>
-
-            <ul className="relative mt-8 space-y-4">
-              {[
-                { icon: <ShoppingBasket />, title: 'Order ahead', text: 'Your basket is ready when you arrive.' },
-                { icon: <Clock3 />, title: 'Track every order', text: 'See when it is confirmed, prepared and ready.' },
-                { icon: <Wallet />, title: 'Pay when you get it', text: 'Cash at pickup or on delivery. No card needed.' },
-              ].map((item) => (
-                <li key={item.title} className="flex gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 text-amber-300 ring-1 ring-white/10 [&>svg]:size-[18px]">{item.icon}</span>
-                  <span>
-                    <span className="block text-sm font-semibold">{item.title}</span>
-                    <span className="block text-xs leading-5 text-emerald-50/65">{item.text}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-
-            {/* A sample of what signed-in customers see: their order moving through the steps. */}
-            <div aria-hidden className="relative mt-8">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-200/60">How your order shows up</p>
-              <div className="rounded-2xl bg-white/[.07] p-4 ring-1 ring-white/10 backdrop-blur-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs font-semibold text-white">ON-20261021-0042</p>
-                    <p className="text-[11px] text-emerald-50/55">Pickup · Main Branch</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-amber-300 px-2.5 py-1 text-[10px] font-bold text-[#0b3b2c]">Ready for pickup</span>
-                </div>
-                <ol className="mt-4 grid grid-cols-4">
-                  {['Placed', 'Confirmed', 'Preparing', 'Ready'].map((step, i) => (
-                    <li key={step} className="relative flex flex-col items-center text-center">
-                      {i > 0 && <span className="absolute right-1/2 top-[11px] h-0.5 w-full bg-emerald-400/70" />}
-                      <span className={`relative grid size-6 place-items-center rounded-full ${i === 3 ? 'bg-amber-300 text-[#0b3b2c] ring-4 ring-amber-300/20' : 'bg-emerald-400 text-[#0b3b2c]'}`}>
-                        <Check className="size-3.5" strokeWidth={3} />
-                      </span>
-                      <span className="mt-1.5 text-[10px] font-medium text-emerald-50/70">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
-                  <span className="text-emerald-50/60">3 items</span>
-                  <span className="font-display font-bold text-white">₱186.50</span>
+          {/* ───── Brand side (computers): the mini-mart store front ───── */}
+          <aside className="relative hidden flex-col overflow-hidden border-r border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] text-[#0b3b2c] lg:flex">
+            <Awning />
+            <div className="flex flex-1 flex-col p-8">
+              <div className="flex items-center gap-3">
+                <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1 shadow-sm ring-1 ring-emerald-900/10" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online shop</p>
+                  <p className="truncate font-display text-[15px] font-bold">{storeName}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="relative mt-auto pt-8">
-              {basketCount > 0 ? (
-                <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-300 text-[#0b3b2c]"><ShoppingBasket className="size-5" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">Your basket is saved</p>
-                    <p className="text-xs text-emerald-50/65">{basketCount} {basketCount === 1 ? 'item' : 'items'} waiting for checkout</p>
+              <p className="mt-8 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-amber-800 ring-1 ring-amber-200">
+                <Store className="size-3.5" /> Your neighborhood mini mart
+              </p>
+              <h3 className="mt-3 font-display text-[26px] font-bold leading-tight tracking-tight">
+                Everyday essentials, <span className="text-emerald-600">ready when you are.</span>
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">One account for pickup and delivery orders at every branch.</p>
+
+              <ul className="mt-7 space-y-3.5">
+                {[
+                  { icon: <ShoppingBasket />, title: 'Order ahead', text: 'Your basket is ready when you arrive.' },
+                  { icon: <Clock3 />, title: 'Track every order', text: 'See when it is confirmed, prepared and ready.' },
+                  { icon: <Wallet />, title: 'Pay when you get it', text: 'Cash at pickup or on delivery. No card needed.' },
+                ].map((item) => (
+                  <li key={item.title} className="flex gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-900/10 [&>svg]:size-[18px]">{item.icon}</span>
+                    <span>
+                      <span className="block text-sm font-semibold">{item.title}</span>
+                      <span className="block text-xs leading-5 text-slate-500">{item.text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* A sample of what signed-in customers see: their order moving through the steps. */}
+              <div aria-hidden className="mt-7">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">How your order shows up</p>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-semibold text-slate-800">ON-20261021-0042</p>
+                      <p className="text-[11px] text-slate-500">Pickup · Main Branch</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800">Ready for pickup</span>
                   </div>
-                  <span className="font-display text-base font-bold">{basketTotal}</span>
+                  <ol className="mt-4 grid grid-cols-4">
+                    {['Placed', 'Confirmed', 'Preparing', 'Ready'].map((step, i) => (
+                      <li key={step} className="relative flex flex-col items-center text-center">
+                        {i > 0 && <span className="absolute right-1/2 top-[11px] h-0.5 w-full bg-emerald-500" />}
+                        <span className={`relative grid size-6 place-items-center rounded-full text-white ${i === 3 ? 'bg-amber-400 ring-4 ring-amber-200' : 'bg-emerald-600'}`}>
+                          <Check className="size-3.5" strokeWidth={3} />
+                        </span>
+                        <span className="mt-1.5 text-[10px] font-medium text-slate-500">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                    <span className="text-slate-500">3 items</span>
+                    <span className="font-display font-bold text-slate-900">₱186.50</span>
+                  </div>
                 </div>
-              ) : (
-                <p className="flex items-center gap-2 text-xs text-emerald-50/60"><ShieldCheck className="size-4 text-emerald-300" /> Your details are only used by {storeName}.</p>
-              )}
+              </div>
+
+              <div className="mt-auto pt-6">
+                {basketCount > 0 ? (
+                  <div className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white"><ShoppingBasket className="size-5" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">Your basket is saved</p>
+                      <p className="text-xs text-slate-500">{basketCount} {basketCount === 1 ? 'item' : 'items'} waiting for checkout</p>
+                    </div>
+                    <span className="font-display text-base font-bold">{basketTotal}</span>
+                  </div>
+                ) : (
+                  <p className="flex items-center gap-2 text-xs text-slate-500"><ShieldCheck className="size-4 text-emerald-600" /> Your details are only used by {storeName}.</p>
+                )}
+              </div>
             </div>
           </aside>
 
@@ -157,13 +158,14 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               onClick={onClose}
               disabled={busy}
               aria-label="Close sign in"
-              className="absolute right-4 top-3.5 z-20 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 lg:right-5 lg:top-5"
+              className="absolute right-4 top-6 z-20 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 lg:right-5 lg:top-5"
             >
               <X className="size-5" />
             </button>
 
             {/* Phones, tablets and the app: a simple top bar, like a native app screen. */}
-            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-3.5 pr-16 sm:px-8 lg:hidden">
+            <Awning className="lg:hidden" />
+            <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-[#eef7ea] to-[#fff5dc] px-5 py-3.5 pr-16 sm:px-8 lg:hidden">
               <img src="/brand/minimart-logo.svg" alt="" className="size-10 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online shop</p>

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bike, CheckCircle2, ChefHat, Clock3, History, House, MapPin, PackageCheck, Phone, Receipt, RotateCcw, ShoppingBag, Store, Wallet, X, XCircle, type LucideIcon } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DeliveryMap, distanceKm, etaMinutes, formatKm, toLatLng } from '../../components/maps';
+import { Awning } from './ShopVisuals';
 import { api } from '../../lib/api';
 
 export interface ShopOrder {
@@ -70,8 +71,9 @@ function Modal({ onClose, label, children, wide }: { onClose: () => void; label:
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="fixed inset-0 bg-[#062a1d]/55 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative flex min-h-full items-end justify-center sm:items-center sm:p-6">
-        <div role="dialog" aria-modal="true" aria-label={label} className={`auth-fade relative w-full overflow-hidden bg-white shadow-2xl sm:rounded-[28px] ${wide ? 'max-w-4xl' : 'max-w-2xl'} rounded-t-[28px]`}>
-          <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-[600] grid size-10 place-items-center rounded-full bg-white/90 text-slate-500 shadow ring-1 ring-slate-200 transition hover:text-slate-800"><X className="size-5" /></button>
+        <div role="dialog" aria-modal="true" aria-label={label} className={`auth-fade relative w-full overflow-hidden bg-white shadow-2xl sm:rounded-2xl ${wide ? 'max-w-4xl' : 'max-w-2xl'} rounded-t-2xl`}>
+          <Awning />
+          <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-6 z-[600] grid size-10 place-items-center rounded-full bg-white/90 text-slate-500 shadow ring-1 ring-slate-200 transition hover:text-slate-800"><X className="size-5" /></button>
           {children}
         </div>
       </div>
@@ -224,7 +226,7 @@ function FullScreen({ onClose, label, children }: { onClose: () => void; label: 
     window.addEventListener('keydown', onKey);
     return () => { document.body.style.overflow = overflow; window.removeEventListener('keydown', onKey); };
   }, [onClose]);
-  return <div role="dialog" aria-modal="true" aria-label={label} className="auth-fade fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-white lg:flex-row lg:overflow-hidden">{children}</div>;
+  return <div role="dialog" aria-modal="true" aria-label={label} className="auth-fade fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-white lg:flex-row lg:overflow-hidden"><Awning className="absolute inset-x-0 top-0 z-[700]" />{children}</div>;
 }
 
 /** Every order and in-store purchase the customer has made, with "Buy again". */
@@ -246,8 +248,8 @@ export function OrderHistoryDialog({ base, orders, onClose, onTrack, onReorder }
 
   return (
     <Modal onClose={onClose} label="My orders" wide>
-      <div className="border-b border-slate-100 px-6 pb-4 pt-6">
-        <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">Purchase history</p>
+      <div className="border-b border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] px-6 pb-4 pt-5">
+        <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-700">Purchase history</p>
         <h2 className="mt-1 font-display text-2xl font-bold text-slate-900">My orders</h2>
         <div className="mt-4 grid grid-cols-3 gap-2 sm:max-w-md">
           <Stat label="Orders" value={String(orders.length)} />
