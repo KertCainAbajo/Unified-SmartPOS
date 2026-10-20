@@ -67,14 +67,14 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
           role="dialog"
           aria-modal="true"
           aria-labelledby="shop-auth-title"
-          className="auth-fade relative grid w-full max-w-[900px] overflow-hidden bg-white shadow-[0_30px_80px_-30px_rgba(2,44,34,0.55)] sm:rounded-2xl lg:grid-cols-[340px_1fr]"
+          className="auth-fade relative grid w-full max-w-[900px] overflow-hidden bg-white shadow-[0_30px_80px_-30px_rgba(2,44,34,0.55)] sm:rounded-[36px] lg:grid-cols-[340px_1fr]"
         >
           {/* ───── Brand side (computers): the mini-mart store front ───── */}
           <aside className="relative hidden flex-col overflow-hidden border-r border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] text-[#0b3b2c] lg:flex">
             <Awning />
             <div className="flex flex-1 flex-col p-8">
               <div className="flex items-center gap-3">
-                <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1 shadow-sm ring-1 ring-emerald-900/10" />
+                <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-2xl bg-white object-contain p-1 shadow-sm ring-1 ring-emerald-900/10" />
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online shop</p>
                   <p className="truncate font-display text-[15px] font-bold">{storeName}</p>
@@ -96,7 +96,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                   { icon: <Wallet />, title: 'Pay when you get it', text: 'Cash at pickup or on delivery. No card needed.' },
                 ].map((item) => (
                   <li key={item.title} className="flex gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-900/10 [&>svg]:size-[18px]">{item.icon}</span>
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-900/10 [&>svg]:size-[18px]">{item.icon}</span>
                     <span>
                       <span className="block text-sm font-semibold">{item.title}</span>
                       <span className="block text-xs leading-5 text-slate-500">{item.text}</span>
@@ -108,7 +108,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               {/* A sample of what signed-in customers see: their order moving through the steps. */}
               <div aria-hidden className="mt-7">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">How your order shows up</p>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-mono text-xs font-semibold text-slate-800">ON-20261021-0042</p>
@@ -136,8 +136,8 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
 
               <div className="mt-auto pt-6">
                 {basketCount > 0 ? (
-                  <div className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white"><ShoppingBasket className="size-5" /></span>
+                  <div className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white"><ShoppingBasket className="size-5" /></span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold">Your basket is saved</p>
                       <p className="text-xs text-slate-500">{basketCount} {basketCount === 1 ? 'item' : 'items'} waiting for checkout</p>
@@ -166,7 +166,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
             {/* Phones, tablets and the app: a simple top bar, like a native app screen. */}
             <Awning className="lg:hidden" />
             <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-[#eef7ea] to-[#fff5dc] px-5 py-3.5 pr-16 sm:px-8 lg:hidden">
-              <img src="/brand/minimart-logo.svg" alt="" className="size-10 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100" />
+              <img src="/brand/minimart-logo.svg" alt="" className="size-10 rounded-2xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online shop</p>
                 <p className="truncate font-display text-[15px] font-bold text-[#0b3b2c]">{storeName}</p>
@@ -204,10 +204,10 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               </p>
               {register && <p className="mt-2 text-xs leading-5 text-slate-500">Your store uses your account details to manage orders. See the <Link to={legalHref('privacy')} className="font-semibold text-emerald-800 underline underline-offset-2">privacy notice</Link> and <Link to={legalHref('terms')} className="font-semibold text-emerald-800 underline underline-offset-2">terms</Link>. The store's own refund rules apply to purchases.</p>}
 
-              <div role="radiogroup" aria-label="Account" className="relative mt-5 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+              <div role="radiogroup" aria-label="Account" className="relative mt-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
                 <span
                   aria-hidden
-                  className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm ring-1 ring-slate-900/5 transition-transform duration-300 ease-out ${register ? 'translate-x-full' : ''}`}
+                  className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5 transition-transform duration-300 ease-out ${register ? 'translate-x-full' : ''}`}
                 />
                 {(['login', 'register'] as const).map((m) => (
                   <button
@@ -216,7 +216,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                     role="radio"
                     aria-checked={mode === m}
                     onClick={() => switchTo(m)}
-                    className={`relative rounded-lg py-2 text-sm font-semibold transition-colors ${mode === m ? 'text-emerald-800' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`relative rounded-xl py-2 text-sm font-semibold transition-colors ${mode === m ? 'text-emerald-800' : 'text-slate-500 hover:text-slate-800'}`}
                   >
                     {m === 'login' ? 'Sign in' : 'Create account'}
                   </button>
@@ -225,12 +225,12 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
 
               <form key={`form-${mode}`} onSubmit={(e) => { setNotice(''); onSubmit(e); }} className="auth-fade mt-6 space-y-4">
                 {notice && !error && (
-                  <p role="status" className="sp-alert-in flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
+                  <p role="status" className="sp-alert-in flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> {notice}
                   </p>
                 )}
                 {error && (
-                  <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+                  <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
                   </p>
                 )}
@@ -271,7 +271,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                   hint={register ? (password.length > 0 && password.length < 10 ? `${10 - password.length} more characters needed` : 'Use at least 10 characters.') : undefined}
                   hintTone={register && password.length > 0 && password.length < 10 ? 'warn' : 'muted'}
                   trailing={
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
                       {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   }
@@ -306,7 +306,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 {capsLock && <p className="-mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-700"><TriangleAlert className="size-3.5" /> Caps Lock is on</p>}
 
                 {register && (
-                  <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-emerald-50/60 p-3 text-sm text-slate-700 ring-1 ring-emerald-100">
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-2xl bg-emerald-50/60 p-3 text-sm text-slate-700 ring-1 ring-emerald-100">
                     <input type="checkbox" name="accept_terms" value="1" required className="mt-0.5 size-4 shrink-0 rounded border-slate-300 accent-emerald-700" />
                     <span className="text-xs leading-5">I agree to the <Link to={legalHref('terms')} className="font-semibold text-emerald-800 underline underline-offset-2">terms</Link> and allow {storeName} to use my name, mobile number, email and delivery address to process my orders, as described in the <Link to={legalHref('privacy')} className="font-semibold text-emerald-800 underline underline-offset-2">privacy notice</Link>.</span>
                   </label>
@@ -322,7 +322,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                 <button
                   type="submit"
                   disabled={busy}
-                  className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                  className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-3xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60"
                 >
                   <span className="absolute inset-x-0 top-0 h-px bg-white/25" />
                   {busy
@@ -375,7 +375,7 @@ function Field({ id, label, icon, trailing, hint, hintTone = 'muted', aside, chi
   aside?: ReactNode;
   children: (inputClass: string) => ReactNode;
 }) {
-  const inputClass = `peer h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-11 ${trailing ? 'pr-12' : 'pr-3.5'} text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10`;
+  const inputClass = `peer h-12 w-full rounded-2xl border border-slate-200 bg-slate-50/70 pl-11 ${trailing ? 'pr-12' : 'pr-3.5'} text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10`;
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -464,7 +464,7 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
       </ol>
 
       <div key={step} className="auth-fade">
-        <span className="mt-6 grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
+        <span className="mt-6 grid size-12 place-items-center rounded-3xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
           {step === 'email' ? <Mail className="size-5" /> : step === 'code' ? <ShieldCheck className="size-5" /> : <KeyRound className="size-5" />}
         </span>
         <h2 id="shop-auth-title" className="mt-4 font-display text-[28px] font-extrabold leading-tight tracking-tight text-[#0b3b2c]">{titles[step][0]}</h2>
@@ -475,7 +475,7 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
           onSubmit={(e) => { e.preventDefault(); if (step === 'email') void sendCode(); else if (step === 'code') void verify(); else void save(); }}
         >
           {error && (
-            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
             </p>
           )}
@@ -510,7 +510,7 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
                 hint={tooShort ? `${10 - password.length} more characters needed` : undefined}
                 hintTone="warn"
                 trailing={
-                  <button type="button" onClick={() => setShow((v) => !v)} className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label={show ? 'Hide password' : 'Show password'}>
+                  <button type="button" onClick={() => setShow((v) => !v)} className="grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label={show ? 'Hide password' : 'Show password'}>
                     {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 }
@@ -527,7 +527,7 @@ function PasswordRecovery({ apiBase, initialEmail, onBack, onDone }: {
           <button
             type="submit"
             disabled={busy || (step === 'email' && !email.trim()) || (step === 'code' && code.length !== 6) || (step === 'password' && (password.length < 10 || confirm !== password))}
-            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-3xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy
               ? <><Loader2 className="size-5 animate-spin" /> Please wait…</>
@@ -606,7 +606,7 @@ function EmailVerification({ apiBase, email, remember, initialResendIn, onBack, 
       </ol>
 
       <div className="auth-fade">
-        <span className="relative mt-6 grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
+        <span className="relative mt-6 grid size-14 place-items-center rounded-3xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-700/10">
           <Mail className="size-6" />
           <span className="absolute -right-1 -top-1 size-3.5 animate-ping rounded-full bg-emerald-400/70" />
           <span className="absolute -right-1 -top-1 size-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />
@@ -616,11 +616,11 @@ function EmailVerification({ apiBase, email, remember, initialResendIn, onBack, 
 
         <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); void verify(); }}>
           {error && (
-            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+            <p role="alert" className="sp-alert-in sp-alert-error flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" /> {error}
             </p>
           )}
-          {sent && !error && <p role="status" className="sp-alert-in flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200"><CheckCircle2 className="size-4" /> {sent}</p>}
+          {sent && !error && <p role="status" className="sp-alert-in flex items-center gap-2 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-200"><CheckCircle2 className="size-4" /> {sent}</p>}
 
           {/* Filling the last box checks the code straight away. */}
           <CodeInput value={code} onChange={(v) => { setCode(v); setError(''); setSent(''); if (v.length === 6) void verify(v); }} disabled={busy} />
@@ -638,7 +638,7 @@ function EmailVerification({ apiBase, email, remember, initialResendIn, onBack, 
           <button
             type="submit"
             disabled={busy || code.length !== 6}
-            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="group relative !mt-6 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-3xl bg-gradient-to-b from-emerald-700 to-emerald-900 font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:from-emerald-600 hover:to-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? <><Loader2 className="size-5 animate-spin" /> Checking…</> : <>Confirm and continue <ArrowRight className="size-4 transition group-hover:translate-x-0.5" /></>}
           </button>
@@ -688,7 +688,7 @@ function CodeInput({ value, onChange, disabled }: { value: string; onChange: (va
             onChange(digits);
             focus(digits.length);
           }}
-          className={`h-14 w-full min-w-0 rounded-xl border text-center font-display text-2xl font-bold text-slate-900 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 disabled:opacity-60 ${digit ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 bg-slate-50/70'}`}
+          className={`h-14 w-full min-w-0 rounded-2xl border text-center font-display text-2xl font-bold text-slate-900 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10 disabled:opacity-60 ${digit ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 bg-slate-50/70'}`}
         />
       ))}
     </div>
