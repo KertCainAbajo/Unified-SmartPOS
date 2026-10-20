@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Phone, ShieldCheck, ShoppingBasket, TriangleAlert, UserRound, Wallet, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { BasketVisual, type PhotoItem } from './ShopVisuals';
+import type { PhotoItem } from './ShopVisuals';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { useLegalHref } from '../../components/LegalLinks';
 
@@ -11,7 +11,7 @@ type Mode = 'login' | 'register';
  * Full-screen customer sign-in / sign-up for the online shop. It opens over the shop so the basket survives.
  * Field names match the shop API (name, phone, email, password, password_confirmation); the parent posts the form as-is.
  */
-export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, photos, apiBase, verifying, onVerified, onCancelVerify }: {
+export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChange, onSubmit, busy, error, basketCount, basketTotal, apiBase, verifying, onVerified, onCancelVerify }: {
   open: boolean;
   /** Set after sign-up: the email waiting for its 6-digit code. */
   verifying?: { email: string; resendIn: number; remember: boolean } | null;
@@ -58,8 +58,6 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
 
   if (!open) return null;
 
-  const withPhotos = photos.filter((p) => p.image_url);
-  const basketPhotos = (withPhotos.length ? withPhotos : photos).slice(0, 5);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -69,95 +67,86 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
           role="dialog"
           aria-modal="true"
           aria-labelledby="shop-auth-title"
-          className="auth-fade relative grid w-full max-w-[1060px] overflow-hidden bg-white shadow-[0_40px_120px_-30px_rgba(2,44,34,0.6)] sm:rounded-[28px] lg:grid-cols-[1.02fr_1fr]"
+          className="auth-fade relative grid w-full max-w-[900px] overflow-hidden bg-white shadow-[0_30px_80px_-30px_rgba(2,44,34,0.55)] sm:rounded-2xl lg:grid-cols-[340px_1fr]"
         >
-          {/* ───── Brand side ───── */}
-          <aside className="relative hidden flex-col overflow-hidden bg-gradient-to-br from-[#e6f3e6] via-[#f3f9ef] to-[#dcefdd] p-10 lg:flex">
-            <div className="pointer-events-none absolute -left-20 -top-24 size-72 rounded-full bg-white/70 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-28 -right-16 size-80 rounded-full bg-emerald-200/60 blur-3xl" />
+          {/* ───── Brand side (computers): slim, dark, three reasons to sign up ───── */}
+          <aside className="relative hidden flex-col overflow-hidden bg-[#0b3b2c] p-8 text-white lg:flex">
+            <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-emerald-400/20 blur-3xl" />
+            <span aria-hidden className="pointer-events-none absolute -bottom-28 -left-20 size-72 rounded-full bg-amber-300/10 blur-3xl" />
 
             <div className="relative flex items-center gap-3">
-              <img src="/brand/minimart-logo.svg" alt="" className="size-12 rounded-2xl bg-white object-contain p-1 shadow-sm ring-1 ring-emerald-900/10" />
+              <img src="/brand/minimart-logo.svg" alt="" className="size-11 rounded-xl bg-white object-contain p-1" />
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online pickup</p>
-                <p className="truncate font-display text-base font-bold text-[#0b3b2c]">{storeName}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Online shop</p>
+                <p className="truncate font-display text-[15px] font-bold">{storeName}</p>
               </div>
             </div>
 
-            <h3 className="relative mt-8 font-display text-[34px] font-extrabold leading-[1.05] tracking-tight text-[#0b3b2c]">
-              Order ahead.<br /><span className="text-emerald-600">Skip the wait.</span>
+            <h3 className="relative mt-10 font-display text-[26px] font-bold leading-tight tracking-tight">
+              Your neighborhood store, <span className="text-amber-300">on your phone.</span>
             </h3>
+            <p className="relative mt-2 text-sm leading-6 text-emerald-50/70">One account for pickup and delivery orders at every branch.</p>
 
-            <div className="relative mx-auto mt-4 w-full max-w-[400px]">
-              <BasketVisual photos={basketPhotos} note={false} />
-            </div>
+            <ul className="relative mt-8 space-y-4">
+              {[
+                { icon: <ShoppingBasket />, title: 'Order ahead', text: 'Your basket is ready when you arrive.' },
+                { icon: <Clock3 />, title: 'Track every order', text: 'See when it is confirmed, prepared and ready.' },
+                { icon: <Wallet />, title: 'Pay when you get it', text: 'Cash at pickup or on delivery. No card needed.' },
+              ].map((item) => (
+                <li key={item.title} className="flex gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 text-amber-300 ring-1 ring-white/10 [&>svg]:size-[18px]">{item.icon}</span>
+                  <span>
+                    <span className="block text-sm font-semibold">{item.title}</span>
+                    <span className="block text-xs leading-5 text-emerald-50/65">{item.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
 
-            <div className="relative mt-auto pt-6">
+            <div className="relative mt-auto pt-8">
               {basketCount > 0 ? (
-                <div className="flex items-center gap-3 rounded-2xl bg-white/85 p-3.5 shadow-sm ring-1 ring-emerald-900/10 backdrop-blur">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-800 text-white"><ShoppingBasket className="size-5" /></span>
+                <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-300 text-[#0b3b2c]"><ShoppingBasket className="size-5" /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#0b3b2c]">Your basket is saved</p>
-                    <p className="text-xs text-slate-500">{basketCount} {basketCount === 1 ? 'item' : 'items'} waiting for checkout</p>
+                    <p className="text-sm font-semibold">Your basket is saved</p>
+                    <p className="text-xs text-emerald-50/65">{basketCount} {basketCount === 1 ? 'item' : 'items'} waiting for checkout</p>
                   </div>
-                  <span className="font-display text-lg font-bold text-[#0b3b2c]">{basketTotal}</span>
+                  <span className="font-display text-base font-bold">{basketTotal}</span>
                 </div>
               ) : (
-                <ul className="grid grid-cols-3 gap-2 text-[11px] font-semibold text-[#0b3b2c]">
-                  <Perk icon={<ShoppingBasket />} label="Order ahead" />
-                  <Perk icon={<Clock3 />} label="Quick pickup" />
-                  <Perk icon={<Wallet />} label="Pay in store" />
-                </ul>
+                <p className="flex items-center gap-2 text-xs text-emerald-50/60"><ShieldCheck className="size-4 text-emerald-300" /> Your details are only used by {storeName}.</p>
               )}
             </div>
           </aside>
 
           {/* ───── Form side ───── */}
-          <div className="relative flex min-h-full flex-col lg:px-12 lg:pb-10 lg:pt-9">
+          <div className="relative flex min-h-full flex-col lg:px-10 lg:pb-8 lg:pt-8">
             <button
               type="button"
               onClick={onClose}
               disabled={busy}
               aria-label="Close sign in"
-              className="absolute right-4 top-4 z-20 grid size-10 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/25 backdrop-blur transition hover:bg-white/25 disabled:opacity-40 sm:right-5 sm:top-5 lg:bg-slate-100 lg:text-slate-500 lg:ring-0 lg:hover:bg-slate-200 lg:hover:text-slate-800"
+              className="absolute right-4 top-3.5 z-20 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-40 lg:right-5 lg:top-5"
             >
               <X className="size-5" />
             </button>
 
-            {/* Phones and small tablets: a branded header with real product photos, the form slides up over it. */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-800 to-[#062a1d] px-6 pb-14 pt-6 text-white sm:px-10 lg:hidden">
-              <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-amber-300/25 blur-3xl" />
-              <span aria-hidden className="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full bg-emerald-300/20 blur-3xl" />
-              <div className="relative flex items-center gap-3 pr-12">
-                <img src="/brand/minimart-logo.svg" alt="" className="size-12 rounded-2xl bg-[#fffbea] object-contain p-1 shadow-lg ring-2 ring-white/20" />
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Pickup &amp; delivery</p>
-                  <p className="truncate font-display text-base font-bold">{storeName}</p>
-                </div>
+            {/* Phones, tablets and the app: a simple top bar, like a native app screen. */}
+            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-3.5 pr-16 sm:px-8 lg:hidden">
+              <img src="/brand/minimart-logo.svg" alt="" className="size-10 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Online shop</p>
+                <p className="truncate font-display text-[15px] font-bold text-[#0b3b2c]">{storeName}</p>
               </div>
-              <p className="relative mt-5 font-display text-[26px] font-extrabold leading-[1.1] tracking-tight">
-                Order ahead.<br /><span className="text-amber-300">Skip the wait.</span>
-              </p>
-              {basketPhotos.length > 0 && (
-                <div className="relative mt-5 flex items-end gap-2.5" aria-hidden>
-                  {basketPhotos.slice(0, basketCount > 0 ? 3 : 4).map((p, i) => (
-                    <span key={p.name} className="grid size-[3.75rem] shrink-0 place-items-center overflow-hidden rounded-2xl bg-white p-1.5 shadow-lg shadow-black/20 transition" style={{ transform: `rotate(${[-6, 3, -2, 5][i]}deg) translateY(${[0, -6, 2, -4][i]}px)` }}>
-                      {p.image_url ? <img src={p.image_url} alt="" className="size-full object-contain" /> : <ShoppingBasket className="size-6 text-emerald-700" />}
-                    </span>
-                  ))}
-                  {basketCount > 0 && (
-                    <span className="ml-auto shrink-0 whitespace-nowrap rounded-2xl bg-white/12 px-3 py-2 text-right ring-1 ring-white/20 backdrop-blur">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-100">Basket saved</span>
-                      <span className="block font-display text-sm font-bold">{basketTotal}</span><span className="block text-[10px] text-emerald-100">{basketCount} {basketCount === 1 ? 'item' : 'items'}</span>
-                    </span>
-                  )}
-                </div>
+              {basketCount > 0 && (
+                <span className="ml-auto shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-100">
+                  {basketCount} in basket · {basketTotal}
+                </span>
               )}
             </div>
 
-            <div className="relative z-10 -mt-8 flex flex-1 flex-col rounded-t-[28px] bg-white px-6 pb-8 pt-7 shadow-[0_-12px_30px_-18px_rgba(2,44,34,0.5)] sm:px-10 sm:pb-10 lg:mt-0 lg:rounded-none lg:p-0 lg:shadow-none">
-            <span aria-hidden className="mx-auto -mt-3 mb-4 block h-1.5 w-10 rounded-full bg-slate-200 lg:hidden" />
-            <div className="my-auto w-full max-w-[410px] self-center lg:self-auto">
+            <div className="relative flex flex-1 flex-col bg-white px-5 pb-8 pt-6 sm:px-8 sm:pb-10 lg:p-0">
+            <div className="w-full max-w-[410px] self-center lg:my-auto lg:self-auto">
               {verifying ? (
                 <EmailVerification apiBase={apiBase} email={verifying.email} remember={verifying.remember} initialResendIn={verifying.resendIn}
                   onBack={() => onCancelVerify?.()} onDone={() => onVerified?.()} />
@@ -174,10 +163,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                   }}
                 />
               ) : <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-800 ring-1 ring-emerald-700/15">
-                <span className="size-1.5 rounded-full bg-emerald-500" /> Customer account
-              </span>
-              <h2 id="shop-auth-title" key={`title-${mode}`} className="auth-fade mt-4 font-display text-[30px] font-extrabold leading-tight tracking-tight text-[#0b3b2c]">
+              <h2 id="shop-auth-title" key={`title-${mode}`} className="auth-fade font-display text-2xl font-bold leading-tight tracking-tight text-[#0b3b2c]">
                 {register ? 'Create your account' : 'Welcome back'}
               </h2>
               <p className="mt-1.5 text-sm leading-6 text-slate-500">
@@ -185,10 +171,10 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
               </p>
               {register && <p className="mt-2 text-xs leading-5 text-slate-500">Your store uses your account details to manage orders. See the <Link to={legalHref('privacy')} className="font-semibold text-emerald-800 underline underline-offset-2">privacy notice</Link> and <Link to={legalHref('terms')} className="font-semibold text-emerald-800 underline underline-offset-2">terms</Link>. The store's own refund rules apply to purchases.</p>}
 
-              <div role="radiogroup" aria-label="Account" className="relative mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+              <div role="radiogroup" aria-label="Account" className="relative mt-5 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
                 <span
                   aria-hidden
-                  className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5 transition-transform duration-300 ease-out ${register ? 'translate-x-full' : ''}`}
+                  className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white shadow-sm ring-1 ring-slate-900/5 transition-transform duration-300 ease-out ${register ? 'translate-x-full' : ''}`}
                 />
                 {(['login', 'register'] as const).map((m) => (
                   <button
@@ -197,7 +183,7 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
                     role="radio"
                     aria-checked={mode === m}
                     onClick={() => switchTo(m)}
-                    className={`relative rounded-xl py-2.5 text-sm font-semibold transition-colors ${mode === m ? 'text-emerald-800' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`relative rounded-lg py-2 text-sm font-semibold transition-colors ${mode === m ? 'text-emerald-800' : 'text-slate-500 hover:text-slate-800'}`}
                   >
                     {m === 'login' ? 'Sign in' : 'Create account'}
                   </button>
@@ -330,15 +316,6 @@ export function CustomerAuthDialog({ open, onClose, storeName, mode, onModeChang
         </div>
       </div>
     </div>
-  );
-}
-
-function Perk({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <li className="flex items-center justify-center gap-1.5 rounded-xl bg-white/80 px-2 py-2.5 shadow-sm ring-1 ring-emerald-900/10">
-      <span className="text-emerald-600 [&>svg]:size-4">{icon}</span>
-      {label}
-    </li>
   );
 }
 
