@@ -1,4 +1,4 @@
-import { ArrowRight, Banknote, Bike, Heart, ShoppingBasket, Store } from 'lucide-react';
+import { ArrowRight, Bike, Heart, ShoppingBasket, Store, Wallet } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface PhotoItem { name: string; image_url: string | null }
@@ -107,45 +107,43 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
     <>
       <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
-      <section aria-label="Store highlights" className="hidden gap-4 sm:grid xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] xl:items-start">
-        {/* Storefront: striped awning, wooden sign, shelves */}
-        <article className="sari-card relative overflow-hidden rounded-2xl">
-          <div aria-hidden className="sari-awning h-6" />
-          <div aria-hidden className="sari-awning-edge" />
-          <div className="flex items-end gap-4 px-5 pb-5 pt-2">
-            <div className="min-w-0 flex-1">
-              <div className="sari-wood inline-block max-w-full rounded-lg px-4 py-2.5 shadow-lg ring-1 ring-black/25">
-                <h2 className="font-display text-lg font-bold leading-snug text-[#fdf3e1] lg:text-[22px]">
-                  Your neighborhood store, <span className="text-amber-300">now online.</span>
-                </h2>
-              </div>
-              <p className="mt-3 max-w-md text-sm leading-6 text-[#6b4a2b]">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
-              <div className="mt-4 flex flex-wrap gap-2.5">
-                <button type="button" onClick={onStart} className="sari-btn group inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition">
-                  Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
-                </button>
-                {!signedIn && <button type="button" onClick={onCreateAccount} className="sari-btn inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold transition">Create a free account</button>}
-              </div>
+      <section aria-label="Store highlights" className="hidden gap-3 sm:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+        {/* Welcome banner */}
+        <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white shadow-sm lg:px-8 lg:py-7">
+          <span aria-hidden className="absolute -left-16 -top-24 -z-10 size-72 rounded-full bg-emerald-500/25 blur-[80px]" />
+          <span aria-hidden className="absolute -bottom-28 right-24 -z-10 size-72 rounded-full bg-amber-400/15 blur-[90px]" />
+          <div className="relative max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold ring-1 ring-white/15">
+              <span className="size-1.5 rounded-full bg-emerald-400" />
+              Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
+            </span>
+            <h2 className="mt-3 font-display text-2xl font-bold leading-tight tracking-tight lg:text-[28px]">
+              Your neighborhood store, <span className="text-amber-300">now online.</span>
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-emerald-50/75">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-emerald-950 transition hover:bg-amber-200">
+                Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
+              </button>
+              {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
             </div>
-            <StoreShelf />
           </div>
+
         </article>
 
-        {/* Hanging price tags: the ways to order */}
-        <ul className="grid grid-cols-3 items-start gap-3 pt-5">
+        {/* Ways to order */}
+        <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
           {[
-            { icon: Bike, title: 'Delivery to your door', text: 'Cash on delivery', tone: 'text-emerald-700', tilt: '-rotate-2' },
-            { icon: Store, title: `Pickup at ${branchCount > 1 ? `${branchCount} branches` : 'the store'}`, text: 'Collect when ready', tone: 'text-[#9a5a2a]', tilt: 'rotate-1' },
-            { icon: Banknote, title: 'Pay when you get it', text: 'No online fees', tone: 'text-amber-700', tilt: '-rotate-1' },
-          ].map(({ icon: Icon, title, text, tone, tilt }) => (
-            <li key={title} className={`relative origin-top ${tilt} transition hover:rotate-0`}>
-              <span aria-hidden className="absolute -top-5 left-1/2 h-7 w-px -translate-x-1/2 bg-[#7a5a35]" />
-              <div className="sari-tag sari-kraft flex flex-col items-center rounded-b-xl px-2 pb-5 pt-7 text-center shadow-[0_12px_20px_-12px_rgba(70,40,10,.6)]">
-                <span aria-hidden className="sari-tag-hole absolute left-1/2 top-2.5 size-3 -translate-x-1/2 rounded-full" />
-                <span className={`grid size-12 place-items-center rounded-full bg-[#fff7e6] shadow-inner ring-1 ring-[#b08550]/40 ${tone}`}><Icon className="size-6" /></span>
-                <p className="mt-2 font-hand text-[22px] font-bold leading-6 text-[#4a2f17]">{title}</p>
-                <p className="mt-1 text-[11px] font-medium text-[#6b4a2b]/80">{text}</p>
-              </div>
+            { icon: Bike, title: 'Delivery to your door', text: 'Cash on delivery. Track your rider on the map.', tone: 'bg-orange-50 text-orange-600 ring-orange-100' },
+            { icon: Store, title: `Pickup at ${branchCount > 1 ? `${branchCount} branches` : 'the store'}`, text: 'Pick a branch and collect when it is ready.', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+            { icon: Wallet, title: 'Pay when you get it', text: 'No card needed and no online fees.', tone: 'bg-sky-50 text-sky-700 ring-sky-100' },
+          ].map(({ icon: Icon, title, text, tone }) => (
+            <li key={title} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-slate-200/80">
+              <span className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ${tone}`}><Icon className="size-5" /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900">{title}</span>
+                <span className="block text-xs leading-5 text-slate-500">{text}</span>
+              </span>
             </li>
           ))}
         </ul>
@@ -206,49 +204,3 @@ function PhoneBanners({ photos, signedIn, onCreateAccount, onStart }: { photos: 
   );
 }
 
-/** A little wooden shelf of goods for the storefront banner (drawn, no photos needed). */
-function StoreShelf() {
-  const rows = [
-    ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad'],
-    ['#d35400', '#16a085', '#c0392b', '#f39c12', '#2c3e50', '#e74c3c'],
-  ];
-  return (
-    <svg aria-hidden viewBox="0 0 200 132" className="hidden w-44 shrink-0 drop-shadow-md md:block xl:hidden">
-      <rect x="2" y="2" width="196" height="128" rx="6" fill="#7b4b27" />
-      <rect x="10" y="10" width="180" height="112" rx="3" fill="#f0dfbf" />
-      {rows.map((colors, r) => (
-        <g key={r} transform={`translate(0 ${r * 52})`}>
-          {colors.map((c, i) => (i % 2
-            ? <g key={i}><rect x={16 + i * 29} y={22} width="20" height="30" rx="4" fill={c} /><rect x={16 + i * 29} y={28} width="20" height="9" fill="#fff" opacity=".75" /></g>
-            : <g key={i}><rect x={18 + i * 29} y={30} width="17" height="22" rx="2" fill={c} /><rect x={18 + i * 29} y={34} width="17" height="6" fill="#fff" opacity=".7" /></g>))}
-          <rect x="10" y="52" width="180" height="7" fill="#a26c3d" />
-          <rect x="10" y="58" width="180" height="2" fill="#5a321a" opacity=".5" />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-/** Empty shop: a chalkboard on an easel in front of empty wooden shelves with baskets. */
-export function EmptyShelves() {
-  return (
-    <div className="sari-card relative mt-5 overflow-hidden rounded-2xl px-4 pb-8 pt-10">
-      <div aria-hidden className="absolute inset-x-6 top-[38%] h-2.5 rounded-sm sari-plank shadow-[0_6px_8px_-4px_rgba(70,40,10,.5)]" />
-      <div aria-hidden className="absolute inset-x-6 top-[78%] h-2.5 rounded-sm sari-plank shadow-[0_6px_8px_-4px_rgba(70,40,10,.5)]" />
-      <div aria-hidden className="absolute inset-x-10 top-[78%] flex -translate-y-full justify-between">
-        {[0, 1, 2, 3].map((i) => <span key={i} className={`h-4 w-14 rounded-b-[40%] bg-[#b98a52] shadow-inner ring-1 ring-[#7b4b27]/40 ${i === 1 || i === 2 ? 'hidden sm:block' : ''}`} />)}
-      </div>
-      <div className="relative mx-auto w-fit">
-        <div className="sari-wood rounded-lg p-2 shadow-xl">
-          <div className="sari-chalk rounded px-8 py-6 text-center sm:px-14">
-            <p className="font-hand text-3xl font-bold leading-9 text-white/90 sm:text-4xl">No products yet…<br />but coming soon!</p>
-          </div>
-        </div>
-        <div aria-hidden className="mx-auto flex w-40 justify-between">
-          <span className="h-10 w-2 -rotate-12 rounded-b sari-wood-v" />
-          <span className="h-10 w-2 rotate-12 rounded-b sari-wood-v" />
-        </div>
-      </div>
-    </div>
-  );
-}

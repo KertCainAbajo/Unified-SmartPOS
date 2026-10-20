@@ -14,7 +14,7 @@ import { CustomerAuthDialog } from './CustomerAuthDialog';
 import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './CustomerOrders';
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
-import { EmptyShelves, ShopHero } from './ShopVisuals';
+import { ShopHero } from './ShopVisuals';
 import { ANDROID_APP_URL, AppDownloadBanner } from './AppDownloadBanner';
 import { isShopApp } from '../../lib/shopApp';
 import { useToast } from '../../components/Toast';
@@ -226,7 +226,7 @@ export function ShopPage() {
     return added;
   };
 
-  return <div className={`sari-paper min-h-screen text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
+  return <div className={`min-h-screen bg-white text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
     <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
     {platformInfo.demo && (
@@ -235,20 +235,19 @@ export function ShopPage() {
       </p>
     )}
     <AppDownloadBanner />
-    <header className="relative z-30">
-      <div className="sari-olive border-b-4 border-[#7b4b27] text-white">
+    <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
-          <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-[#fbf3e2] object-contain p-1 shadow ring-2 ring-[#7b4b27]/60 sm:size-11" alt="" />
+          <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-amber-200">Pickup and delivery</p>
-            <h1 className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-white sm:text-lg">{shop.business.name}</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-700">Pickup and delivery</p>
+            <h1 className="truncate font-display text-[15px] font-bold leading-tight tracking-tight sm:text-lg">{shop.business.name}</h1>
           </div>
         </a>
 
         <label className="relative hidden max-w-xl flex-1 md:block">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${shop.data.length} products…`} aria-label="Search products" className="h-11 w-full rounded-full border border-[#c9a978] bg-[#fbf3e2] text-slate-800 pl-11 pr-10 text-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${shop.data.length} products…`} aria-label="Search products" className="h-11 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10" />
           {search && <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700"><X size={14} /></button>}
         </label>
 
@@ -265,23 +264,21 @@ export function ShopPage() {
             </button>
             <button onClick={() => logoutMutation.mutate()} aria-label="Sign out" title="Sign out" className="hidden size-11 place-items-center sm:grid rounded-full border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"><LogOut size={17} /></button>
           </> : <>
-            <button onClick={() => openAuth('register')} className="sari-btn hidden h-10 items-center rounded-full px-4 text-sm font-semibold transition sm:inline-flex">Create account</button>
-            <button onClick={() => openAuth('login')} className="sari-btn inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold transition sm:px-5">Sign in <ArrowRight size={15} className="hidden sm:block" /></button>
+            <button onClick={() => openAuth('register')} className="hidden h-11 items-center rounded-full px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:inline-flex">Create account</button>
+            <button onClick={() => openAuth('login')} className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-800 px-4 text-sm font-bold text-white shadow-sm shadow-emerald-900/20 transition hover:bg-emerald-900 sm:px-5">Sign in <ArrowRight size={15} className="hidden sm:block" /></button>
           </>}
         </div>
       </div>
 
-      </div>
-
       {/* Categories: one row of pills; on smaller screens it slides sideways (fades and arrows show there are more). */}
-      <nav aria-label="Categories" className="border-b border-[#c9a978]/60 bg-[#f6eedc]/80">
+      <nav aria-label="Categories" className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50/60">
         <div className="mx-auto max-w-[1280px] py-2.5 lg:px-8">
           <CategoryRail>
             {categories.map((category, i) => {
               const Icon = category === ALL ? LayoutGrid : iconFor(category);
               const color = category === ALL ? null : CAT_COLORS[(i - 1) % CAT_COLORS.length];
               const active = selectedCategory === category;
-              return <button key={category} onClick={() => setSelectedCategory(category)} aria-pressed={active} className={`group inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold transition duration-200 ${active ? 'sari-btn' : 'bg-[#fffaf0] text-[#4a2f17] ring-1 ring-[#c9a978]/70 hover:-translate-y-px hover:shadow-sm hover:ring-[#a5793f]'}`}>
+              return <button key={category} onClick={() => setSelectedCategory(category)} aria-pressed={active} className={`group inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold transition duration-200 ${active ? 'bg-emerald-900 text-white shadow-md shadow-emerald-900/20' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:-translate-y-px hover:shadow-sm hover:ring-slate-300'}`}>
                 <span className={`grid size-7 place-items-center rounded-full ${active ? 'bg-white/15 text-amber-300' : color ? `${color.bg} ${color.fg}` : 'bg-emerald-900 text-amber-300'}`}><Icon size={15} /></span>
                 {category}
                 <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{countFor(category)}</span>
@@ -306,14 +303,14 @@ export function ShopPage() {
           </div>
         </div>
       )}
+      <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main id="main-content" className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <main id="main-content" className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section id="products" className="min-w-0 scroll-mt-4">
-  <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
-          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#8a5a32]">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
               <h2 className="mt-0.5 font-display text-xl font-bold tracking-tight sm:text-2xl">{selectedCategory}</h2>
               <p className="mt-1 text-sm text-slate-500">{visibleProducts.length} of {shop.data.length} items{term && <> matching “<span className="font-semibold text-slate-700">{search.trim()}</span>”</>}</p>
             </div>
@@ -327,7 +324,7 @@ export function ShopPage() {
           </div>
 
           {shop.data.length === 0
-            ? <EmptyShelves />
+            ? <EmptyState title="No products yet" text="This store hasn't listed anything online yet. Please check back soon." />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
               : <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
@@ -337,16 +334,16 @@ export function ShopPage() {
 
         {/* ───────── Basket ───────── */}
         <aside className="min-w-0 space-y-5 lg:sticky lg:top-4 lg:-m-1.5 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:p-1.5 [scrollbar-width:thin]">
-          <section id="basket" className="sari-wood-v scroll-mt-4 rounded-2xl p-2 shadow-[0_22px_40px_-24px_rgba(70,40,10,.7)]">
-            <div className="sari-olive flex items-center justify-between gap-3 rounded-t-xl border-b-2 border-[#4f5d24] px-4 py-3 text-white">
+          <section id="basket" className="scroll-mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-[#fbf3e2] text-[#7b4b27] shadow"><ShoppingBasket size={19} /></span>
-              <div><h2 className="font-hand text-[28px] font-bold leading-7">Your basket</h2><p className="text-xs text-amber-100/80">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : `${fulfilment === 'pickup' ? 'Pickup' : 'Delivery'} order`}</p></div>
+                <span className="grid size-10 place-items-center rounded-xl bg-emerald-900 text-amber-300"><ShoppingBasket size={19} /></span>
+              <div><h2 className="font-display text-lg font-bold leading-tight">Your basket</h2><p className="text-xs text-slate-500">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : `${fulfilment === 'pickup' ? 'Pickup' : 'Delivery'} order`}</p></div>
               </div>
-              {lines.length > 0 && <button onClick={() => setCart({})} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-amber-100/80 transition hover:bg-white/10 hover:text-white"><Trash2 size={13} /> Clear</button>}
+              {lines.length > 0 && <button onClick={() => setCart({})} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Clear</button>}
             </div>
 
-            <div className="rounded-b-xl bg-[#fbf3e2] p-4">
+            <div className="p-5">
               {justPlaced && <div className="mb-4 flex gap-3 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
                 <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" />
                 <div className="text-sm"><p className="font-bold text-emerald-900">Order {justPlaced.order_number} placed</p><p className="mt-0.5 text-emerald-800/80">We'll prepare it at {justPlaced.branch.name}. Follow its status below.</p></div>
@@ -370,9 +367,9 @@ export function ShopPage() {
                     </div>
                   </li>;
                 })}
-              </ul> : !justPlaced && <div className="relative mx-1 -rotate-1 bg-[#fffdf6] px-5 py-6 text-center shadow-[0_8px_14px_-10px_rgba(70,40,10,.6)]">
-                <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-14 -translate-x-1/2 rotate-2 bg-amber-200/70" />
-                <p className="font-hand text-[26px] font-bold leading-7 text-[#4a2f17]">Your basket is empty.</p>
+              </ul> : !justPlaced && <div className="rounded-2xl border-2 border-dashed border-slate-200 px-5 py-8 text-center">
+                <span className="mx-auto grid size-12 place-items-center rounded-full bg-slate-50 text-slate-300"><ShoppingBasket size={22} /></span>
+                <p className="mt-3 text-sm font-semibold text-slate-700">Your basket is empty</p>
                 <p className="mt-1 text-xs text-slate-400">Tap <b className="text-slate-500">Add</b> on a product to start your order.</p>
               </div>}
 
@@ -482,11 +479,11 @@ export function ShopPage() {
           )}
         </div>
         <div>
-          <p className="sari-kraft inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.18em] text-[#4a2f17] sm:text-[11px]">Pickup locations</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-300 sm:text-[11px]">Pickup locations</p>
           <ul className="mt-2.5 flex flex-wrap gap-1.5 text-sm sm:mt-3 sm:block sm:space-y-2">{shop.branches.map((branch) => <li key={branch.id} className="flex items-center gap-1.5 rounded-full bg-white/[.07] px-2.5 py-1 ring-1 ring-white/10 sm:items-start sm:gap-2 sm:rounded-none sm:bg-transparent sm:p-0 sm:ring-0"><MapPin size={14} className="shrink-0 text-emerald-300 sm:mt-0.5" /><span><span className="text-xs font-semibold text-white sm:text-sm">{branch.name}</span>{branch.address && <span className="hidden text-xs text-emerald-50/60 sm:block">{branch.address}</span>}</span></li>)}</ul>
         </div>
         <div className="hidden sm:block">
-          <p className="sari-kraft inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-[.18em] text-[#4a2f17]">Order status</p>
+          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">Order status</p>
           <ul className="mt-3 space-y-1.5 text-[13px]">{statusFlow.map((status) => <li key={status} className="flex items-center gap-2"><PackageCheck size={15} className="text-emerald-300" />{statusNames[status]}</li>)}</ul>
         </div>
       </div>
@@ -666,7 +663,7 @@ function CategoryRail({ children }: { children: ReactNode }) {
 
 function ProductCard({ product, stock, quantity, saved, tone, Icon, onChange, onToggleSaved }: { product: ShopProduct; stock: ProductStock; quantity: number; saved: boolean; tone: (typeof tones)[number]; Icon: LucideIcon; onChange: (quantity: number) => void; onToggleSaved: () => void }) {
   const out = stock.level === 'none';
-  return <article className={`group relative flex flex-col overflow-hidden rounded-[22px] bg-[#fffaf0] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_45px_-24px_rgba(6,60,40,.45)] ${quantity ? 'ring-2 ring-emerald-600 shadow-[0_14px_30px_-18px_rgba(5,150,105,.55)]' : 'shadow-[0_1px_3px_rgba(15,23,42,.06)] ring-1 ring-slate-200/80'}`}>
+  return <article className={`group relative flex flex-col overflow-hidden rounded-[22px] bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_45px_-24px_rgba(6,60,40,.45)] ${quantity ? 'ring-2 ring-emerald-600 shadow-[0_14px_30px_-18px_rgba(5,150,105,.55)]' : 'shadow-[0_1px_3px_rgba(15,23,42,.06)] ring-1 ring-slate-200/80'}`}>
     {/* Photo on a soft tinted square, with the save heart, badges and the quick-add button floating on it. */}
     <div className={`relative m-1.5 aspect-square overflow-hidden rounded-[18px] sm:m-2 ${tone.bg}`}>
       <span aria-hidden className="pointer-events-none absolute -bottom-10 left-1/2 h-20 w-[85%] -translate-x-1/2 rounded-full bg-white/70 blur-2xl" />
@@ -752,7 +749,7 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 }
 
 function ShopLoading() {
-  return <div className="sari-paper min-h-screen">
+  return <div className="min-h-screen bg-white">
     <div className="h-[118px] border-b border-slate-200 bg-white" />
     <div className="mx-auto max-w-[1280px] px-4 pt-8 sm:px-6 lg:px-8">
       <div className="h-72 animate-pulse rounded-[32px] bg-emerald-900/10" />
