@@ -229,11 +229,6 @@ export function ShopPage() {
   return <div className={`min-h-screen bg-[#f7f8f7] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
     <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
-    {platformInfo.demo && (
-      <p role="note" className="bg-sky-700 px-4 py-1.5 text-center text-[11px] font-semibold text-white sm:text-xs">
-        Demo store for testing only: orders are not real, nothing is delivered and no payment is taken. <Link to={legalHref('terms')} className="underline underline-offset-2">Learn more</Link>
-      </p>
-    )}
     <AppDownloadBanner />
     <header className="relative z-30 border-b border-slate-200/80 bg-white">
       <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
@@ -489,6 +484,7 @@ export function ShopPage() {
       </div>
       <div className={`border-t border-white/10 px-4 pt-4 text-center text-[11px] text-emerald-50/50 sm:py-5 sm:text-xs lg:pb-5 ${lines.length ? 'pb-24' : 'pb-5'}`}>
         {shop.business.name} · Online orders powered by SmartPOS
+        {platformInfo.demo && <span className="mt-1 block text-[10px] text-emerald-50/45">Demo store: orders are not real, nothing is delivered and no payment is taken. <Link to={legalHref('terms')} className="underline underline-offset-2">Learn more</Link></span>}
         {(shop.business.legal_name || shop.business.address || shop.business.phone || shop.business.email) && <span className="mt-2 block">{[shop.business.legal_name, shop.business.address, shop.business.phone, shop.business.email].filter(Boolean).join(' · ')}</span>}
         <span className="mt-1 block text-[10px]">For order or refund questions, contact this store using the details above.</span>
         <LegalLinks tone="dark" className="mt-3" />
