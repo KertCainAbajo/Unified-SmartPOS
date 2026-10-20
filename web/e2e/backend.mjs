@@ -27,7 +27,7 @@ if (!existsSync(envFile)) {
       `DB_DATABASE="${database}"`,
       'SESSION_DRIVER=database',
       'SESSION_DOMAIN=null',
-      'CACHE_STORE=array',
+      'CACHE_STORE=file',
       'QUEUE_CONNECTION=sync',
       'MAIL_MAILER=array',
       'LOG_CHANNEL=stderr',
@@ -35,6 +35,9 @@ if (!existsSync(envFile)) {
       'BCRYPT_ROUNDS=4',
       `SANCTUM_STATEFUL_DOMAINS=127.0.0.1:${WEB_PORT},localhost:${WEB_PORT}`,
       'SMARTPOS_REQUIRE_EMAIL_VERIFICATION=false',
+      'SMARTPOS_NEW_DEVICE_CODES=false',
+      'SMARTPOS_CHECK_BREACHED_PASSWORDS=false',
+      'SMARTPOS_RATE_LIMIT_MULTIPLIER=50',
       '',
     ].join('\n'),
   );

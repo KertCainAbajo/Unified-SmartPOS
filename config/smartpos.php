@@ -26,6 +26,16 @@ return [
 
     'staff_code_ttl_hours' => (int) env('SMARTPOS_STAFF_CODE_TTL_HOURS', 72),
 
+    // Sign-in with email from a browser not used before needs a 6-digit code sent to that email (two-step sign-in).
+    'new_device_codes' => (bool) env('SMARTPOS_NEW_DEVICE_CODES', true),
+
+    // Refuse new passwords found in known data breaches (checked with Have I Been Pwned; only the first 5
+    // characters of the password's SHA-1 hash leave the server). If the service cannot be reached, the check is skipped.
+    'check_breached_passwords' => (bool) env('SMARTPOS_CHECK_BREACHED_PASSWORDS', true),
+
+    // Multiplies every request speed limit. Only for automated test runs; keep 1 on a real server.
+    'rate_limit_multiplier' => (int) env('SMARTPOS_RATE_LIMIT_MULTIPLIER', 1),
+
     // Maximum page size accepted by paginated endpoints.
     'max_per_page' => 100,
 ];

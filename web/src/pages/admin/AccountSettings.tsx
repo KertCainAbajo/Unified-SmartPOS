@@ -1,7 +1,9 @@
-import { CheckCircle2, Eye, EyeOff, KeyRound, Lock, Mail, MailWarning, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, KeyRound, Lock, LogOut, Mail, MailWarning, MonitorSmartphone, ShieldCheck, UserRound, type LucideIcon } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
+import { useConfirm } from '../../components/Confirm';
 import { useToast } from '../../components/Toast';
+import { formatDateTime } from '../../lib/format';
 import { Button, ErrorBanner, Field, Input, cx } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
 import { useTenant } from '../../tenant/TenantProvider';
@@ -39,6 +41,8 @@ export function AccountSettings() {
         <ProfileCard />
         <PasswordCard />
       </div>
+
+      <DevicesCard />
 
       <p className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 ring-1 ring-slate-100">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-600" />
@@ -209,6 +213,57 @@ function PasswordCard() {
           <Button type="submit" loading={busy} disabled={!form.current || !strong || !matches} icon={<Lock className="size-4" />}>Change password</Button>
         </div>
       </form>
+    </Panel>
+  );
+}
+
+interface TrustedBrowser { id: number; label: string | null; ip_address: string | null; current: boolean; last_used_at: string | null; expires_at: string }
+
+/** Browsers that skip the emailed sign-in code, and "sign out everywhere else". */
+function DevicesCard() {
+  const toast = useToast();
+  const ask = useConfirm();
+  const [devices, setDevices] = useState<TrustedBrowser[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api<{ data: TrustedBrowser[] }>('/me/devices').then((r) => setDevices(r.data)).catch(setError);
+  useEffect(() => { void load(); }, []);
+
+  async function forget() {
+    if (!(await ask({ title: 'Sign out everywhere else?', message: 'Other browsers are signed out, and every browser (this one too) will need an emailed code at the next sign-in.', confirmLabel: 'Sign out everywhere else' }))) return;
+    setBusy(true);
+    try {
+      await api('/me/devices', { method: 'DELETE' });
+      toast.success('Signed out everywhere else.');
+      await load();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel icon={MonitorSmartphone} title="Trusted browsers" description="Signing in with your email on a new browser needs a code we email you. These browsers skip it for 30 days.">
+      <div className="space-y-3">
+        {error ? <ErrorBanner error={error} /> : null}
+        {devices === null && !error ? <p className="text-sm text-slate-400">Loading…</p> : devices?.length === 0 ? (
+          <p className="text-sm text-slate-500">No trusted browsers. You will get an emailed code each time you sign in on a new browser.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl ring-1 ring-slate-100">
+            {devices?.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+                <span className="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500"><MonitorSmartphone className="size-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 font-medium text-slate-800">{d.label ?? 'Browser'}{d.current && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">This browser</span>}</span>
+                  <span className="block text-xs text-slate-500">Last used {formatDateTime(d.last_used_at)}{d.ip_address ? ` · IP ${d.ip_address}` : ''}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Button variant="secondary" loading={busy} icon={<LogOut className="size-4" />} onClick={() => void forget()}>Sign out everywhere else</Button>
+      </div>
     </Panel>
   );
 }

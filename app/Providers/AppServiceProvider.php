@@ -27,7 +27,8 @@ class AppServiceProvider extends ServiceProvider
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
         Model::preventAccessingMissingAttributes(! $this->app->isProduction());
 
-        Password::defaults(fn () => Password::min(8)->letters()->mixedCase()->numbers());
+        Password::defaults(fn () => Password::min(8)->max(128)->letters()->mixedCase()->numbers()
+            ->when(config('smartpos.check_breached_passwords'), fn (Password $rule) => $rule->uncompromised()));
 
         ResetPassword::createUrlUsing(fn ($user, string $token) => rtrim(config('smartpos.frontend_url'), '/')
             .'/reset-password?token='.$token.'&email='.urlencode($user->getEmailForPasswordReset()));
@@ -47,32 +48,44 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureRateLimiting(): void
     {
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+        // SMARTPOS_RATE_LIMIT_MULTIPLIER raises every limit for automated test runs (one robot user clicking
+        // non-stop from one computer). Keep it 1 on a real server. Account pauses after wrong passwords still apply.
+        $multiplier = max(1, (int) config('smartpos.rate_limit_multiplier', 1));
+        $n = fn (int $limit) => $limit * $multiplier;
+
+        // Signed-in user, or guest IP address (shoppers on one store Wi-Fi share one). A dashboard page alone makes 10-15 requests.
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute($n(300))
             ->by($request->user()?->id ?: $request->ip()));
 
-        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute($n(10))->by($request->ip()));
 
         RateLimiter::for('login', fn (Request $request) => [
-            Limit::perMinute(5)->by(mb_strtolower((string) ($request->input('email') ?: $request->input('business_code').'/'.$request->input('username'))).'|'.$request->ip()),
-            Limit::perMinute(20)->by($request->ip()),
+            Limit::perMinute($n(5))->by(mb_strtolower((string) ($request->input('email') ?: $request->input('business_code').'/'.$request->input('username'))).'|'.$request->ip()),
+            Limit::perMinute($n(20))->by($request->ip()),
         ]);
 
         // Activation/recovery codes: slow down guessing per account and per IP.
         RateLimiter::for('staff-codes', fn (Request $request) => [
-            Limit::perMinute(5)->by(mb_strtolower($request->input('business_code').'/'.$request->input('username')).'|'.$request->ip()),
-            Limit::perMinute(20)->by($request->ip()),
+            Limit::perMinute($n(5))->by(mb_strtolower($request->input('business_code').'/'.$request->input('username')).'|'.$request->ip()),
+            Limit::perMinute($n(20))->by($request->ip()),
         ]);
 
         // Public careers pages: applications, status checks and applicant actions.
         // Shop forgot-password codes: separate from sign-in so a few wrong passwords do not block a reset.
         RateLimiter::for('customer-codes', fn (Request $request) => [
-            Limit::perMinute(10)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
-            Limit::perMinute(30)->by($request->ip()),
+            Limit::perMinute($n(10))->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute($n(30))->by($request->ip()),
         ]);
 
-        RateLimiter::for('public-applications', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        // Emailed sign-in codes: each sign-in allows a few guesses; this caps the rest per IP address.
+        RateLimiter::for('login-codes', fn (Request $request) => [
+            Limit::perMinute($n(10))->by('code|'.$request->ip()),
+            Limit::perHour($n(60))->by('code|'.$request->ip()),
+        ]);
 
-        RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute(60)
+        RateLimiter::for('public-applications', fn (Request $request) => Limit::perMinute($n(10))->by($request->ip()));
+
+        RateLimiter::for('checkout', fn (Request $request) => Limit::perMinute($n(60))
             ->by($request->user()?->id ?: $request->ip()));
     }
 }

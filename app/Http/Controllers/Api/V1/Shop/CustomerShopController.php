@@ -6,13 +6,15 @@ use App\Enums\OnlineOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CustomerAccount;
-use App\Models\User;
 use App\Models\Inventory;
 use App\Models\OnlineOrder;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Notifications\SignInLockedNotification;
 use App\Services\Catalog\ProductImageService;
 use App\Services\DocumentNumberer;
+use App\Services\Security\AccountLockout;
 use App\Services\Shop\CustomerEmailVerificationService;
 use App\Services\Shop\CustomerPasswordResetService;
 use App\Services\Shop\OnlineOrderNotifier;
@@ -25,6 +27,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 /** Public customer shop API. A shop account is isolated from staff authentication. */
 class CustomerShopController extends Controller
@@ -49,6 +52,7 @@ class CustomerShopController extends Controller
                 'reorder_level' => $product->reorder_level,
                 'stock_by_branch' => $branches->mapWithKeys(function (Branch $branch) use ($product, $stockByProduct) {
                     $stock = $stockByProduct->get($product->id, collect())->firstWhere('branch_id', $branch->id);
+
                     return [$branch->id => ['quantity' => $stock?->quantity ?? '0.000', 'reorder_level' => $stock?->reorder_level]];
                 }),
                 'image_url' => $product->image_path ? route('api.v1.shop.products.image', [$tenant->slug, $product->id, 'v' => ProductImageService::version($product)], false) : null,
@@ -61,7 +65,7 @@ class CustomerShopController extends Controller
     }
 
     /** A product photo for the shop. Only products listed online are served. */
-    public function productImage(string $business, int $product, ProductImageService $images): \Symfony\Component\HttpFoundation\Response
+    public function productImage(string $business, int $product, ProductImageService $images): Response
     {
         $tenant = $this->shopTenant($business);
         $listed = $tenant->products()->where('show_online', true)->where('status', 'active')->findOrFail($product);
@@ -167,13 +171,27 @@ class CustomerShopController extends Controller
     {
         $tenant = $this->shopTenant($business);
         $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255'], 'password' => ['required', 'string', 'max:128']]);
-        $account = $tenant->customerAccounts()->where('email', mb_strtolower(trim($data['email'])))->first();
-        if (! $account || ! Hash::check($data['password'], $account->password)) {
+        $email = mb_strtolower(trim($data['email']));
+        $lockKey = "customer:{$tenant->id}:{$email}";
+        $lockout = app(AccountLockout::class);
+        $lockout->ensureNotLocked($lockKey, 'email');
+        $account = $tenant->customerAccounts()->where('email', $email)->first();
+        // Hash even for unknown emails so the answer time does not reveal who has an account.
+        $valid = Hash::check($data['password'], $account?->password ?? '$2y$12$'.str_repeat('a', 53));
+        if (! $account || ! $valid) {
+            $lockout->recordFailure($lockKey, function () use ($account, $request, $tenant) {
+                if ($account) {
+                    rescue(fn () => $account->notify(new SignInLockedNotification($tenant->name.' online shop', $request->ip(), AccountLockout::LOCK_MINUTES)), report: true);
+                }
+            });
+
             return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
         }
+        $lockout->clear($lockKey);
         // Shown only after the password matched, so it never reveals which emails are administrators.
         if ($account->status === CustomerAccount::STATUS_MOVED_TO_ADMIN || CustomerAccount::emailIsPlatformAdmin($account->email)) {
             CustomerAccount::closeForAdmin($account->email);
+
             return response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 422);
         }
         if ($account->status === CustomerAccount::STATUS_UNVERIFIED) {
@@ -212,6 +230,7 @@ class CustomerShopController extends Controller
         // Keep a separately authenticated staff guard in this browser session intact.
         $request->session()->regenerate();
         $request->session()->regenerateToken();
+
         return response()->json(['message' => 'Signed out.']);
     }
 
@@ -254,6 +273,7 @@ class CustomerShopController extends Controller
         $account = $this->accountFor($business);
         $orders = $account->orders()->with(['branch:id,name,address,latitude,longitude', 'items:id,online_order_id,name,sku,unit,unit_price,quantity,line_total'])
             ->latest('id')->paginate(20)->through(fn (OnlineOrder $order) => $order->customerView());
+
         return response()->json($orders);
     }
 
@@ -360,6 +380,7 @@ class CustomerShopController extends Controller
                     'unit_price' => $product->price, 'quantity' => $line['quantity'], 'line_total' => $line['line_total'],
                 ]);
             }
+
             return $order;
         });
 
@@ -383,6 +404,7 @@ class CustomerShopController extends Controller
             $locked->forceFill(['status' => OnlineOrderStatus::Cancelled, 'cancelled_at' => now(), 'cancelled_by' => 'customer'])->save();
         });
         $notify->cancelledByCustomer($order);
+
         return response()->json(['data' => $order->fresh(['branch:id,name,address,latitude,longitude', 'items'])->customerView()]);
     }
 
@@ -390,6 +412,7 @@ class CustomerShopController extends Controller
     {
         $tenant = Tenant::query()->where('slug', mb_strtolower($business))->where('status', 'active')->firstOrFail();
         abort_unless($tenant->shop_enabled, 404);
+
         return $tenant;
     }
 
@@ -403,6 +426,7 @@ class CustomerShopController extends Controller
             abort(response()->json(['message' => self::ADMIN_EMAIL_MESSAGE, 'code' => 'MOVED_TO_ADMIN'], 403));
         }
         abort_unless($account instanceof CustomerAccount && $account->tenant_id === $tenant->id && $account->isActive(), 403, 'Customer account is not available for this shop.');
+
         return $account;
     }
 

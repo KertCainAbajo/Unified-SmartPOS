@@ -8,6 +8,7 @@ use App\Http\Resources\MembershipResource;
 use App\Http\Resources\UserResource;
 use App\Models\TenantMembership;
 use App\Services\AuditLogger;
+use App\Services\Security\NewDeviceVerification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -91,7 +92,11 @@ class ProfileController extends Controller
             ->when($current instanceof PersonalAccessToken, fn ($q) => $q->where('id', '!=', $current->id))
             ->delete();
 
-        $this->audit->log('user.password_changed', $user, metadata: $wasTemporary ? ['replaced_temporary_password' => true] : [], userId: $user->id);
+        // Someone who knew the old password must not stay signed in elsewhere.
+        $sessions = AuthController::endOtherSessions($user, $request);
+        app(NewDeviceVerification::class)->forgetDevices($user, keepCurrent: $request);
+
+        $this->audit->log('user.password_changed', $user, metadata: ($wasTemporary ? ['replaced_temporary_password' => true] : []) + ['other_sessions_ended' => $sessions], userId: $user->id);
 
         return response()->json(['message' => 'Password updated.']);
     }

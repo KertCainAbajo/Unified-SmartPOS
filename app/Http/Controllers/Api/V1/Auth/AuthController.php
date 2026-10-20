@@ -10,13 +10,18 @@ use App\Http\Resources\TenantResource;
 use App\Http\Resources\UserResource;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
+use App\Models\TrustedDevice;
 use App\Models\User;
+use App\Notifications\SignInLockedNotification;
 use App\Services\AuditLogger;
+use App\Services\Security\AccountLockout;
+use App\Services\Security\NewDeviceVerification;
 use App\Services\Tenancy\TenantOnboardingService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -26,7 +31,11 @@ use Laravel\Sanctum\PersonalAccessToken;
  */
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly AccountLockout $lockout,
+        private readonly NewDeviceVerification $newDevice,
+    ) {}
 
     /**
      * Register a business owner and their business.
@@ -76,6 +85,10 @@ class AuthController extends Controller
         $data = $request->validated();
         $field = isset($data['username']) ? 'username' : 'email';
         $tenant = isset($data['username']) ? Tenant::query()->where('slug', $data['business_code'])->first() : null;
+        // Paused after repeated wrong passwords from any IP address (checked before the password, so a paused
+        // account cannot be guessed at all).
+        $lockKey = 'staff:'.$request->identifier();
+        $this->lockout->ensureNotLocked($lockKey, $field);
 
         $user = match ($field) {
             'email' => User::query()->where('email', $data['email'])->first(),
@@ -97,6 +110,13 @@ class AuthController extends Controller
                 'identifier' => $request->identifier(),
                 'reason' => 'invalid_credentials',
             ], tenantId: $tenant?->id);
+            $this->lockout->recordFailure($lockKey, function () use ($user, $request, $tenant) {
+                $this->audit->log('auth.account_locked', $user, metadata: ['identifier' => $request->identifier(), 'minutes' => AccountLockout::LOCK_MINUTES], tenantId: $tenant?->id, userId: $user?->id);
+                if ($user?->email) {
+                    rescue(fn () => $user->notify(new SignInLockedNotification(config('app.name'), $request->ip(), AccountLockout::LOCK_MINUTES,
+                        rtrim(config('smartpos.frontend_url'), '/').'/forgot-password')), report: true);
+                }
+            });
 
             throw ValidationException::withMessages([$field => __('auth.failed')]);
         }
@@ -131,6 +151,16 @@ class AuthController extends Controller
                 : 'This account has been disabled.']);
         }
 
+        $this->lockout->clear($lockKey);
+
+        // Email sign-in from a browser this account has not confirmed: the password alone is not enough.
+        if ($field === 'email' && $this->newDevice->enabled() && ! $this->newDevice->isTrusted($user, $request)) {
+            $challenge = $this->newDevice->start($user, $request, $data['device_name'] ?? null);
+            $this->audit->log('auth.sign_in_code_sent', $user, metadata: ['ip' => $request->ip()], userId: $user->id);
+
+            return response()->json($challenge)->header('Cache-Control', 'no-store');
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
         $this->audit->log('auth.login', $user, metadata: ['client' => isset($data['device_name']) ? 'token' : 'session'], userId: $user->id);
 
@@ -140,6 +170,95 @@ class AuthController extends Controller
             'must_change_password' => (bool) $user->must_change_password,
             ...$this->establishSession($request, $user, $data['device_name'] ?? null),
         ]);
+    }
+
+    /**
+     * Finish a two-step sign-in with the emailed code.
+     *
+     * Send the `challenge` from the login answer and the 6-digit `code`. With `trust_device`, this browser is
+     * remembered for 30 days and is not asked again.
+     *
+     * @unauthenticated
+     */
+    public function verifyLoginCode(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'challenge' => ['required', 'string', 'max:100'],
+            'code' => ['required', 'string', 'max:10'],
+            'trust_device' => ['sometimes', 'boolean'],
+        ]);
+        $challenge = $this->newDevice->verify($data['challenge'], $data['code']);
+        $user = $challenge->user;
+
+        if (! $user->isActive()) {
+            throw ValidationException::withMessages(['code' => 'This account has been disabled.']);
+        }
+
+        $trust = (bool) ($data['trust_device'] ?? false);
+        $user->forceFill(['last_login_at' => now()])->save();
+        $this->audit->log('auth.login', $user, metadata: ['client' => $challenge->device_name ? 'token' : 'session', 'new_device' => true, 'trusted' => $trust], userId: $user->id);
+
+        $response = response()->json([
+            'user' => new UserResource($user),
+            'must_change_password' => (bool) $user->must_change_password,
+            ...$this->establishSession($request, $user, $challenge->device_name),
+        ])->header('Cache-Control', 'no-store');
+
+        return $trust ? $response->withCookie($this->newDevice->trust($user, $request)) : $response;
+    }
+
+    /**
+     * Email another sign-in code for the same sign-in.
+     *
+     * @unauthenticated
+     */
+    public function resendLoginCode(Request $request): JsonResponse
+    {
+        $data = $request->validate(['challenge' => ['required', 'string', 'max:100']]);
+        $wait = $this->newDevice->resend($data['challenge'], $request);
+
+        return response()->json([
+            'message' => $wait ? "Please wait {$wait} seconds before asking for another code." : 'We sent a new code.',
+            'resend_after_seconds' => $wait ?: NewDeviceVerification::RESEND_SECONDS,
+        ]);
+    }
+
+    /** Browsers remembered for two-step sign-in (this one is marked). */
+    public function devices(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $current = $this->newDevice->currentDevice($user, $request)?->id;
+        $devices = TrustedDevice::query()->where('user_id', $user->id)->where('expires_at', '>', now())->latest('last_used_at')->get()
+            ->map(fn (TrustedDevice $d) => [
+                'id' => $d->id, 'label' => $d->label, 'ip_address' => $d->ip_address, 'current' => $d->id === $current,
+                'last_used_at' => $d->last_used_at?->toIso8601String(), 'expires_at' => $d->expires_at->toIso8601String(),
+            ]);
+
+        return response()->json(['data' => $devices]);
+    }
+
+    /** Forget every remembered browser (each needs an emailed code again) and sign out the other sessions. */
+    public function forgetDevices(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $count = $this->newDevice->forgetDevices($user);
+        $sessions = self::endOtherSessions($user, $request);
+        $this->audit->log('auth.devices_forgotten', $user, metadata: ['devices' => $count, 'sessions' => $sessions], userId: $user->id);
+
+        return response()->json(['message' => 'Signed out everywhere else. Every browser will need an emailed code next time.', 'devices' => $count, 'sessions' => $sessions])
+            ->withoutCookie(NewDeviceVerification::COOKIE);
+    }
+
+    /** End the user's browser sessions other than this request's (database sessions only). */
+    public static function endOtherSessions(User $user, ?Request $request = null): int
+    {
+        if (config('session.driver') !== 'database') {
+            return 0;
+        }
+        $current = $request?->hasSession() ? $request->session()->getId() : null;
+
+        return DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))
+            ->where('user_id', $user->id)->when($current, fn ($q) => $q->where('id', '!=', $current))->delete();
     }
 
     /**

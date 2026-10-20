@@ -25,7 +25,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useAuth, type LoginCredentials } from '../../auth/AuthProvider';
+import { useAuth, type LoginChallenge, type LoginCredentials } from '../../auth/AuthProvider';
 import { ErrorBanner } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
 import { getDeviceBusiness, setDeviceBusiness, type DeviceBusiness } from '../../lib/device';
@@ -54,6 +54,7 @@ export function LoginPage() {
   const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const staff = mode === 'staff';
 
   // Usernames are per store, so a new device needs to know its store. Branches are not chosen here: the owner or
@@ -82,16 +83,33 @@ export function LoginPage() {
     const code = device?.code ?? businessCode.trim().toLowerCase();
     const credentials: LoginCredentials = staff ? { business_code: code, username: username.trim(), password } : { email, password };
     try {
-      await login(credentials);
+      const pending = await login(credentials);
+      if (pending) {
+        setPassword('');
+        setChallenge(pending);
+        return;
+      }
       // Remember the store; its real name replaces the code once the business is opened.
       if (staff && !device) setDeviceBusiness({ code, name: code });
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/login' ? from : '/', { replace: true });
+      goOn();
     } catch (err) {
       setError(err);
     } finally {
       setBusy(false);
     }
+  }
+
+  function goOn() {
+    const from = (location.state as { from?: string } | null)?.from;
+    navigate(from && from !== '/login' ? from : '/', { replace: true });
+  }
+
+  if (challenge) {
+    return (
+      <AuthLayout title="Check your email" subtitle="One more step: this browser is new for your account." panel={<ManagementPanel />} below={<Below device={device} />}>
+        <SignInCodeStep challenge={challenge} onDone={goOn} onBack={() => { setChallenge(null); setError(null); }} />
+      </AuthLayout>
+    );
   }
 
   const fieldError = error instanceof ApiError ? error.field(staff ? 'username' : 'email') : undefined;
@@ -373,5 +391,80 @@ function IconField({ id, label, icon, trailing, hint, error, children }: {
       </div>
       {error ? <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p> : hint ? <p className="mt-1.5 text-xs text-slate-500">{hint}</p> : null}
     </div>
+  );
+}
+
+/** Second step on a new browser: the 6-digit code emailed to the account. */
+function SignInCodeStep({ challenge, onDone, onBack }: { challenge: LoginChallenge; onDone: () => void; onBack: () => void }) {
+  const { verifyLoginCode, resendLoginCode } = useAuth();
+  const [code, setCode] = useState('');
+  const [trust, setTrust] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(challenge.resend_after_seconds);
+  const [resent, setResent] = useState(false);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyLoginCode(challenge.challenge, code, trust);
+      onDone();
+    } catch (err) {
+      setError(err);
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setError(null);
+    try {
+      setWait(await resendLoginCode(challenge.challenge));
+      setResent(true);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  const codeError = error instanceof ApiError ? error.field('code') : undefined;
+  return (
+    <form onSubmit={submit} className="auth-fade space-y-5" noValidate>
+      <div className="flex items-start gap-3 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900 ring-1 ring-brand-100">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-600 text-white"><ShieldCheck className="size-5" /></span>
+        <p>Your password was correct. For your security we sent a 6-digit code to <strong>{challenge.email_hint}</strong>. It works for {challenge.expires_in_minutes} minutes.</p>
+      </div>
+      {error && !codeError ? <ErrorBanner error={error} /> : null}
+      <div>
+        <label htmlFor="sign-in-code" className="mb-1.5 block text-sm font-semibold text-slate-700">Sign-in code</label>
+        <input id="sign-in-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000"
+          className={`h-14 w-full rounded-2xl border bg-white text-center font-mono text-2xl tracking-[.5em] text-slate-900 outline-none transition focus:ring-4 ${codeError ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:border-brand-400 focus:ring-brand-100'}`} />
+        {codeError && <p role="alert" className="mt-1.5 text-xs font-medium text-rose-600">{codeError}</p>}
+      </div>
+      <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-600">
+        <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
+        <span>Trust this browser for 30 days <span className="block text-xs text-slate-400">Untick on a shared or public computer.</span></span>
+      </label>
+      <button type="submit" disabled={code.length !== 6 || busy}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-brand-600 to-brand-800 text-sm font-semibold text-white shadow-lg shadow-brand-900/20 transition hover:brightness-110 disabled:opacity-50">
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />} Verify and sign in
+      </button>
+      <div className="flex items-center justify-between text-sm">
+        <button type="button" onClick={onBack} className="font-semibold text-slate-500 hover:text-slate-800">‹ Back</button>
+        {wait > 0
+          ? <span className="text-slate-400">{resent ? 'Code sent. ' : ''}New code in {wait}s</span>
+          : <button type="button" onClick={() => void resend()} className="font-semibold text-brand-700 hover:text-brand-600">Send a new code</button>}
+      </div>
+      <p className="text-center text-xs text-slate-400">Did not try to sign in? Someone knows your password. Reset it now.</p>
+    </form>
   );
 }

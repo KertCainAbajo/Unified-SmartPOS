@@ -13,6 +13,7 @@ use App\Models\OnboardingTask;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\Vacancy;
+use App\Rules\ReadableUpload;
 use App\Services\Recruitment\RecruitmentService;
 use App\Services\Staff\StaffService;
 use Illuminate\Http\JsonResponse;
@@ -225,7 +226,7 @@ class ApplicationController extends Controller
     {
         $data = $request->validate([
             'type' => ['required', Rule::in(array_keys(Vacancy::DOCUMENT_TYPES))],
-            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'file' => ['bail', 'required', 'file', new ReadableUpload, 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ]);
         $this->recruitment->staffUpload($application, $data['type'], $data['file']);
 

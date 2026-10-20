@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Security\NewDeviceVerification;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,8 @@ class PasswordResetController extends Controller
         $status = Password::reset($data, function (User $user, string $password) use ($audit) {
             $user->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
             $user->tokens()->delete();
+            AuthController::endOtherSessions($user);
+            app(NewDeviceVerification::class)->forgetDevices($user);
             $audit->log('auth.password_reset', $user, userId: $user->id);
             event(new PasswordReset($user));
         });

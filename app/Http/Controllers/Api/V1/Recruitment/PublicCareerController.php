@@ -8,6 +8,7 @@ use App\Models\Interview;
 use App\Models\JobApplication;
 use App\Models\Tenant;
 use App\Models\Vacancy;
+use App\Rules\ReadableUpload;
 use App\Services\Recruitment\RecruitmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -198,7 +199,7 @@ class PublicCareerController extends Controller
     {
         return [
             'documents.*.type' => ['required', Rule::in(array_keys(Vacancy::DOCUMENT_TYPES))],
-            'documents.*.file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'documents.*.file' => ['bail', 'required', 'file', new ReadableUpload, 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
     }
 }

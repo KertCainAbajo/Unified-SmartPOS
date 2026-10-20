@@ -14,10 +14,21 @@ interface RegisterInput {
 /** Owners sign in with email; company-managed staff with business code + username. */
 export type LoginCredentials = { email: string; password: string } | { business_code: string; username: string; password: string; branch_id?: number };
 
+/** Sign-in from a browser this email account has not confirmed: a 6-digit code was emailed. */
+export interface LoginChallenge {
+  challenge: string;
+  email_hint: string;
+  expires_in_minutes: number;
+  resend_after_seconds: number;
+}
+
 interface AuthValue {
   user: User | null;
   loading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  /** Resolves with a challenge when an emailed code is still needed; otherwise the user is signed in. */
+  login: (credentials: LoginCredentials) => Promise<LoginChallenge | null>;
+  verifyLoginCode: (challenge: string, code: string, trustDevice: boolean) => Promise<void>;
+  resendLoginCode: (challenge: string) => Promise<number>;
   register: (input: RegisterInput) => Promise<{ tenantId: number }>;
   logout: () => Promise<void>;
   refresh: () => Promise<unknown>;
@@ -55,11 +66,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: LoginCredentials) => {
       // No device_name: the backend starts a session instead of issuing a token.
-      await api('/auth/login', { method: 'POST', body: credentials });
+      const result = await api<Partial<LoginChallenge> & { two_factor_required?: boolean }>('/auth/login', { method: 'POST', body: credentials });
+      if (result?.two_factor_required) return result as LoginChallenge;
+      resetUserData(queryClient);
+      await me.refetch();
+      return null;
+    },
+    [queryClient, me],
+  );
+
+  const verifyLoginCode = useCallback(
+    async (challenge: string, code: string, trustDevice: boolean) => {
+      await api('/auth/login/verify', { method: 'POST', body: { challenge, code, trust_device: trustDevice } });
       resetUserData(queryClient);
       await me.refetch();
     },
     [queryClient, me],
+  );
+
+  const resendLoginCode = useCallback(
+    async (challenge: string) => (await api<{ resend_after_seconds: number }>('/auth/login/resend', { method: 'POST', body: { challenge } })).resend_after_seconds,
+    [],
   );
 
   const register = useCallback(
@@ -82,8 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo<AuthValue>(
-    () => ({ user: me.data ?? null, loading: me.isPending, login, register, logout, refresh: me.refetch }),
-    [me.data, me.isPending, me.refetch, login, register, logout],
+    () => ({ user: me.data ?? null, loading: me.isPending, login, verifyLoginCode, resendLoginCode, register, logout, refresh: me.refetch }),
+    [me.data, me.isPending, me.refetch, login, verifyLoginCode, resendLoginCode, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

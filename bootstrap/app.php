@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA cookie authentication for first-party browser clients listed in SANCTUM_STATEFUL_DOMAINS.
         $middleware->statefulApi();
+        $middleware->append(SecurityHeaders::class);
+        // The trusted-device cookie is random and checked by hash; it does not need Laravel's cookie encryption.
+        $middleware->encryptCookies(except: ['smartpos_device']);
 
         $middleware->alias([
             'tenant' => ResolveTenant::class,
