@@ -107,42 +107,39 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
     <>
       <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
-      <section aria-label="Store highlights" className="hidden gap-3 sm:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+      <section aria-label="Store highlights" className="hidden sm:block">
         {/* Welcome banner */}
-        <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white shadow-sm lg:px-8 lg:py-7">
-          <span aria-hidden className="absolute -left-16 -top-24 -z-10 size-72 rounded-full bg-emerald-500/25 blur-[80px]" />
-          <span aria-hidden className="absolute -bottom-28 right-24 -z-10 size-72 rounded-full bg-amber-400/15 blur-[90px]" />
-          <div className="relative max-w-xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold ring-1 ring-white/15">
-              <span className="size-1.5 rounded-full bg-emerald-400" />
-              Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
-            </span>
-            <h2 className="mt-3 font-display text-2xl font-bold leading-tight tracking-tight lg:text-[28px]">
-              Your neighborhood store, <span className="text-amber-300">now online.</span>
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-emerald-50/75">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
-            <div className="mt-5 flex flex-wrap gap-2.5">
-              <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-emerald-950 transition hover:bg-amber-200">
-                Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
-              </button>
-              {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
-            </div>
+        <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white lg:px-8">
+          <span aria-hidden className="absolute -right-20 -top-28 -z-10 size-80 rounded-full bg-emerald-400/20 blur-[80px]" />
+          <span aria-hidden className="absolute -bottom-32 left-1/3 -z-10 size-72 rounded-full bg-amber-300/10 blur-[90px]" />
+          <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.16em] text-emerald-200">
+            <span className="size-1.5 rounded-full bg-emerald-400" />
+            Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
+          </p>
+          <h2 className="mt-2 max-w-xl font-display text-2xl font-bold leading-tight tracking-tight lg:text-[28px]">
+            Your neighborhood store, <span className="text-amber-300">now online.</span>
+          </h2>
+          <p className="mt-2 max-w-lg text-sm leading-6 text-emerald-50/70">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
+          <div className="mt-5 flex flex-wrap gap-2.5">
+            <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-emerald-950 transition hover:bg-amber-100">
+              Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
+            </button>
+            {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
           </div>
-
         </article>
 
-        {/* Ways to order */}
-        <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+        {/* Ways to order: one slim strip */}
+        <ul className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white">
           {[
-            { icon: Bike, title: 'Delivery to your door', text: 'Cash on delivery. Track your rider on the map.', tone: 'bg-orange-50 text-orange-600 ring-orange-100' },
-            { icon: Store, title: `Pickup at ${branchCount > 1 ? `${branchCount} branches` : 'the store'}`, text: 'Pick a branch and collect when it is ready.', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
-            { icon: Wallet, title: 'Pay when you get it', text: 'No card needed and no online fees.', tone: 'bg-sky-50 text-sky-700 ring-sky-100' },
-          ].map(({ icon: Icon, title, text, tone }) => (
-            <li key={title} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-slate-200/80">
-              <span className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ${tone}`}><Icon className="size-5" /></span>
+            { icon: Bike, title: 'Delivery', text: 'Cash on delivery, live rider map' },
+            { icon: Store, title: branchCount > 1 ? `Pickup at ${branchCount} branches` : 'Store pickup', text: 'Collect when it is ready' },
+            { icon: Wallet, title: 'Pay when you get it', text: 'No card, no online fees' },
+          ].map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-center gap-3 px-4 py-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Icon className="size-[18px]" /></span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-900">{title}</span>
-                <span className="block text-xs leading-5 text-slate-500">{text}</span>
+                <span className="block truncate text-sm font-semibold text-slate-900">{title}</span>
+                <span className="block truncate text-xs text-slate-500">{text}</span>
               </span>
             </li>
           ))}

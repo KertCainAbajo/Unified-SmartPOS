@@ -226,7 +226,7 @@ export function ShopPage() {
     return added;
   };
 
-  return <div className={`min-h-screen bg-white text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
+  return <div className={`min-h-screen bg-[#f7f8f7] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
     <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
     {platformInfo.demo && (
@@ -235,7 +235,7 @@ export function ShopPage() {
       </p>
     )}
     <AppDownloadBanner />
-    <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
+    <header className="relative z-30 border-b border-slate-200/80 bg-white">
       <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
@@ -271,7 +271,7 @@ export function ShopPage() {
       </div>
 
       {/* Categories: one row of pills; on smaller screens it slides sideways (fades and arrows show there are more). */}
-      <nav aria-label="Categories" className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50/60">
+      {categories.length > 1 && <nav aria-label="Categories" className="border-t border-slate-100 bg-white">
         <div className="mx-auto max-w-[1280px] py-2.5 lg:px-8">
           <CategoryRail>
             {categories.map((category, i) => {
@@ -290,10 +290,10 @@ export function ShopPage() {
             </button>}
           </CategoryRail>
         </div>
-      </nav>
+      </nav>}
     </header>
 
-    <div id="top" className="mx-auto max-w-[1280px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+    <div id="top" className="mx-auto max-w-[1280px] px-4 pt-5 sm:px-6 lg:px-8 lg:pt-6">
       {signedIn && (
         <div className="mb-4 flex items-center gap-3 sm:hidden">
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 font-display text-lg font-extrabold text-emerald-950 shadow-sm">{firstName.charAt(0).toUpperCase()}</span>
@@ -303,12 +303,12 @@ export function ShopPage() {
           </div>
         </div>
       )}
-      <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main id="main-content" className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <main id="main-content" className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section id="products" className="min-w-0 scroll-mt-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
+          <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
               <h2 className="mt-0.5 font-display text-xl font-bold tracking-tight sm:text-2xl">{selectedCategory}</h2>
@@ -334,11 +334,11 @@ export function ShopPage() {
 
         {/* ───────── Basket ───────── */}
         <aside className="min-w-0 space-y-5 lg:sticky lg:top-4 lg:-m-1.5 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:p-1.5 [scrollbar-width:thin]">
-          <section id="basket" className="scroll-mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
+          <section id="basket" className="scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-emerald-900 text-amber-300"><ShoppingBasket size={19} /></span>
-              <div><h2 className="font-display text-lg font-bold leading-tight">Your basket</h2><p className="text-xs text-slate-500">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : `${fulfilment === 'pickup' ? 'Pickup' : 'Delivery'} order`}</p></div>
+                <span className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><ShoppingBasket size={18} /></span>
+              <div><h2 className="font-display text-base font-bold leading-tight">Your basket</h2><p className="text-xs text-slate-500">{basketCount ? `${basketCount} ${basketCount === 1 ? 'item' : 'items'}` : `${fulfilment === 'pickup' ? 'Pickup' : 'Delivery'} order`}</p></div>
               </div>
               {lines.length > 0 && <button onClick={() => setCart({})} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Clear</button>}
             </div>
@@ -367,8 +367,8 @@ export function ShopPage() {
                     </div>
                   </li>;
                 })}
-              </ul> : !justPlaced && <div className="rounded-2xl border-2 border-dashed border-slate-200 px-5 py-8 text-center">
-                <span className="mx-auto grid size-12 place-items-center rounded-full bg-slate-50 text-slate-300"><ShoppingBasket size={22} /></span>
+              </ul> : !justPlaced && <div className="rounded-xl bg-slate-50 px-5 py-6 text-center">
+                <span className="mx-auto grid size-10 place-items-center rounded-full bg-white text-slate-300 ring-1 ring-slate-200"><ShoppingBasket size={18} /></span>
                 <p className="mt-3 text-sm font-semibold text-slate-700">Your basket is empty</p>
                 <p className="mt-1 text-xs text-slate-400">Tap <b className="text-slate-500">Add</b> on a product to start your order.</p>
               </div>}
@@ -445,7 +445,7 @@ export function ShopPage() {
             </div>
           </section>
 
-          {signedIn && <section className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/80">
+          {signedIn && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="grid size-10 place-items-center rounded-xl bg-amber-100 text-amber-700"><Receipt size={18} /></span>
@@ -740,9 +740,9 @@ function OrderCard({ order, cancelling, onCancel, onTrack }: { order: Order; can
 }
 
 function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
-  return <div className="mt-6 rounded-3xl border-2 border-dashed border-slate-200 bg-white px-6 py-14 text-center">
-    <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-50 text-slate-300"><Search size={24} /></span>
-    <p className="mt-4 font-display text-lg font-bold">{title}</p>
+  return <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center">
+    <span className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-50 text-emerald-600"><ShoppingBasket size={22} /></span>
+    <p className="mt-4 font-display text-base font-bold text-slate-900">{title}</p>
     <p className="mt-1 text-sm text-slate-500">{text}</p>
     {action}
   </div>;
