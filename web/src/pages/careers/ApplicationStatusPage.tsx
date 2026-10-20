@@ -1,6 +1,6 @@
-import { CalendarClock, CheckCircle2 } from 'lucide-react';
+import { Briefcase, CalendarClock, CheckCircle2, ChevronDown, KeyRound, Mail, MailCheck, Send } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { HiringSteps } from '../../components/HiringSteps';
 import { Button, ErrorBanner, Field, Input, Textarea } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -51,6 +51,25 @@ export function ApplicationStatusPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Email me my link": the reply is the same whether or not the email has applied.
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [linkError, setLinkError] = useState<unknown>(null);
+  async function sendLink(e: FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setLinkError(null);
+    try {
+      await api('/careers/applications/resend-link', { method: 'POST', body: { email: email.trim() } });
+      setSent(true);
+    } catch (ex) {
+      setLinkError(ex);
+    } finally {
+      setSending(false);
+    }
+  }
+
   function lookUp(e: FormEvent) {
     e.preventDefault();
     setParams({ ref: reference, token });
@@ -60,13 +79,54 @@ export function ApplicationStatusPage() {
   if (!data) {
     return (
       <PublicLayout title="Your job application">
-        <form onSubmit={lookUp} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-600">Open the link in your confirmation email, or enter the details from it.</p>
-          <ErrorBanner error={error} />
-          <Field label="Application reference">{(id) => <Input id={id} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="APP-XXXXXXXX" />}</Field>
-          <Field label="Access key (from the email link)">{(id) => <Input id={id} value={token} onChange={(e) => setToken(e.target.value)} />}</Field>
-          <Button type="submit" loading={busy} disabled={!reference || !token}>View application</Button>
-        </form>
+        <div className="space-y-4">
+          {/* Main way in: get the link by email. */}
+          <section className="overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-30px_rgba(15,23,42,.45)] ring-1 ring-slate-900/[.06]">
+            <div className="relative overflow-hidden bg-gradient-to-br from-brand-700 via-brand-800 to-[#062a1d] p-6 text-white">
+              <span aria-hidden className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-sun-400/25 blur-3xl" />
+              <span className="relative grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-sun-300 to-sun-500 text-brand-900 shadow-lg"><Briefcase className="size-6" /></span>
+              <h2 className="relative mt-4 font-display text-2xl font-extrabold tracking-tight">Check your application</h2>
+              <p className="relative mt-1 text-sm text-brand-100/80">See your stage, interview schedule and job offer. HR, the branch manager and the owner review every application.</p>
+            </div>
+            {sent ? (
+              <div className="sp-rise p-6 text-center">
+                <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-emerald-100 text-emerald-700 ring-8 ring-emerald-50"><MailCheck className="size-7" /></span>
+                <p className="mt-4 font-display text-lg font-bold text-slate-900">Check your email</p>
+                <p className="mt-1 text-sm text-slate-600">If <strong>{email.trim()}</strong> has applied, we sent it a link to each application. Open it on this device. Check Spam too.</p>
+                <button type="button" onClick={() => setSent(false)} className="mt-4 text-sm font-semibold text-brand-700 hover:underline">Use another email</button>
+              </div>
+            ) : (
+              <form onSubmit={sendLink} className="space-y-4 p-6">
+                <ErrorBanner error={linkError} />
+                <Field label="The email you applied with">
+                  {(id) => (
+                    <div className="relative">
+                      <Mail aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input id={id} type="email" required autoComplete="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9" />
+                    </div>
+                  )}
+                </Field>
+                <Button type="submit" loading={sending} disabled={!email.trim()} className="w-full" icon={<Send className="size-4" />}>Email me my application link</Button>
+                <p className="text-center text-xs text-slate-500">For your privacy, the link goes to your email; the page never shows applications to someone who only knows the email.</p>
+                <p className="text-center text-sm text-slate-600">Haven't applied yet? <Link to="/careers/aling-nena-mini-mart" className="font-semibold text-brand-700 hover:underline">See job openings</Link></p>
+              </form>
+            )}
+          </section>
+
+          {/* Second way in: the reference and key from the confirmation email. */}
+          <details open={!!(reference || token) || undefined} className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/[.06]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+              <span className="flex items-center gap-2"><KeyRound className="size-4 text-brand-600" /> I have my reference and access key</span>
+              <ChevronDown className="size-4 text-slate-400 transition group-open:rotate-180" />
+            </summary>
+            <form onSubmit={lookUp} className="mt-4 space-y-4">
+              <ErrorBanner error={error} />
+              <Field label="Application reference" hint="Starts with APP-, e.g. APP-7K2QZ9XB">{(id) => <Input id={id} value={reference} onChange={(e) => setReference(e.target.value.toUpperCase())} placeholder="APP-XXXXXXXX" />}</Field>
+              <Field label="Access key" hint="The long code after token= in your email link (not your email address).">{(id) => <Input id={id} value={token} onChange={(e) => setToken(e.target.value.trim())} />}</Field>
+              <Button type="submit" variant="secondary" loading={busy} disabled={!reference || !token}>View application</Button>
+            </form>
+          </details>
+        </div>
       </PublicLayout>
     );
   }
@@ -74,7 +134,7 @@ export function ApplicationStatusPage() {
   return (
     <PublicLayout title={`${data.business} — ${data.position}`}>
       <div className="space-y-4">
-        {justApplied && (
+        {justApplied && !data.closed && data.step === 1 && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
             <p className="flex items-center gap-2 font-semibold"><CheckCircle2 className="size-4" /> Application submitted</p>
             <p className="mt-1">Your reference is <strong>{data.reference}</strong>. We emailed you a link to this page — keep it, or bookmark this page now. It is the only way to see your application.</p>
@@ -117,18 +177,29 @@ export function ApplicationStatusPage() {
 
         <DocumentsCard data={data} busy={busy} onUpload={(form) => call('documents', form)} />
 
-        {data.can_withdraw && (
-          <p className="text-center text-sm">
-            <button type="button" className="text-slate-500 underline hover:text-red-700" onClick={() => {
-              const reason = prompt('Withdraw your application? You can tell us why (optional).');
-              if (reason !== null) void call('withdraw', { reason });
-            }}>
-              Withdraw my application
-            </button>
-          </p>
-        )}
+        {data.can_withdraw && <WithdrawBox busy={busy} onWithdraw={(reason) => call('withdraw', { reason })} />}
       </div>
     </PublicLayout>
+  );
+}
+
+/** Withdraw with an optional reason, asked on the page (no browser pop-up, which phone app views may block). */
+function WithdrawBox({ busy, onWithdraw }: { busy: boolean; onWithdraw: (reason: string) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  if (!open) {
+    return <p className="text-center text-sm"><button type="button" className="text-slate-500 underline hover:text-red-700" onClick={() => setOpen(true)}>Withdraw my application</button></p>;
+  }
+  return (
+    <section className="rounded-2xl border border-rose-200 bg-rose-50/60 p-5 text-sm">
+      <p className="font-semibold text-rose-900">Withdraw your application?</p>
+      <p className="mt-1 text-rose-900/80">This closes it for good. You can apply again later.</p>
+      <Textarea className="mt-3" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="You can tell us why (optional)" />
+      <div className="mt-3 flex gap-2">
+        <Button variant="danger" loading={busy} onClick={async () => { if (await onWithdraw(reason.trim())) setOpen(false); }}>Withdraw application</Button>
+        <Button variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Keep it</Button>
+      </div>
+    </section>
   );
 }
 

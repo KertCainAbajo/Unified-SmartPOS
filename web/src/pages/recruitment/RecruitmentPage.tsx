@@ -509,7 +509,7 @@ function ScheduleForm({ app, stage }: { app: JobApplication; stage: InterviewSta
 
 function OpenInterview({ app, interview, mine, canManage }: { app: JobApplication; interview: Interview; mine: boolean; canManage: boolean }) {
   const ask = useConfirm();
-  const [mode, setMode] = useState<'view' | 'reschedule' | 'result'>('view');
+  const [mode, setMode] = useState<'view' | 'reschedule' | 'result' | 'cancel'>('view');
   const act = useTenantMutation<{ action: string } & Record<string, unknown>>('POST', (b) => `/applications/${app.id}/interviews/${interview.id}/${b.action}`, { success: 'Saved.', toastErrors: false });
   const [when, setWhen] = useState('');
   const [reason, setReason] = useState('');
@@ -526,7 +526,7 @@ function OpenInterview({ app, interview, mine, canManage }: { app: JobApplicatio
           {mine && interview.status === 'scheduled' && <Button size="sm" onClick={() => setMode('result')}>Record interview result</Button>}
           {!mine && <span className="self-center text-slate-500">Only {interview.interviewer_name} can record the result.</span>}
           {canManage && <Button size="sm" variant="secondary" onClick={() => setMode('reschedule')}>Reschedule</Button>}
-          {canManage && <Button size="sm" variant="secondary" onClick={() => { const r = prompt('Why is this interview cancelled?'); if (r) act.mutate({ action: 'cancel', reason: r }); }}>Cancel interview</Button>}
+          {canManage && <Button size="sm" variant="secondary" onClick={() => { setReason(''); setMode('cancel'); }}>Cancel interview</Button>}
           {(mine || canManage) && interview.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={async () => { if (await ask({ title: 'Mark the applicant as a no-show?', confirmLabel: 'Mark no-show' })) act.mutate({ action: 'no-show' }); }}>Applicant did not show up</Button>}
         </div>
       )}
@@ -537,6 +537,15 @@ function OpenInterview({ app, interview, mine, canManage }: { app: JobApplicatio
           <div className="flex gap-2">
             <Button size="sm" loading={act.isPending} disabled={!when || !reason} onClick={() => act.mutate({ action: 'reschedule', scheduled_at: new Date(when).toISOString(), reason }, { onSuccess: () => setMode('view') })}>Save</Button>
             <Button size="sm" variant="ghost" onClick={() => setMode('view')}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {mode === 'cancel' && (
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+          <Field label="Why is this interview cancelled?">{(id) => <Textarea id={id} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />}</Field>
+          <div className="flex gap-2">
+            <Button size="sm" variant="danger" loading={act.isPending} disabled={!reason.trim()} onClick={() => act.mutate({ action: 'cancel', reason: reason.trim() }, { onSuccess: () => setMode('view') })}>Cancel interview</Button>
+            <Button size="sm" variant="ghost" onClick={() => setMode('view')}>Keep it</Button>
           </div>
         </div>
       )}
@@ -624,7 +633,10 @@ function OfferForm({ onSubmit, busy, defaultPosition }: { onSubmit: (b: Record<s
 
 function Onboarding({ app, onProvisioned }: { app: JobApplication; onProvisioned: (c: Credentials) => void }) {
   const { can } = useTenant();
+  const [ticking, setTicking] = useState<Record<number, boolean>>({});
   const task = useTenantMutation<{ taskId: number; done: boolean }>('PATCH', (b) => `/applications/${app.id}/onboarding-tasks/${b.taskId}`, {});
+  // The box changes at once; the saved state takes over when the application reloads, or the tick is undone on error.
+  useEffect(() => setTicking({}), [app.onboarding_tasks]);
   const [email, setEmail] = useState(app.email);
   const [requireChange, setRequireChange] = useState(false);
   const roles = useTenantQuery<{ data: Role[] }>('/roles');
@@ -639,14 +651,14 @@ function Onboarding({ app, onProvisioned }: { app: JobApplication; onProvisioned
         <p className="mb-2 font-medium text-slate-800">Onboarding checklist</p>
         {app.onboarding_tasks?.length ? (
           <div className="mb-2 flex items-center gap-2 text-xs text-slate-500">
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200"><span className="block h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600" style={{ width: `${(app.onboarding_tasks.filter((t) => t.completed_at).length / app.onboarding_tasks.length) * 100}%` }} /></span>
-            {app.onboarding_tasks.filter((t) => t.completed_at).length}/{app.onboarding_tasks.length} done
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200"><span className="block h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600" style={{ width: `${(app.onboarding_tasks.filter((t) => ticking[t.id] ?? t.completed_at).length / app.onboarding_tasks.length) * 100}%` }} /></span>
+            {app.onboarding_tasks.filter((t) => ticking[t.id] ?? t.completed_at).length}/{app.onboarding_tasks.length} done
           </div>
         ) : null}
         <ul className="space-y-1">
           {app.onboarding_tasks?.map((t) => (
             <li key={t.id}>
-              <Checkbox label={`${t.label}${t.required ? '' : ' (optional)'}`} checked={!!t.completed_at} disabled={!can('recruitment.hr')} onChange={(v) => task.mutate({ taskId: t.id, done: v })} />
+              <Checkbox label={`${t.label}${t.required ? '' : ' (optional)'}`} checked={ticking[t.id] ?? !!t.completed_at} disabled={!can('recruitment.hr')} onChange={(v) => { setTicking((m) => ({ ...m, [t.id]: v })); task.mutate({ taskId: t.id, done: v }, { onError: () => setTicking(({ [t.id]: _undo, ...rest }) => rest) }); }} />
             </li>
           ))}
         </ul>
@@ -752,7 +764,7 @@ function VacancyForm({ vacancy, onClose }: { vacancy: Vacancy | null; onClose: (
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} onClick={() => save.mutate({ ...form, slots: Number(form.slots), branch_id: Number(form.branch_id), role_id: Number(form.role_id), required_documents: docs })}>Save</Button></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         {save.error instanceof ApiError && !Object.keys(save.error.errors).length && <ErrorBanner error={save.error} className="sm:col-span-2" />}
-        <Field label="Position title" error={err('title')}>{(id) => <Input id={id} value={form.title} onChange={set('title')} />}</Field>
+        <Field label="Position title" error={err('title')} hint="The job name applicants see on the careers page.">{(id) => <Input id={id} value={form.title} onChange={set('title')} placeholder="e.g. Cashier, Delivery Rider" />}</Field>
         <Field label="Status" error={err('status')} hint="Only open vacancies appear on the careers page.">{(id) => <Select id={id} value={form.status} onChange={set('status')}><option value="draft">Draft</option><option value="open">Open</option><option value="closed">Closed</option></Select>}</Field>
         <Field label="Branch" error={err('branch_id')}>{(id) => <Select id={id} value={form.branch_id} onChange={set('branch_id')}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}</Field>
         <Field label="SmartPOS role on hire" error={err('role_id')}>{(id) => <Select id={id} value={form.role_id} onChange={set('role_id')}><option value="">Choose…</option>{roles.data?.data.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select>}</Field>

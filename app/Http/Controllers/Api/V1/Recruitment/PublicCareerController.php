@@ -80,6 +80,15 @@ class PublicCareerController extends Controller
         ], 201)->header('Cache-Control', 'no-store');
     }
 
+    /** Email the applicant fresh links to their applications. Always the same answer, so emails cannot be probed. */
+    public function resendLink(Request $request): JsonResponse
+    {
+        $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $this->recruitment->resendStatusLinks($data['email']);
+
+        return response()->json(['message' => 'If this email has applied, we sent it a link to each application. Check your inbox and spam folder.']);
+    }
+
     /** Application status for the applicant (reference + token). */
     public function status(Request $request): JsonResponse
     {

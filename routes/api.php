@@ -63,6 +63,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('{business}/vacancies', [PublicCareerController::class, 'vacancies'])->middleware('throttle:60,1')->withoutMiddleware('throttle:public-applications')->name('vacancies');
         Route::post('{business}/vacancies/{vacancy}/apply', [PublicCareerController::class, 'apply'])->whereNumber('vacancy')->name('apply');
         Route::post('applications/status', [PublicCareerController::class, 'status'])->name('status');
+        Route::post('applications/resend-link', [PublicCareerController::class, 'resendLink'])->name('resend-link');
         Route::post('applications/documents', [PublicCareerController::class, 'upload'])->name('documents');
         Route::post('applications/withdraw', [PublicCareerController::class, 'withdraw'])->name('withdraw');
         Route::post('applications/offer-response', [PublicCareerController::class, 'offerResponse'])->name('offer-response');

@@ -150,7 +150,11 @@ class RecruitmentService
             return $application;
         });
 
-        $this->notifyHr($application, 'application_received', 'New job application', "{$application->fullName()} applied for {$vacancy->title}.");
+        // Everyone who looks after hiring hears about a new applicant: HR, the owner and the branch managers.
+        DB::afterCommit(fn () => $this->notifications->notifyPermissionHolders(
+            $application->tenant_id, $application->branch_id, P::RECRUITMENT_VIEW, 'application_received', 'New job application',
+            "{$application->fullName()} applied for {$vacancy->title}.", ['application_id' => $application->id],
+        ));
         $this->mailApplicant($application, 'submitted', 'Application received', [
             "Thank you for applying for {$vacancy->title}. We have received your application and will review it.",
         ], $this->statusUrl($application, $token));
@@ -943,6 +947,23 @@ class RecruitmentService
         $this->assertVisible($document->application);
 
         return Storage::disk('local')->get($document->path) ?? '';
+    }
+
+    /**
+     * "Email me my link": sends a fresh status link for every application made with this email (older links stop
+     * working). Returns nothing, so the reply never reveals whether an email has applied.
+     */
+    public function resendStatusLinks(string $email): void
+    {
+        $applications = JobApplication::query()->where('email', mb_strtolower(trim($email)))->with('vacancy:id,title')->latest('id')->limit(10)->get();
+        foreach ($applications as $application) {
+            $token = Str::random(48);
+            $application->forceFill(['status_token_hash' => hash('sha256', $token)])->save();
+            $this->mailApplicant($application, 'link', 'Your application link', [
+                'You asked for the link to your application'.($application->vacancy ? " for {$application->vacancy->title}" : '').'.',
+                "Reference: {$application->reference}. Use the button below to see its status. Earlier links no longer work.",
+            ], $this->statusUrl($application, $token));
+        }
     }
 
     private function newReference(): string
