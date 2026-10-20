@@ -226,7 +226,7 @@ export function ShopPage() {
     return added;
   };
 
-  return <div className={`min-h-screen bg-[#f5f7f4] text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
+  return <div className={`min-h-screen bg-white text-slate-900 ${lines.length ? 'pb-24 lg:pb-0' : ''}`}>
     {/* ───────── Header ───────── */}
     <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
     {platformInfo.demo && (
@@ -236,7 +236,7 @@ export function ShopPage() {
     )}
     <AppDownloadBanner />
     <header className="relative z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1920px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
+      <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
@@ -272,7 +272,7 @@ export function ShopPage() {
 
       {/* Categories: one row of pills; on smaller screens it slides sideways (fades and arrows show there are more). */}
       <nav aria-label="Categories" className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50/60">
-        <div className="mx-auto max-w-[1920px] py-2.5 lg:px-8">
+        <div className="mx-auto max-w-[1280px] py-2.5 lg:px-8">
           <CategoryRail>
             {categories.map((category, i) => {
               const Icon = category === ALL ? LayoutGrid : iconFor(category);
@@ -293,7 +293,7 @@ export function ShopPage() {
       </nav>
     </header>
 
-    <div id="top" className="mx-auto max-w-[1920px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+    <div id="top" className="mx-auto max-w-[1280px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
       {signedIn && (
         <div className="mb-4 flex items-center gap-3 sm:hidden">
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 font-display text-lg font-extrabold text-emerald-950 shadow-sm">{firstName.charAt(0).toUpperCase()}</span>
@@ -306,7 +306,7 @@ export function ShopPage() {
       <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main id="main-content" className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <main id="main-content" className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section id="products" className="min-w-0 scroll-mt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -327,13 +327,13 @@ export function ShopPage() {
             ? <EmptyState title="No products yet" text="This store hasn't listed anything online yet. Please check back soon." />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
-              : <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 min-[1700px]:grid-cols-5">
+              : <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
                 {visibleProducts.map((product) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
               </div>}
         </section>
 
         {/* ───────── Basket ───────── */}
-        <aside className="min-w-0 space-y-5 lg:self-start">
+        <aside className="min-w-0 space-y-5 lg:sticky lg:top-4 lg:-m-1.5 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:p-1.5 [scrollbar-width:thin]">
           <section id="basket" className="scroll-mt-4 overflow-hidden rounded-3xl bg-white shadow-[0_20px_50px_-28px_rgba(6,50,35,.45)] ring-1 ring-slate-200/80">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
@@ -467,7 +467,7 @@ export function ShopPage() {
 
     {/* ───────── Footer ───────── */}
     <footer className="bg-[#0a3d2c] text-emerald-50/80">
-      <div className="mx-auto grid max-w-[1920px] gap-5 px-4 pb-5 pt-6 sm:gap-8 sm:px-6 sm:py-8 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1280px] gap-5 px-4 pb-5 pt-6 sm:gap-8 sm:px-6 sm:py-8 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-9 rounded-xl bg-white object-contain p-1" /><p className="font-display text-base font-bold text-white">{shop.business.name}</p></div>
           <p className="mt-2.5 max-w-sm text-xs leading-5 sm:mt-3 sm:text-[13px] sm:leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
@@ -749,9 +749,9 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 }
 
 function ShopLoading() {
-  return <div className="min-h-screen bg-[#f5f7f4]">
+  return <div className="min-h-screen bg-white">
     <div className="h-[118px] border-b border-slate-200 bg-white" />
-    <div className="mx-auto max-w-[1920px] px-4 pt-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1280px] px-4 pt-8 sm:px-6 lg:px-8">
       <div className="h-72 animate-pulse rounded-[32px] bg-emerald-900/10" />
       <div className="mt-8 grid grid-cols-2 gap-5 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <div key={i} className="h-72 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />)}</div>
     </div>

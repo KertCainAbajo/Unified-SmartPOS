@@ -91,8 +91,8 @@ function BasketBody() {
 }
 
 /**
- * Storefront hero. Phones: swipeable promo cards. Tablets and computers: a compact welcome banner (with a few
- * product photos when the store has them) beside three short cards on the ways to order.
+ * Storefront hero. Phones: swipeable promo cards. Tablets and computers: a compact welcome banner beside three
+ * short cards on the ways to order.
  */
 export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCount = 0 }: {
   photos: PhotoItem[]; signedIn: boolean; onCreateAccount: () => void;
@@ -102,13 +102,12 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
 }) {
   const withPhotos = photos.filter((photo) => photo.image_url);
   const pool = withPhotos.length >= 3 ? withPhotos : photos;
-  const floating = pool.slice(3, 6);
 
   return (
     <>
       <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
-      <section aria-label="Store highlights" className="hidden gap-3 sm:grid lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section aria-label="Store highlights" className="hidden gap-3 sm:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
         {/* Welcome banner */}
         <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white shadow-sm lg:px-8 lg:py-7">
           <span aria-hidden className="absolute -left-16 -top-24 -z-10 size-72 rounded-full bg-emerald-500/25 blur-[80px]" />
@@ -130,16 +129,6 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
             </div>
           </div>
 
-          {/* A few product photos, only when the store has them */}
-          {floating.some((p) => p.image_url) && (
-            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-6 hidden items-center gap-3 xl:flex">
-              {floating.filter((p) => p.image_url).map((p, i) => (
-                <span key={p.name} className="grid size-24 place-items-center rounded-2xl bg-white p-2.5 shadow-xl shadow-black/30" style={{ transform: `rotate(${[-6, 4, -2][i] ?? 0}deg) translateY(${[6, -8, 4][i] ?? 0}px)` }}>
-                  <img src={p.image_url as string} alt="" className="size-full object-contain" />
-                </span>
-              ))}
-            </div>
-          )}
         </article>
 
         {/* Ways to order */}
