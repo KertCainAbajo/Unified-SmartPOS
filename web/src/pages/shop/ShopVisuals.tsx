@@ -98,8 +98,10 @@ const peso = (value: string | number) => new Intl.NumberFormat('en-PH', { style:
  * Storefront hero. Phones: swipeable promo cards. Tablets and computers: a "bento" grid — a large feature tile with
  * live store facts and floating product photos, a delivery tile, best sellers you can add straight away, and pay-at-pickup.
  */
-export function ShopHero({ photos, signedIn, onCreateAccount, products = [], branchCount = 0, onAdd }: {
+export function ShopHero({ photos, signedIn, onCreateAccount, onStart, products = [], branchCount = 0, onAdd }: {
   photos: PhotoItem[]; signedIn: boolean; onCreateAccount: () => void;
+  /** "Start shopping": signed-in customers go to the products, guests are asked to sign in first. */
+  onStart: () => void;
   products?: HeroProduct[]; branchCount?: number; onAdd?: (id: number) => void;
 }) {
   const withPhotos = photos.filter((photo) => photo.image_url);
@@ -109,7 +111,7 @@ export function ShopHero({ photos, signedIn, onCreateAccount, products = [], bra
 
   return (
     <>
-      <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} />
+      <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
       <section aria-label="Store highlights" className="hidden gap-4 sm:grid lg:grid-cols-12 lg:grid-rows-[auto_auto]">
         {/* Feature tile */}
@@ -128,9 +130,9 @@ export function ShopHero({ photos, signedIn, onCreateAccount, products = [], bra
           </h2>
           <p className="mt-5 max-w-md text-[15px] leading-7 text-emerald-50/75">Fill your basket, choose pickup or delivery, and pay in cash when you get your order. Live stock from every branch.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <a href="#products" className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-emerald-950 shadow-lg shadow-black/20 transition hover:bg-amber-200">
+            <button type="button" onClick={onStart} className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-emerald-950 shadow-lg shadow-black/20 transition hover:bg-amber-200">
               Start shopping <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
-            </a>
+            </button>
             {!signedIn && <button onClick={onCreateAccount} className="inline-flex h-12 items-center rounded-full bg-white/10 px-6 text-sm font-semibold ring-1 ring-white/25 backdrop-blur transition hover:bg-white/20">Create a free account</button>}
           </div>
           <dl className="mt-9 flex flex-wrap gap-x-8 gap-y-3">
@@ -205,7 +207,7 @@ const BANNERS = [
 ];
 
 /** Phones: compact swipeable promo cards (the next one peeks in), auto-advancing, instead of the tall banner. */
-function PhoneBanners({ photos, signedIn, onCreateAccount }: { photos: PhotoItem[]; signedIn: boolean; onCreateAccount: () => void }) {
+function PhoneBanners({ photos, signedIn, onCreateAccount, onStart }: { photos: PhotoItem[]; signedIn: boolean; onCreateAccount: () => void; onStart: () => void }) {
   const rail = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const go = (i: number) => {
@@ -231,7 +233,7 @@ function PhoneBanners({ photos, signedIn, onCreateAccount }: { photos: PhotoItem
               <p className="mt-2 text-xs leading-relaxed text-white/85">{b.text}</p>
               {i === 0 && !signedIn
                 ? <button onClick={onCreateAccount} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-xs font-bold text-emerald-900 shadow-sm active:scale-95">Create free account <ArrowRight size={14} /></button>
-                : <a href="#products" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-xs font-bold text-slate-900 shadow-sm active:scale-95">Shop now <ArrowRight size={14} /></a>}
+                : <button type="button" onClick={onStart} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-xs font-bold text-slate-900 shadow-sm active:scale-95">Shop now <ArrowRight size={14} /></button>}
             </div>
             <div aria-hidden className="relative w-[34%] shrink-0">
               {photos.slice(i * 2, i * 2 + 2).map((p, j) => (

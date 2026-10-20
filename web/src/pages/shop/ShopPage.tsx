@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Apple, ArrowRight, ArrowUpDown, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
+  Apple, ArrowRight, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
   MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ChevronDown, Sparkles, ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowDownAZ,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
@@ -290,7 +290,7 @@ export function ShopPage() {
           </div>
         </div>
       )}
-      <ShopHero photos={shop.data} products={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} onAdd={(id) => { const p = shop.data.find((x) => x.id === id); if (p) setQuantity(p, (cart[id]?.quantity ?? 0) + 1); }} />
+      <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={shop.data} products={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} onAdd={(id) => { const p = shop.data.find((x) => x.id === id); if (p) setQuantity(p, (cart[id]?.quantity ?? 0) + 1); }} />
 
       {/* ───────── Shop + basket ───────── */}
       <main className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -306,17 +306,7 @@ export function ShopPage() {
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products" aria-label="Search products" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
               </label>
-              <label className="relative">
-                <span className="sr-only">Sort products</span>
-                <ArrowUpDown className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="h-11 appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10">
-                  <option value="featured">Featured</option>
-                  <option value="price-asc">Price: low to high</option>
-                  <option value="price-desc">Price: high to low</option>
-                  <option value="name">Name: A to Z</option>
-                </select>
-                <svg className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden><path d="M5.5 7.5 10 12l4.5-4.5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </label>
+              <SortMenu value={sort} onChange={setSort} />
             </div>
           </div>
 
@@ -557,6 +547,61 @@ function productStock(product: ShopProduct, selectedBranch: number | '', branche
  * One sliding row of category pills. Edge fades and arrow buttons appear only while there is more to see in that
  * direction, so customers know to swipe; on wide screens everything fits and they disappear.
  */
+const SORT_OPTIONS: { value: Sort; label: string; hint: string; icon: LucideIcon }[] = [
+  { value: 'featured', label: 'Featured', hint: 'Store picks first', icon: Sparkles },
+  { value: 'price-asc', label: 'Price: low to high', hint: 'Cheapest first', icon: ArrowUpNarrowWide },
+  { value: 'price-desc', label: 'Price: high to low', hint: 'Premium first', icon: ArrowDownWideNarrow },
+  { value: 'name', label: 'Name: A to Z', hint: 'Alphabetical', icon: ArrowDownAZ },
+];
+
+/** Sort dropdown: a styled menu instead of the browser's plain list. Closes on outside click or Escape. */
+function SortMenu({ value, onChange }: { value: Sort; onChange: (sort: Sort) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const current = SORT_OPTIONS.find((o) => o.value === value) ?? SORT_OPTIONS[0];
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [open]);
+
+  return (
+    <div ref={box} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open} aria-label={`Sort products: ${current.label}`}
+        className={`inline-flex h-11 items-center gap-2 rounded-xl bg-white pl-3 pr-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 transition ${open ? 'ring-2 ring-emerald-600' : 'ring-slate-200 hover:ring-slate-300'}`}>
+        <span className="grid size-7 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><current.icon size={15} /></span>
+        <span className="hidden sm:inline">{current.label}</span><span className="sm:hidden">Sort</span>
+        <ChevronDown size={16} className={`text-slate-400 transition duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="Sort products" className="sp-rise absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_24px_50px_-18px_rgba(15,23,42,.35)] ring-1 ring-slate-200">
+          <li className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400" role="presentation">Sort by</li>
+          {SORT_OPTIONS.map((o) => {
+            const active = o.value === value;
+            return (
+              <li key={o.value} role="option" aria-selected={active}>
+                <button type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${active ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${active ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-500'}`}><o.icon size={15} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm font-semibold ${active ? 'text-emerald-900' : 'text-slate-800'}`}>{o.label}</span>
+                    <span className="block text-[11px] text-slate-400">{o.hint}</span>
+                  </span>
+                  {active && <Check size={16} className="shrink-0 text-emerald-700" />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function CategoryRail({ children }: { children: ReactNode }) {
   const rail = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
