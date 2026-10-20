@@ -3,7 +3,7 @@ import {
   Apple, ArrowRight, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
   MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, Soup, SprayCan, Trash2, Wheat, X,
   type LucideIcon,
-  ChevronLeft, ChevronRight, ChevronDown, Sparkles, ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowDownAZ,
+  ChevronLeft, ChevronRight, ChevronDown, Sparkles, ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowDownAZ, Smartphone,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useParams, Link } from 'react-router';
@@ -15,7 +15,8 @@ import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './Customer
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
 import { ShopHero } from './ShopVisuals';
-import { AppDownloadBanner } from './AppDownloadBanner';
+import { ANDROID_APP_URL, AppDownloadBanner } from './AppDownloadBanner';
+import { isShopApp } from '../../lib/shopApp';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
 import { platformInfo } from '../../lib/platformInfo';
@@ -470,6 +471,12 @@ export function ShopPage() {
         <div>
           <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-9 rounded-xl bg-white object-contain p-1" /><p className="font-display text-base font-bold text-white">{shop.business.name}</p></div>
           <p className="mt-2.5 max-w-sm text-xs leading-5 sm:mt-3 sm:text-[13px] sm:leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
+          {!isShopApp() && (
+            <a href={ANDROID_APP_URL} download className="mt-4 inline-flex items-center gap-2.5 rounded-xl bg-white/10 px-3.5 py-2 ring-1 ring-white/15 transition hover:bg-white/15">
+              <Smartphone className="size-5 text-amber-300" />
+              <span className="text-left leading-tight"><span className="block text-[10px] uppercase tracking-wider text-emerald-50/60">Get the app</span><span className="block text-sm font-semibold text-white">Android · Free download</span></span>
+            </a>
+          )}
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-300 sm:text-[11px]">Pickup locations</p>
