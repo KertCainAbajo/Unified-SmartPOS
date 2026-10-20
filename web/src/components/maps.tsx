@@ -146,11 +146,28 @@ export interface PlaceResult { label: string; detail: string; point: LatLng }
 
 const cleanParts = (name: string) => name.split(', ').filter((part) => !/^\d{4}$/.test(part) && part !== 'Philippines');
 
+/** The parts of an address OpenStreetMap knows at a point, used to fill the region/province/city/barangay fields. */
+export interface AddressParts { region?: string; province?: string; city?: string; barangays: string[]; postcode?: string }
+
 /** Street address at a point (OpenStreetMap Nominatim). Returns '' when nothing useful is found. */
 export async function reverseGeocode(point: LatLng, signal?: AbortSignal): Promise<string> {
-  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=0&lat=${point.lat}&lon=${point.lng}`, { headers: { Accept: 'application/json' }, signal });
-  const json = (await res.json()) as { display_name?: string };
-  return json.display_name ? cleanParts(json.display_name).slice(0, 5).join(', ') : '';
+  return (await reverseGeocodeDetails(point, signal)).label;
+}
+
+/** Street address at a point plus its region, province, city, barangay and postal code. */
+export async function reverseGeocodeDetails(point: LatLng, signal?: AbortSignal): Promise<{ label: string; parts: AddressParts }> {
+  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${point.lat}&lon=${point.lng}`, { headers: { Accept: 'application/json' }, signal });
+  const json = (await res.json()) as { display_name?: string; address?: Record<string, string> };
+  const a = json.address ?? {};
+  return {
+    label: json.display_name ? cleanParts(json.display_name).slice(0, 5).join(', ') : '',
+    parts: {
+      region: a.region, province: a.province ?? a.state ?? a.county, city: a.city ?? a.town ?? a.municipality,
+      // Barangays appear under different keys depending on the area; the most specific come first.
+      barangays: [a.quarter, a.village, a.neighbourhood, a.suburb, a.hamlet, a.city_district].filter((v): v is string => !!v),
+      postcode: a.postcode,
+    },
+  };
 }
 
 /** Places matching typed text, Philippines only, nearer `near` first when given. */
@@ -177,7 +194,7 @@ export function LocationPicker({ value, onChange, start, onAddress, onResolvedAd
   /** Shows "Near: …" under the map with a button that passes the address on. */
   onAddress?: (address: string) => void;
   /** Called automatically with the street address each time the pin settles. */
-  onResolvedAddress?: (address: string) => void;
+  onResolvedAddress?: (address: string, parts?: AddressParts) => void;
   /** Move the map here (e.g. a search result). The new centre is also reported as the pin. */
   flyTo?: LatLng | null;
   /** Pixels, or any CSS length such as '100%' to fill the parent. */
@@ -209,10 +226,10 @@ export function LocationPicker({ value, onChange, start, onAddress, onResolvedAd
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const address = await reverseGeocode(value, controller.signal);
+        const { label: address, parts } = await reverseGeocodeDetails(value, controller.signal);
         if (id !== lookup.current || !address) return;
         setNear(address);
-        resolved.current?.(address);
+        resolved.current?.(address, parts);
       } catch { /* offline or rate-limited: the pin still works without an address */ }
     }, 900);
     return () => { window.clearTimeout(timer); controller.abort(); };

@@ -1,6 +1,8 @@
 import { ArrowLeft, Check, Home, LoaderCircle, MapPin, MessageSquareText, Search, Store, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { LocationPicker, distanceKm, formatKm, searchPlaces, type LatLng, type PlaceResult } from '../../components/maps';
+import { useQueryClient } from '@tanstack/react-query';
+import { matchArea } from './areaMatch';
+import { LocationPicker, distanceKm, formatKm, searchPlaces, type AddressParts, type LatLng, type PlaceResult } from '../../components/maps';
 import { AreaPicker, areaComplete, emptyAreaPath, type AreaPath } from './AreaPicker';
 import { StreetField, plainBarangay } from './StreetSuggest';
 
@@ -61,18 +63,32 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
   const [resolving, setResolving] = useState(false);
   /** True while the street field holds what the map found (not something the customer typed). */
   const streetFromMap = useRef(!initial.street);
+  /** True when the pin was last moved by the customer (drag, "Use my location", map search): its address then fills the area fields. */
+  const fillArea = useRef(false);
+  const [areaFilled, setAreaFilled] = useState<'idle' | 'finding' | 'done' | 'partial'>('idle');
+  const queryClient = useQueryClient();
   const onPinChange = (point: LatLng) => {
     setPin(point);
     setResolving(true);
-    if (Date.now() > automaticUntil.current) { setPinByHand(true); setPinNotice(''); }
+    if (Date.now() > automaticUntil.current) { setPinByHand(true); setPinNotice(''); fillArea.current = true; }
   };
   const [street, setStreet] = useState(initial.street);
   const [postal, setPostal] = useState(initial.postal);
   const [note, setNote] = useState(initial.note);
   const [suggestion, setSuggestion] = useState('');
-  const onResolved = (address: string) => {
+  const onResolved = (address: string, parts?: AddressParts) => {
     setSuggestion(address);
     setResolving(false);
+    if (parts && fillArea.current) {
+      fillArea.current = false;
+      setAreaFilled('finding');
+      matchArea(parts, queryClient).then((found) => {
+        if (!found) { setAreaFilled('idle'); return; }
+        setArea(found.area);
+        if (found.postal && /^\d{4}$/.test(found.postal)) setPostal(found.postal);
+        setAreaFilled(found.area.barangay ? 'done' : 'partial');
+      }).catch(() => setAreaFilled('idle'));
+    }
     // Fill the street from where the pin stopped, unless the customer typed their own.
     const streetPart = address.split(', ').slice(0, 2).join(', ');
     if (streetPart && streetFromMap.current) setStreet(streetPart);
@@ -108,6 +124,8 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
 
   /** After a barangay is chosen, centre the map on it so the customer only has to fine-tune the pin. */
   async function changeArea(next: AreaPath) {
+    fillArea.current = false;
+    setAreaFilled('idle');
     const barangayChanged = next.barangay?.code !== area.barangay?.code;
     setArea(next);
     if (!next.barangay || !barangayChanged) return;
@@ -125,6 +143,7 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
 
   const pick = (place: PlaceResult) => {
     moveTo(place.point);
+    fillArea.current = true;
     if (!street.trim() || streetFromMap.current) { setStreet(place.label); streetFromMap.current = false; }
     setQuery('');
     setResults([]);
@@ -207,6 +226,9 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
           <div className="block">
             <span className="mb-1.5 block text-sm font-semibold text-slate-800">Region, Province, City, Barangay</span>
             <AreaPicker value={area} onChange={(next) => void changeArea(next)} />
+            {areaFilled === 'finding' && <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle className="size-3.5 animate-spin" /> Filling in the address from the pin…</p>}
+            {areaFilled === 'done' && <p className="sp-alert-in mt-1.5 flex items-center gap-1.5 text-xs font-medium text-emerald-700"><Check className="size-3.5" /> Filled in from where you put the pin. Change it if it is wrong.</p>}
+            {areaFilled === 'partial' && <p className="sp-alert-in mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-700"><MapPin className="size-3.5" /> Filled in what the map knows. Please choose your barangay.</p>}
           </div>
 
           <label className="block">
