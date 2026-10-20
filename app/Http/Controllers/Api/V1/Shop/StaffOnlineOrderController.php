@@ -65,8 +65,8 @@ class StaffOnlineOrderController extends Controller
             ->when($request->filled('date_to'), fn ($q) => $q->where('placed_at', '<=', Carbon::parse($request->string('date_to'), $tz)->endOfDay()->utc()))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-                $q->where(fn ($w) => $w->where('order_number', 'like', $term)->orWhere('contact_name', 'like', $term)
-                    ->orWhere('contact_phone', 'like', $term)->orWhere('delivery_address', 'like', $term));
+                $q->where(fn ($w) => $w->whereLike('order_number', $term)->orWhereLike('contact_name', $term)
+                    ->orWhereLike('contact_phone', $term)->orWhereLike('delivery_address', $term));
             });
 
         $summary = $this->summarize((clone $query)->get(['id', 'fulfilment', 'status', 'estimated_total', 'placed_at', 'completed_at', 'cancelled_by', 'cancel_reason']));

@@ -43,7 +43,7 @@ class ProductController extends Controller
             ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->integer('category_id')))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-                $q->where(fn ($w) => $w->where('name', 'like', $term)->orWhere('sku', 'like', $term)->orWhere('barcode', 'like', $term));
+                $q->where(fn ($w) => $w->whereLike('name', $term)->orWhereLike('sku', $term)->orWhereLike('barcode', $term));
             })
             ->when($request->boolean('with_stock'), fn ($q) => $q->with(['inventory' => fn ($i) => $this->scopeToAccessibleBranches($i)]))
             ->orderBy('name')

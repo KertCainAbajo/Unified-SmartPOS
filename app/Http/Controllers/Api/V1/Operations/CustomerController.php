@@ -25,7 +25,7 @@ class CustomerController extends Controller
             ->when(! $request->boolean('include_inactive'), fn ($q) => $q->where('is_active', true))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-                $q->where(fn ($w) => $w->where('name', 'like', $term)->orWhere('phone', 'like', $term)->orWhere('email', 'like', $term));
+                $q->where(fn ($w) => $w->whereLike('name', $term)->orWhereLike('phone', $term)->orWhereLike('email', $term));
             })
             ->orderBy('name')
             ->paginate($this->perPage($request));

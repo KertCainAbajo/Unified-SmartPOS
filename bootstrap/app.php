@@ -25,6 +25,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum SPA cookie authentication for first-party browser clients listed in SANCTUM_STATEFUL_DOMAINS.
         $middleware->statefulApi();
         $middleware->append(SecurityHeaders::class);
+        // The API answers 401 to signed-out requests (there is no server-side sign-in page to redirect to).
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : rtrim((string) config('smartpos.frontend_url'), '/').'/login');
+        // Behind a hosting proxy (Vercel): TRUSTED_PROXIES=* so the real visitor IP is used for sign-in limits and
+        // HTTPS is detected. Leave unset when the app is reachable directly, or anyone could fake their IP.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
         // The trusted-device cookie is random and checked by hash; it does not need Laravel's cookie encryption.
         $middleware->encryptCookies(except: ['smartpos_device']);
 

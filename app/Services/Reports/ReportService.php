@@ -31,7 +31,9 @@ class ReportService
 
     public function salesSummary(string $groupBy): array
     {
-        $period = $groupBy === 'month' ? 'SUBSTR(business_date, 1, 7)' : 'SUBSTR(business_date, 1, 10)';
+        // As text first: PostgreSQL has no SUBSTR for dates (MySQL and SQLite convert by themselves).
+        $date = $this->completedSales()->getConnection()->getDriverName() === 'pgsql' ? 'CAST(business_date AS TEXT)' : 'business_date';
+        $period = $groupBy === 'month' ? "SUBSTR({$date}, 1, 7)" : "SUBSTR({$date}, 1, 10)";
 
         $sales = $this->completedSales()
             ->selectRaw("{$period} as period")

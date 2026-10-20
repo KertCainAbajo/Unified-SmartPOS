@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -97,7 +98,7 @@ class PlatformConsoleController extends Controller
         $term = trim((string) ($data['q'] ?? ''));
 
         $users = User::query()
-            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")->orWhere('email', 'like', "%{$term}%")->orWhere('username', 'like', "%{$term}%")))
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->whereLike('name', "%{$term}%")->orWhereLike('email', "%{$term}%")->orWhereLike('username', "%{$term}%")))
             ->when(($data['filter'] ?? null) === 'admins', fn ($q) => $q->where('is_platform_admin', true))
             ->when(($data['filter'] ?? null) === 'disabled', fn ($q) => $q->where('status', UserStatus::Disabled->value))
             ->when(($data['filter'] ?? null) === 'never', fn ($q) => $q->whereNull('last_login_at'))
@@ -157,7 +158,7 @@ class PlatformConsoleController extends Controller
         $converted = $grant && $user->managed_by_tenant_id !== null;
 
         DB::transaction(function () use ($user, $grant, $converted) {
-            if (! $grant && User::query()->where('is_platform_admin', true)->lockForUpdate()->count() <= 1) {
+            if (! $grant && User::query()->where('is_platform_admin', true)->lockForUpdate()->pluck('id')->count() <= 1) {
                 throw new BusinessRuleException('The platform needs at least one administrator.', 'LAST_PLATFORM_ADMIN', status: 409);
             }
             $user->forceFill(['is_platform_admin' => $grant, ...($converted ? ['managed_by_tenant_id' => null] : [])])->save();
@@ -211,7 +212,7 @@ class PlatformConsoleController extends Controller
                 throw new BusinessRuleException('A sign-in account with this email exists but is not active. Enable it first.', 'PLATFORM_ADMIN_NOT_ELIGIBLE', status: 409);
             }
             $converted = $user !== null && $user->managed_by_tenant_id !== null;
-            $user ??= (new User())->forceFill(['name' => $customerAccount->name, 'email' => $email, 'phone' => $customerAccount->phone, 'status' => UserStatus::Active->value]);
+            $user ??= (new User)->forceFill(['name' => $customerAccount->name, 'email' => $email, 'phone' => $customerAccount->phone, 'status' => UserStatus::Active->value]);
             // The shop password hash is copied, so they sign in with the password they chose in the shop; nobody sees it.
             $user->forceFill([
                 'password' => $customerAccount->getAttributes()['password'], 'must_change_password' => false, 'temporary_password_expires_at' => null,
@@ -280,13 +281,13 @@ class PlatformConsoleController extends Controller
         ];
     }
 
-    /** @return array<int, \Illuminate\Support\Carbon> latest member sign-in per business */
+    /** @return array<int, Carbon> latest member sign-in per business */
     private function lastActivityByTenant(?int $tenantId = null): array
     {
         return DB::table('tenant_memberships')->join('users', 'users.id', '=', 'tenant_memberships.user_id')
             ->when($tenantId, fn ($q) => $q->where('tenant_memberships.tenant_id', $tenantId))
             ->whereNotNull('users.last_login_at')
             ->selectRaw('tenant_memberships.tenant_id, max(users.last_login_at) as last')->groupBy('tenant_memberships.tenant_id')
-            ->pluck('last', 'tenant_id')->map(fn ($v) => \Illuminate\Support\Carbon::parse($v))->all();
+            ->pluck('last', 'tenant_id')->map(fn ($v) => Carbon::parse($v))->all();
     }
 }

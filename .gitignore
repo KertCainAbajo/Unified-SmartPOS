@@ -31,3 +31,8 @@ Thumbs.db
 /web/test-results/
 /web/playwright-report/
 /web/e2e/.auth/
+
+# Deployment secrets (Supabase, Vercel)
+.env.*
+!.env.example
+.vercel

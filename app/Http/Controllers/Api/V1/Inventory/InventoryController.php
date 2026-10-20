@@ -38,7 +38,7 @@ class InventoryController extends Controller
             ->when($request->filled('product_id'), fn ($q) => $q->where('inventory.product_id', $request->integer('product_id')))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-                $q->where(fn ($w) => $w->where('products.name', 'like', $term)->orWhere('products.sku', 'like', $term)->orWhere('products.barcode', 'like', $term));
+                $q->where(fn ($w) => $w->whereLike('products.name', $term)->orWhereLike('products.sku', $term)->orWhereLike('products.barcode', $term));
             })
             ->orderBy('products.name')
             ->select([

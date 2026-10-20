@@ -87,7 +87,7 @@ class RiderDeliveryController extends Controller
             ->where('delivered_at', '<=', Carbon::parse($data['date_to'], $tz)->endOfDay()->utc())
             ->when(filled($data['q'] ?? null), function ($q) use ($data) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $data['q']).'%';
-                $q->where(fn ($w) => $w->where('order_number', 'like', $term)->orWhere('contact_name', 'like', $term)->orWhere('delivery_address', 'like', $term));
+                $q->where(fn ($w) => $w->whereLike('order_number', $term)->orWhereLike('contact_name', $term)->orWhereLike('delivery_address', $term));
             });
 
         $all = (clone $query)->get(['id', 'status', 'estimated_total', 'dispatched_at', 'delivered_at']);

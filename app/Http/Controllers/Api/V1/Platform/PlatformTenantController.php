@@ -30,8 +30,8 @@ class PlatformTenantController extends Controller
             ->with('owner:id,name,email')
             ->withCount(['branches', 'memberships'])
             ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w
-                ->where('name', 'like', '%'.$request->string('q').'%')
-                ->orWhere('slug', 'like', '%'.$request->string('q').'%')))
+                ->whereLike('name', '%'.$request->string('q').'%')
+                ->orWhereLike('slug', '%'.$request->string('q').'%')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderBy('id')
             ->paginate($this->perPage($request));

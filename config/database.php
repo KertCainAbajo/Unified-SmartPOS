@@ -44,6 +44,19 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        // Only for `php artisan smartpos:copy-data --from=source`: the old database to copy from (e.g. local MySQL).
+        'source' => [
+            'driver' => env('SOURCE_DB_CONNECTION', 'mysql'),
+            'host' => env('SOURCE_DB_HOST', '127.0.0.1'),
+            'port' => env('SOURCE_DB_PORT', '3306'),
+            'database' => env('SOURCE_DB_DATABASE', 'laravel'),
+            'username' => env('SOURCE_DB_USERNAME', 'root'),
+            'password' => env('SOURCE_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

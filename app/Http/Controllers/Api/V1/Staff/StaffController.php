@@ -43,8 +43,8 @@ class StaffController extends Controller
             ->when($request->filled('role_id'), fn ($q) => $q->whereHas('roles', fn ($r) => $r->where('roles.id', $request->integer('role_id'))))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-                $q->where(fn ($w) => $w->where('employee_code', 'like', $term)
-                    ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $term)->orWhere('username', 'like', $term)->orWhere('email', 'like', $term)));
+                $q->where(fn ($w) => $w->whereLike('employee_code', $term)
+                    ->orWhereHas('user', fn ($u) => $u->whereLike('name', $term)->orWhereLike('username', $term)->orWhereLike('email', $term)));
             })
             ->orderBy('id')
             ->paginate($this->perPage($request));

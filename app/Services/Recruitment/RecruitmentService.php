@@ -927,7 +927,7 @@ class RecruitmentService
 
     private function storeDocument(JobApplication $application, string $type, UploadedFile $file, string $by): ApplicationDocument
     {
-        $path = $file->storeAs("recruitment/{$application->tenant_id}/{$application->id}", Str::uuid().'.'.($file->guessExtension() ?: $file->getClientOriginalExtension()), 'local');
+        $path = $file->storeAs("recruitment/{$application->tenant_id}/{$application->id}", Str::uuid().'.'.($file->guessExtension() ?: $file->getClientOriginalExtension()), self::documentsDisk());
 
         return ApplicationDocument::query()->create([
             'tenant_id' => $application->tenant_id,
@@ -946,7 +946,7 @@ class RecruitmentService
     {
         $this->assertVisible($document->application);
 
-        return Storage::disk('local')->get($document->path) ?? '';
+        return Storage::disk(self::documentsDisk())->get($document->path) ?? '';
     }
 
     /**
@@ -992,6 +992,12 @@ class RecruitmentService
     }
 
     /** @param  list<string>  $lines */
+    /** Private disk for applicants' documents (SMARTPOS_PRIVATE_FILES_DISK, e.g. `s3` for Supabase Storage). */
+    public static function documentsDisk(): string
+    {
+        return config('smartpos.private_files_disk') ?: 'local';
+    }
+
     private function mailApplicant(JobApplication $application, string $event, string $subject, array $lines, ?string $statusUrl = null): void
     {
         $tenant = $application->tenant ?? Tenant::query()->find($application->tenant_id);

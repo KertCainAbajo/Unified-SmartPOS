@@ -36,6 +36,11 @@ return [
     // Multiplies every request speed limit. Only for automated test runs; keep 1 on a real server.
     'rate_limit_multiplier' => (int) env('SMARTPOS_RATE_LIMIT_MULTIPLIER', 1),
 
+    // Where uploads are kept. On a host without a lasting disk (Vercel), set both to `s3` and fill the AWS_* settings
+    // with Supabase Storage's S3 keys. Files are always served through the API, so the bucket stays private.
+    'files_disk' => env('SMARTPOS_FILES_DISK', 'public'),
+    'private_files_disk' => env('SMARTPOS_PRIVATE_FILES_DISK', 'local'),
+
     // Maximum page size accepted by paginated endpoints.
     'max_per_page' => 100,
 ];

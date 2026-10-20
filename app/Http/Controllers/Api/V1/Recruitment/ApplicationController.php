@@ -44,8 +44,8 @@ class ApplicationController extends Controller
             ->when($request->query('vacancy_id'), fn ($q, $v) => $q->where('vacancy_id', $v))
             ->when($request->query('branch_id'), fn ($q, $b) => $q->where('branch_id', $b))
             ->when($request->query('q'), fn ($q, $term) => $q->where(fn ($w) => $w
-                ->where('reference', 'like', "%{$term}%")->orWhere('email', 'like', "%{$term}%")
-                ->orWhere('first_name', 'like', "%{$term}%")->orWhere('last_name', 'like', "%{$term}%")))
+                ->whereLike('reference', "%{$term}%")->orWhereLike('email', "%{$term}%")
+                ->orWhereLike('first_name', "%{$term}%")->orWhereLike('last_name', "%{$term}%")))
             ->latest('id');
 
         return JobApplicationResource::collection($query->paginate(min((int) $request->query('per_page', 20), 100)));
