@@ -14,7 +14,7 @@ import { CustomerAuthDialog } from './CustomerAuthDialog';
 import { OrderHistoryDialog, TrackOrderDialog, type ShopOrder } from './CustomerOrders';
 import { DeliveryLocationDialog, composeAddress, emptyLocation, loadLocation, type DeliveryLocation } from './DeliveryLocationDialog';
 import { ShopDirectory } from './ShopDirectory';
-import { ShopHero } from './ShopVisuals';
+import { EmptyAisle, ShopHero } from './ShopVisuals';
 import { ANDROID_APP_URL, AppDownloadBanner } from './AppDownloadBanner';
 import { isShopApp } from '../../lib/shopApp';
 import { useToast } from '../../components/Toast';
@@ -324,7 +324,7 @@ export function ShopPage() {
           </div>
 
           {shop.data.length === 0
-            ? <EmptyState title="No products yet" text="This store hasn't listed anything online yet. Please check back soon." />
+            ? <EmptyAisle />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
               : <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">

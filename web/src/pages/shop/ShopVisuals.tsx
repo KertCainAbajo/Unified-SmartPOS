@@ -1,4 +1,4 @@
-import { ArrowRight, Bike, Heart, ShoppingBasket, Store, Wallet } from 'lucide-react';
+import { ArrowRight, Bike, Cookie, CupSoda, Heart, ShoppingBasket, Soup, Sparkles, SprayCan, Store, Wallet, Wheat } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface PhotoItem { name: string; image_url: string | null }
@@ -108,23 +108,36 @@ export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCou
       <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
       <section aria-label="Store highlights" className="hidden sm:block">
-        {/* Welcome banner */}
-        <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white lg:px-8">
-          <span aria-hidden className="absolute -right-20 -top-28 -z-10 size-80 rounded-full bg-emerald-400/20 blur-[80px]" />
-          <span aria-hidden className="absolute -bottom-32 left-1/3 -z-10 size-72 rounded-full bg-amber-300/10 blur-[90px]" />
-          <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.16em] text-emerald-200">
-            <span className="size-1.5 rounded-full bg-emerald-400" />
-            Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
-          </p>
-          <h2 className="mt-2 max-w-xl font-display text-2xl font-bold leading-tight tracking-tight lg:text-[28px]">
-            Your neighborhood store, <span className="text-amber-300">now online.</span>
-          </h2>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-emerald-50/70">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-emerald-950 transition hover:bg-amber-100">
-              Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
-            </button>
-            {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-lg px-4 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
+        {/* Store front: awning stripe, headline, aisle signs */}
+        <article className="relative overflow-hidden rounded-2xl border border-emerald-900/10 bg-gradient-to-br from-[#eef7ea] via-white to-[#fff5dc] shadow-[0_12px_30px_-24px_rgba(6,60,40,.6)]">
+          <div aria-hidden className="h-3 bg-[repeating-linear-gradient(90deg,#0b6b43_0_24px,#ffffff_24px_48px)] shadow-[0_3px_6px_-3px_rgba(6,60,40,.35)]" />
+          <div className="grid items-center gap-6 px-6 py-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="min-w-0">
+              <p className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[.14em] text-amber-800 ring-1 ring-amber-200">
+                <Store className="size-3.5" /> Your neighborhood mini mart
+              </p>
+              <h2 className="mt-3 max-w-lg font-display text-2xl font-bold leading-tight tracking-tight text-[#0b3b2c] lg:text-[28px]">
+                Everyday essentials, <span className="text-emerald-600">ready when you are.</span>
+              </h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                Order online from {branchCount > 1 ? `${branchCount} branches` : 'the store'}. Pick it up or have it delivered, and pay in cash when you get it.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 transition hover:bg-emerald-800">
+                  Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
+                </button>
+                {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-900/15 transition hover:bg-emerald-50">Create a free account</button>}
+              </div>
+            </div>
+
+            <ul aria-hidden className="hidden grid-cols-3 gap-2.5 xl:grid">
+              {AISLES.map(({ icon: Icon, label, tone }) => (
+                <li key={label} className="flex w-[104px] flex-col items-center gap-1.5 rounded-xl bg-white/80 px-2 py-3 text-center shadow-sm ring-1 ring-slate-900/[.06]">
+                  <span className={`grid size-10 place-items-center rounded-full ${tone}`}><Icon className="size-5" /></span>
+                  <span className="text-[11px] font-semibold leading-tight text-slate-700">{label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </article>
 
@@ -201,3 +214,35 @@ function PhoneBanners({ photos, signedIn, onCreateAccount, onStart }: { photos: 
   );
 }
 
+/** Store aisles shown as signs in the banner. */
+const AISLES = [
+  { icon: Wheat, label: 'Rice & grains', tone: 'bg-amber-100 text-amber-700' },
+  { icon: Soup, label: 'Canned goods', tone: 'bg-rose-100 text-rose-600' },
+  { icon: CupSoda, label: 'Drinks', tone: 'bg-sky-100 text-sky-600' },
+  { icon: Cookie, label: 'Snacks', tone: 'bg-orange-100 text-orange-600' },
+  { icon: Sparkles, label: 'Personal care', tone: 'bg-violet-100 text-violet-600' },
+  { icon: SprayCan, label: 'Household', tone: 'bg-emerald-100 text-emerald-700' },
+];
+
+/** Empty shop: a store shelf of faded products, "being stocked". */
+export function EmptyAisle() {
+  const shelf = ['bg-amber-200', 'bg-rose-200', 'bg-sky-200', 'bg-emerald-200', 'bg-orange-200', 'bg-violet-200', 'bg-amber-200'];
+  return (
+    <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center">
+      <div aria-hidden className="mx-auto w-full max-w-xs">
+        {[0, 1].map((row) => (
+          <div key={row} className="mt-2 first:mt-0">
+            <div className="flex items-end justify-center gap-2 px-3 opacity-60">
+              {shelf.map((tone, i) => (
+                <span key={i} className={`${tone} rounded-t-md ${(i + row) % 3 === 0 ? 'h-9 w-6' : (i + row) % 3 === 1 ? 'h-6 w-8' : 'h-7 w-5'}`} />
+              ))}
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-300" />
+          </div>
+        ))}
+      </div>
+      <p className="mt-6 font-display text-base font-bold text-slate-900">Shelves are being stocked</p>
+      <p className="mt-1 text-sm text-slate-500">This store hasn't listed products online yet. Please check back soon.</p>
+    </div>
+  );
+}

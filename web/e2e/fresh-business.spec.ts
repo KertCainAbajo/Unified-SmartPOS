@@ -72,7 +72,7 @@ test.describe.serial('a brand-new empty business', () => {
     const slug = await page.evaluate(async (id) => (await (await fetch(`/api/v1/tenants/${id}`, { credentials: 'include', headers: { Accept: 'application/json' } })).json()).data.slug, id);
     shopPath = `/shop/${slug}`;
     await page.goto(shopPath);
-    await expect(page.getByText('No products yet')).toBeVisible();
+    await expect(page.getByText('Shelves are being stocked')).toBeVisible();
 
     await page.goto(`${tenantPath}/products`);
     await page.getByRole('button', { name: 'Add product' }).first().click();
