@@ -302,15 +302,15 @@ export function ShopPage() {
           </div>
         </div>
       )}
-      <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={shop.data} products={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} onAdd={(id) => { const p = shop.data.find((x) => x.id === id); if (p) setQuantity(p, (cart[id]?.quantity ?? 0) + 1); }} />
+      <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
 
       {/* ───────── Shop + basket ───────── */}
-      <main id="main-content" className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <main id="main-content" className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <section id="products" className="min-w-0 scroll-mt-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
-              <h2 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-[28px]">{selectedCategory}</h2>
+              <h2 className="mt-0.5 font-display text-xl font-bold tracking-tight sm:text-2xl">{selectedCategory}</h2>
               <p className="mt-1 text-sm text-slate-500">{visibleProducts.length} of {shop.data.length} items{term && <> matching “<span className="font-semibold text-slate-700">{search.trim()}</span>”</>}</p>
             </div>
             <div className="flex gap-2">
@@ -466,18 +466,18 @@ export function ShopPage() {
 
     {/* ───────── Footer ───────── */}
     <footer className="bg-[#0a3d2c] text-emerald-50/80">
-      <div className="mx-auto grid max-w-[1920px] gap-5 px-4 pb-6 pt-7 sm:gap-10 sm:px-6 sm:py-12 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1920px] gap-5 px-4 pb-5 pt-6 sm:gap-8 sm:px-6 sm:py-8 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-9 rounded-xl bg-white object-contain p-1 sm:size-11" /><p className="font-display text-base font-bold text-white sm:text-lg">{shop.business.name}</p></div>
-          <p className="mt-2.5 max-w-sm text-xs leading-5 sm:mt-4 sm:text-sm sm:leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
+          <div className="flex items-center gap-3"><img src="/brand/minimart-logo.svg" alt="" className="size-9 rounded-xl bg-white object-contain p-1" /><p className="font-display text-base font-bold text-white">{shop.business.name}</p></div>
+          <p className="mt-2.5 max-w-sm text-xs leading-5 sm:mt-3 sm:text-[13px] sm:leading-6">Order online and pick up at the branch of your choice. Payment is made in store when you collect.</p>
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-amber-300 sm:text-[11px]">Pickup locations</p>
-          <ul className="mt-2.5 flex flex-wrap gap-1.5 text-sm sm:mt-4 sm:block sm:space-y-3">{shop.branches.map((branch) => <li key={branch.id} className="flex items-center gap-1.5 rounded-full bg-white/[.07] px-2.5 py-1 ring-1 ring-white/10 sm:items-start sm:gap-2 sm:rounded-none sm:bg-transparent sm:p-0 sm:ring-0"><MapPin size={14} className="shrink-0 text-emerald-300 sm:mt-0.5" /><span><span className="text-xs font-semibold text-white sm:text-sm">{branch.name}</span>{branch.address && <span className="hidden text-xs text-emerald-50/60 sm:block">{branch.address}</span>}</span></li>)}</ul>
+          <ul className="mt-2.5 flex flex-wrap gap-1.5 text-sm sm:mt-3 sm:block sm:space-y-2">{shop.branches.map((branch) => <li key={branch.id} className="flex items-center gap-1.5 rounded-full bg-white/[.07] px-2.5 py-1 ring-1 ring-white/10 sm:items-start sm:gap-2 sm:rounded-none sm:bg-transparent sm:p-0 sm:ring-0"><MapPin size={14} className="shrink-0 text-emerald-300 sm:mt-0.5" /><span><span className="text-xs font-semibold text-white sm:text-sm">{branch.name}</span>{branch.address && <span className="hidden text-xs text-emerald-50/60 sm:block">{branch.address}</span>}</span></li>)}</ul>
         </div>
         <div className="hidden sm:block">
           <p className="text-[11px] font-bold uppercase tracking-[.18em] text-amber-300">Order status</p>
-          <ul className="mt-4 space-y-2.5 text-sm">{statusFlow.map((status) => <li key={status} className="flex items-center gap-2"><PackageCheck size={15} className="text-emerald-300" />{statusNames[status]}</li>)}</ul>
+          <ul className="mt-3 space-y-1.5 text-[13px]">{statusFlow.map((status) => <li key={status} className="flex items-center gap-2"><PackageCheck size={15} className="text-emerald-300" />{statusNames[status]}</li>)}</ul>
         </div>
       </div>
       <div className={`border-t border-white/10 px-4 pt-4 text-center text-[11px] text-emerald-50/50 sm:py-5 sm:text-xs lg:pb-5 ${lines.length ? 'pb-24' : 'pb-5'}`}>
@@ -485,7 +485,7 @@ export function ShopPage() {
         {(shop.business.legal_name || shop.business.address || shop.business.phone || shop.business.email) && <span className="mt-2 block">{[shop.business.legal_name, shop.business.address, shop.business.phone, shop.business.email].filter(Boolean).join(' · ')}</span>}
         <span className="mt-1 block text-[10px]">For order or refund questions, contact this store using the details above.</span>
         <LegalLinks tone="dark" className="mt-3" />
-        <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>
+        {shop.data.some((p) => p.image_url) && <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>}
       </div>
     </footer>
 

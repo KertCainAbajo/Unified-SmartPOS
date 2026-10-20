@@ -1,4 +1,4 @@
-import { ArrowRight, Bike, Flame, Heart, Plus, ShoppingBasket, Wallet } from 'lucide-react';
+import { ArrowRight, Bike, Heart, ShoppingBasket, Store, Wallet } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface PhotoItem { name: string; image_url: string | null }
@@ -90,111 +90,74 @@ function BasketBody() {
   );
 }
 
-export interface HeroProduct extends PhotoItem { id: number; price: string; unit: string }
-
-const peso = (value: string | number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(value));
-
 /**
- * Storefront hero. Phones: swipeable promo cards. Tablets and computers: a "bento" grid — a large feature tile with
- * live store facts and floating product photos, a delivery tile, best sellers you can add straight away, and pay-at-pickup.
+ * Storefront hero. Phones: swipeable promo cards. Tablets and computers: a compact welcome banner (with a few
+ * product photos when the store has them) beside three short cards on the ways to order.
  */
-export function ShopHero({ photos, signedIn, onCreateAccount, onStart, products = [], branchCount = 0, onAdd }: {
+export function ShopHero({ photos, signedIn, onCreateAccount, onStart, branchCount = 0 }: {
   photos: PhotoItem[]; signedIn: boolean; onCreateAccount: () => void;
   /** "Start shopping": signed-in customers go to the products, guests are asked to sign in first. */
   onStart: () => void;
-  products?: HeroProduct[]; branchCount?: number; onAdd?: (id: number) => void;
+  branchCount?: number;
 }) {
   const withPhotos = photos.filter((photo) => photo.image_url);
   const pool = withPhotos.length >= 3 ? withPhotos : photos;
-  const best = products.filter((p) => p.image_url).slice(0, 3);
   const floating = pool.slice(3, 6);
 
   return (
     <>
       <PhoneBanners photos={pool} signedIn={signedIn} onCreateAccount={onCreateAccount} onStart={onStart} />
 
-      <section aria-label="Store highlights" className="hidden gap-4 sm:grid lg:grid-cols-12 lg:grid-rows-[auto_auto]">
-        {/* Feature tile */}
-        <article className="relative isolate overflow-hidden rounded-[32px] bg-[#062a1d] p-8 text-white shadow-[0_40px_80px_-40px_rgba(2,44,34,.8)] lg:col-span-7 lg:row-span-2 lg:p-10">
-          <span aria-hidden className="absolute -left-24 -top-32 -z-10 size-[26rem] rounded-full bg-emerald-500/35 blur-[90px]" />
-          <span aria-hidden className="absolute -bottom-40 right-0 -z-10 size-[28rem] rounded-full bg-amber-400/25 blur-[100px]" />
-          <span aria-hidden className="absolute inset-0 -z-10 opacity-[0.07] [background-image:linear-gradient(#fff_1px,transparent_1px),linear-gradient(90deg,#fff_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_30%_30%,#000_20%,transparent_70%)]" />
-
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold ring-1 ring-white/15 backdrop-blur">
-            <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-emerald-400" /></span>
-            Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
-          </span>
-          <h2 className="mt-6 max-w-xl font-display text-[40px] font-extrabold leading-[1.02] tracking-[-0.03em] xl:text-[60px]">
-            Your neighborhood store,{' '}
-            <span className="bg-gradient-to-r from-amber-300 via-yellow-200 to-lime-300 bg-clip-text text-transparent">now on your phone.</span>
-          </h2>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-emerald-50/75">Fill your basket, choose pickup or delivery, and pay in cash when you get your order. Live stock from every branch.</p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <button type="button" onClick={onStart} className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-emerald-950 shadow-lg shadow-black/20 transition hover:bg-amber-200">
-              Start shopping <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
-            </button>
-            {!signedIn && <button onClick={onCreateAccount} className="inline-flex h-12 items-center rounded-full bg-white/10 px-6 text-sm font-semibold ring-1 ring-white/25 backdrop-blur transition hover:bg-white/20">Create a free account</button>}
-          </div>
-          <dl className="mt-9 flex flex-wrap gap-x-8 gap-y-3">
-            {[[String(products.length || photos.length), 'Products'], [String(branchCount || 1), branchCount === 1 ? 'Branch' : 'Branches'], ['₱0', 'Online fees']].map(([value, label]) => (
-              <div key={label}>
-                <dt className="font-display text-2xl font-extrabold">{value}</dt>
-                <dd className="text-xs font-medium uppercase tracking-wider text-emerald-100/60">{label}</dd>
-              </div>
-            ))}
-          </dl>
-
-          {/* Floating photos */}
-          <div aria-hidden className="pointer-events-none absolute -right-4 bottom-6 hidden w-[44%] max-w-[300px] xl:block">
-            {floating.map((p, i) => (
-              <span key={p.name} className="absolute grid size-28 place-items-center rounded-3xl bg-white/95 p-3 shadow-2xl shadow-black/40 ring-1 ring-white/40 xl:size-32"
-                style={{ right: [10, 120, 40][i], bottom: [150, 60, 0][i], transform: `rotate(${[8, -10, 4][i]}deg)` }}>
-                {p.image_url ? <img src={p.image_url} alt="" className="size-full object-contain" /> : <ShoppingBasket className="size-10 text-emerald-700" />}
-              </span>
-            ))}
-          </div>
-        </article>
-
-        {/* Delivery tile */}
-        <article className="relative isolate overflow-hidden rounded-[32px] bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-7 text-white shadow-[0_30px_60px_-35px_rgba(234,88,12,.8)] lg:col-span-5">
-          <span aria-hidden className="absolute -right-10 -top-16 -z-10 size-56 rounded-full bg-yellow-200/40 blur-3xl" />
-          <svg aria-hidden viewBox="0 0 200 80" className="absolute bottom-4 right-4 -z-10 w-48 opacity-40"><path d="M5 70 C 50 70, 60 15, 105 25 S 160 60, 195 10" fill="none" stroke="#fff" strokeWidth="3" strokeDasharray="2 8" strokeLinecap="round" /><circle cx="195" cy="10" r="6" fill="#fff" /></svg>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wider ring-1 ring-white/30">Cash on delivery</span>
-              <h3 className="mt-4 font-display text-2xl font-extrabold leading-tight xl:text-[28px]">Delivered to your door.</h3>
-              <p className="mt-2 max-w-xs text-sm text-white/85">Pin your exact spot on the map and follow your rider live.</p>
+      <section aria-label="Store highlights" className="hidden gap-3 sm:grid lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Welcome banner */}
+        <article className="relative isolate overflow-hidden rounded-2xl bg-[#0b3b2c] px-6 py-6 text-white shadow-sm lg:px-8 lg:py-7">
+          <span aria-hidden className="absolute -left-16 -top-24 -z-10 size-72 rounded-full bg-emerald-500/25 blur-[80px]" />
+          <span aria-hidden className="absolute -bottom-28 right-24 -z-10 size-72 rounded-full bg-amber-400/15 blur-[90px]" />
+          <div className="relative max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold ring-1 ring-white/15">
+              <span className="size-1.5 rounded-full bg-emerald-400" />
+              Order online{branchCount ? ` · ${branchCount} ${branchCount === 1 ? 'branch' : 'branches'}` : ''}
+            </span>
+            <h2 className="mt-3 font-display text-2xl font-bold leading-tight tracking-tight lg:text-[28px]">
+              Your neighborhood store, <span className="text-amber-300">now online.</span>
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-emerald-50/75">Fill your basket, choose pickup or delivery, and pay in cash when you get your order.</p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button type="button" onClick={onStart} className="group inline-flex h-10 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-emerald-950 transition hover:bg-amber-200">
+                Start shopping <ArrowRight size={15} className="transition group-hover:translate-x-0.5" />
+              </button>
+              {!signedIn && <button type="button" onClick={onCreateAccount} className="inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold ring-1 ring-white/25 transition hover:bg-white/10">Create a free account</button>}
             </div>
-            <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-white/20 ring-1 ring-white/30 backdrop-blur"><Bike className="size-8" /></span>
           </div>
-        </article>
 
-        {/* Best sellers + pay at pickup */}
-        <div className="grid gap-4 sm:grid-cols-[1.5fr_1fr] lg:col-span-5">
-          <article className="rounded-[32px] bg-white p-5 shadow-[0_20px_50px_-30px_rgba(15,23,42,.35)] ring-1 ring-slate-200/80">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.16em] text-emerald-700"><Flame className="size-4 text-orange-500" />Best sellers</p>
-            <ul className="mt-3 space-y-2.5">
-              {best.map((p) => (
-                <li key={p.id} className="flex items-center gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-50 p-1 ring-1 ring-slate-100">{p.image_url && <img src={p.image_url} alt="" className="size-full object-contain mix-blend-multiply" />}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-900">{p.name}</span>
-                    <span className="text-xs font-bold text-emerald-700">{peso(p.price)}<span className="font-medium text-slate-400"> / {p.unit}</span></span>
-                  </span>
-                  {onAdd && <button type="button" onClick={() => onAdd(p.id)} aria-label={`Quick add ${p.name}`} className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-700 text-white transition hover:bg-emerald-800 active:scale-90"><Plus size={16} strokeWidth={2.6} /></button>}
-                </li>
+          {/* A few product photos, only when the store has them */}
+          {floating.some((p) => p.image_url) && (
+            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-6 hidden items-center gap-3 xl:flex">
+              {floating.filter((p) => p.image_url).map((p, i) => (
+                <span key={p.name} className="grid size-24 place-items-center rounded-2xl bg-white p-2.5 shadow-xl shadow-black/30" style={{ transform: `rotate(${[-6, 4, -2][i] ?? 0}deg) translateY(${[6, -8, 4][i] ?? 0}px)` }}>
+                  <img src={p.image_url as string} alt="" className="size-full object-contain" />
+                </span>
               ))}
-            </ul>
-          </article>
-          <article className="relative isolate flex flex-col justify-between overflow-hidden rounded-[32px] bg-gradient-to-br from-lime-200 via-emerald-100 to-teal-100 p-5 text-emerald-950 ring-1 ring-emerald-900/5">
-            <span aria-hidden className="absolute -bottom-10 -right-10 -z-10 size-36 rounded-full bg-white/60 blur-2xl" />
-            <span className="grid size-12 place-items-center rounded-2xl bg-white shadow-sm"><Wallet className="size-6 text-emerald-700" /></span>
-            <div className="mt-6">
-              <h3 className="font-display text-lg font-extrabold leading-tight">Pay at pickup</h3>
-              <p className="mt-1 text-xs text-emerald-900/70">No card needed. Reserve now, pay at the counter.</p>
             </div>
-          </article>
-        </div>
+          )}
+        </article>
+
+        {/* Ways to order */}
+        <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          {[
+            { icon: Bike, title: 'Delivery to your door', text: 'Cash on delivery. Track your rider on the map.', tone: 'bg-orange-50 text-orange-600 ring-orange-100' },
+            { icon: Store, title: `Pickup at ${branchCount > 1 ? `${branchCount} branches` : 'the store'}`, text: 'Pick a branch and collect when it is ready.', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+            { icon: Wallet, title: 'Pay when you get it', text: 'No card needed and no online fees.', tone: 'bg-sky-50 text-sky-700 ring-sky-100' },
+          ].map(({ icon: Icon, title, text, tone }) => (
+            <li key={title} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-slate-200/80">
+              <span className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ${tone}`}><Icon className="size-5" /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900">{title}</span>
+                <span className="block text-xs leading-5 text-slate-500">{text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   );
