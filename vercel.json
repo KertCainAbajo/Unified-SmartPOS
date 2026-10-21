@@ -7,15 +7,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://unified-smartpos.onrender.com/api/:path*"
+      "destination": "https://unified-smartpos-1.onrender.com/api/:path*"
     },
     {
       "source": "/sanctum/:path*",
-      "destination": "https://unified-smartpos.onrender.com/sanctum/:path*"
+      "destination": "https://unified-smartpos-1.onrender.com/sanctum/:path*"
     },
     {
       "source": "/up",
-      "destination": "https://unified-smartpos.onrender.com/up"
+      "destination": "https://unified-smartpos-1.onrender.com/up"
     },
     {
       "source": "/(.*)",
