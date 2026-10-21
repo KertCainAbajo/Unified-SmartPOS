@@ -603,6 +603,17 @@ function ProductPhoto({ product }: { product: Product }) {
 /** Click the product thumbnail to see its photo and details in a larger card. */
 function ProductPhotoCard({ product, imageUrl }: { product: Product; imageUrl: string }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const closePreview = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    };
+    window.addEventListener('keydown', closePreview, true);
+    return () => window.removeEventListener('keydown', closePreview, true);
+  }, [open]);
 
   return (
     <>
@@ -617,23 +628,42 @@ function ProductPhotoCard({ product, imageUrl }: { product: Product; imageUrl: s
           <span className="grid size-9 place-items-center rounded-full bg-white/95 text-slate-700 shadow"><Expand className="size-4" /></span>
         </span>
       </button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Product photo" size="sm" description={product.name}>
-        <article className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm">
-          <div className="grid aspect-square place-items-center bg-slate-50 p-5 sm:p-7">
-            <img src={imageUrl} alt={product.name} className="max-h-full max-w-full object-contain" />
-          </div>
-          <div className="space-y-3 p-4">
-            <div>
-              <h3 className="font-display text-lg font-bold text-slate-900">{product.name}</h3>
-              {product.category?.name && <p className="mt-1 text-sm text-slate-500">{product.category.name}</p>}
+      {open && (
+        <div
+          className="fixed inset-0 z-[100] grid place-items-center bg-brand-900/40 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}
+        >
+          <article role="dialog" aria-modal="true" aria-label={`${product.name} photo preview`} className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+            <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="font-display text-sm font-semibold text-slate-900">Product photo</h2>
+                <p className="mt-0.5 truncate text-xs text-slate-500">{product.name}</p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close product photo" className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+                <X className="size-5" />
+              </button>
+            </header>
+            <div className="p-4">
+              <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm">
+                <div className="grid aspect-square place-items-center bg-slate-50 p-5 sm:p-7">
+                  <img src={imageUrl} alt={product.name} className="max-h-full max-w-full object-contain" />
+                </div>
+                <div className="space-y-3 p-4">
+                  <div>
+                    <h3 className="font-display text-lg font-bold text-slate-900">{product.name}</h3>
+                    {product.category?.name && <p className="mt-1 text-sm text-slate-500">{product.category.name}</p>}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600">SKU {product.sku}</span>
+                    <span className="font-semibold text-brand-800">{formatMoney(product.price)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-              <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600">SKU {product.sku}</span>
-              <span className="font-semibold text-brand-800">{formatMoney(product.price)}</span>
-            </div>
-          </div>
-        </article>
-      </Modal>
+          </article>
+        </div>
+      )}
     </>
   );
 }
