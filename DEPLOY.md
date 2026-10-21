@@ -101,13 +101,10 @@ never uploaded.
    AWS_ENDPOINT=                 # same as in .env.supabase
    AWS_USE_PATH_STYLE_ENDPOINT=true
 
-   MAIL_MAILER=smtp
-   MAIL_HOST=smtp.gmail.com
-   MAIL_PORT=587
-   MAIL_USERNAME=                # your Gmail address
-   MAIL_PASSWORD=                # a Gmail App Password (make a NEW one for the live site)
-   MAIL_FROM_ADDRESS=            # your Gmail address
-   MAIL_FROM_NAME="Aling Nena Mini Mart"
+   MAIL_MAILER=resend
+   RESEND_API_KEY=               # create an API key in Resend
+   MAIL_FROM_ADDRESS=onboarding@resend.dev
+   MAIL_FROM_NAME="Unified SmartPOS"
 
    SMARTPOS_NEW_DEVICE_CODES=true
    SMARTPOS_CHECK_BREACHED_PASSWORDS=true
