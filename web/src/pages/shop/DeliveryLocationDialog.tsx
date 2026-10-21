@@ -39,12 +39,14 @@ export function composeAddress(loc: DeliveryLocation): string {
  * Full-screen delivery address form. Shopee-style dropdowns pick the region, province, city and barangay; the map
  * (like Foodpanda) then puts the pin exactly on the door, so the rider can find it and the customer can track them.
  */
-export function DeliveryLocationDialog({ initial, store, storeName, onClose, onSave }: {
+export function DeliveryLocationDialog({ initial, store, storeName, hasSavedHome, homeMode, onClose, onSave }: {
   initial: DeliveryLocation;
   store: LatLng | null;
   storeName?: string;
+  hasSavedHome: boolean;
+  homeMode: boolean;
   onClose: () => void;
-  onSave: (location: DeliveryLocation) => void;
+  onSave: (location: DeliveryLocation, saveAsHome: boolean) => void;
 }) {
   const [area, setArea] = useState<AreaPath>({ region: initial.region, province: initial.province, city: initial.city, barangay: initial.barangay });
   const [pin, setPin] = useState<LatLng | null>(initial.pin);
@@ -70,11 +72,19 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
   const onPinChange = (point: LatLng) => {
     setPin(point);
     setResolving(true);
-    if (Date.now() > automaticUntil.current) { setPinByHand(true); setPinNotice(''); fillArea.current = true; }
+    if (Date.now() > automaticUntil.current) {
+      setPinByHand(true);
+      setPinNotice('');
+      fillArea.current = true;
+      // A manually moved pin is a new delivery location, so don't keep showing the prior address's street.
+      streetFromMap.current = true;
+      setStreet('');
+    }
   };
   const [street, setStreet] = useState(initial.street);
   const [postal, setPostal] = useState(initial.postal);
   const [note, setNote] = useState(initial.note);
+  const [saveAsHome, setSaveAsHome] = useState(false);
   const [suggestion, setSuggestion] = useState('');
   const onResolved = (address: string, parts?: AddressParts) => {
     setSuggestion(address);
@@ -128,6 +138,11 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
     setAreaFilled('idle');
     const barangayChanged = next.barangay?.code !== area.barangay?.code;
     setArea(next);
+    if (barangayChanged) {
+      // Changing the barangay invalidates a street saved for the previous area.
+      streetFromMap.current = true;
+      setStreet('');
+    }
     if (!next.barangay || !barangayChanged) return;
     setLocatingArea(true);
     const movesBefore = moves.current;
@@ -144,7 +159,8 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
   const pick = (place: PlaceResult) => {
     moveTo(place.point);
     fillArea.current = true;
-    if (!street.trim() || streetFromMap.current) { setStreet(place.label); streetFromMap.current = false; }
+    setStreet(place.label);
+    streetFromMap.current = false;
     setQuery('');
     setResults([]);
   };
@@ -262,12 +278,17 @@ export function DeliveryLocationDialog({ initial, store, storeName, onClose, onS
             <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><MessageSquareText className="size-4 text-slate-400" /> Note to rider <span className="font-normal text-slate-400">(optional)</span></span>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={300} placeholder="Landmark, gate colour, call when outside…" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10" />
           </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+            <input type="checkbox" checked={homeMode || saveAsHome} disabled={homeMode} onChange={(event) => setSaveAsHome(event.target.checked)} className="mt-0.5 size-4 accent-emerald-700 disabled:cursor-default" />
+            <span><span className="block text-sm font-semibold text-slate-800">{homeMode ? 'This is your permanent home address' : hasSavedHome ? 'Save this as my new home address' : 'Save as my home address'}</span><span className="mt-0.5 block text-xs leading-5 text-slate-500">{homeMode ? 'Saving changes here updates your saved home address.' : 'Leave this unchecked for a one-time delivery. Your saved home address will stay unchanged.'}</span></span>
+          </label>
         </div>
         <div className="border-t border-slate-100 bg-white p-4 sm:px-6">
           <button
             type="button"
             disabled={!!missing}
-            onClick={() => onSave(location)}
+            onClick={() => onSave(location, homeMode || saveAsHome)}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 font-bold text-white shadow-lg shadow-orange-600/20 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
           >
             {!missing && <Check className="size-5" />} {missing || 'Save address'}

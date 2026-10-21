@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { devices, type Page } from '@playwright/test';
 import { expect, test, TENANT } from './fixtures';
@@ -19,8 +21,16 @@ const appContext = {
   userAgent: `${phone.userAgent} AlingNenaShopApp/1.0`, storageState: { cookies: [], origins: [] },
 };
 
+/** Runs PHP in the e2e app. The code goes through a temporary file: some Node versions on Windows drop the
+ *  backslashes of class names (App\Models\…) when passing them as a command-line argument. */
 function tinker(php: string) {
-  return execFileSync('php', ['artisan', 'tinker', '--env=e2e', `--execute=${php}`], { cwd: join(process.cwd(), '..') }).toString();
+  const file = join(tmpdir(), `e2e-tinker-${Date.now()}-${Math.random().toString(36).slice(2)}.php`).replaceAll('\\', '/');
+  writeFileSync(file, `<?php\n${php}\n`);
+  try {
+    return execFileSync('php', ['artisan', 'tinker', '--env=e2e', `--execute=require '${file}';`], { cwd: join(process.cwd(), '..') }).toString();
+  } finally {
+    rmSync(file, { force: true });
+  }
 }
 
 /** Signs the customer in through the shop API (the sign-in screen itself is tested once below). */
@@ -40,7 +50,8 @@ async function signIn(page: Page, password = PASSWORD) {
 async function placeOrder(page: Page, kind: 'pickup' | 'delivery', branch = /Main Branch - Quezon City/) {
   await page.getByRole('button', { name: /^Add Coca-Cola/ }).first().click();
   if (kind === 'delivery') await page.getByRole('button', { name: 'delivery', exact: true }).click();
-  await page.getByRole('radio', { name: branch }).first().check({ force: true });
+  const choice = page.locator('#basket').getByRole('button', { name: branch }).first();
+  if ((await choice.getAttribute('aria-pressed')) !== 'true') await choice.click();
   if (kind === 'delivery') await page.getByLabel('Cash amount in Philippine pesos').fill('1000');
   const reply = page.waitForResponse((r) => r.url().endsWith(`${API}/orders`) && r.request().method() === 'POST');
   await page.getByRole('button', { name: new RegExp(`Place ${kind} order`) }).click();

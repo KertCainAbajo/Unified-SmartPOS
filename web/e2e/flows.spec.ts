@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, TENANT } from './fixtures';
 
@@ -14,7 +16,14 @@ let orderNumber = '';
 
 /** The emailed code is covered by the backend tests; here the account is confirmed directly in the e2e database. */
 function confirmEmail(email: string) {
-  execFileSync('php', ['artisan', 'tinker', '--env=e2e', `--execute=App\\Models\\CustomerAccount::where('email','${email}')->update(['status'=>'active','email_verified_at'=>now()]);`], { cwd: join(process.cwd(), '..') });
+  // Through a temporary file: some Node versions on Windows drop the backslashes of class names in arguments.
+  const file = join(tmpdir(), `e2e-confirm-${Date.now()}.php`).replaceAll('\\', '/');
+  writeFileSync(file, `<?php\nApp\\Models\\CustomerAccount::where('email','${email}')->update(['status'=>'active','email_verified_at'=>now()]);\n`);
+  try {
+    execFileSync('php', ['artisan', 'tinker', '--env=e2e', `--execute=require '${file}';`], { cwd: join(process.cwd(), '..') });
+  } finally {
+    rmSync(file, { force: true });
+  }
 }
 
 test.describe.serial('online pickup order, end to end', () => {
@@ -45,7 +54,7 @@ test.describe.serial('online pickup order, end to end', () => {
       await expect(page.getByRole('dialog')).toHaveCount(0);
 
       await page.getByRole('button', { name: /^Add / }).first().click();
-      await page.getByRole('radio', { name: /Main Branch - Quezon City/ }).first().check({ force: true });
+      await page.locator('#basket').getByRole('button', { name: /Main Branch - Quezon City/ }).click();
       await page.getByRole('button', { name: /Place pickup order/ }).click();
       const placed = page.getByText(/ORD-[A-Z]+-\d{6}/).first();
       await expect(placed).toBeVisible();

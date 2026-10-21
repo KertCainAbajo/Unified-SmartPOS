@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Apple, ArrowRight, Beef, Check, CheckCircle2, Cookie, CupSoda, Droplets, Heart, LayoutGrid, Lock, LogOut,
-  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBasket, Soup, SprayCan, Trash2, Wheat, X,
+  Apple, ArrowRight, Beef, Bike, Check, CheckCircle2, Cookie, CupSoda, Droplets, Grid2X2, Heart, Home, LayoutGrid, Lock, LogOut,
+  MapPin, Milk, Minus, PackageCheck, Plus, Receipt, Search, ShoppingBag, ShoppingBasket, Soup, SprayCan, Store, Trash2, Wallet, Wheat, X,
   type LucideIcon,
   ChevronLeft, ChevronRight, ChevronDown, Sparkles, ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowDownAZ, Smartphone,
 } from 'lucide-react';
@@ -73,18 +73,30 @@ export function ShopPage() {
   const [branchId, setBranchId] = useState<number | ''>('');
   const [fulfilment, setFulfilment] = useState<'pickup' | 'delivery'>('pickup');
   const [cashAmount, setCashAmount] = useState('');
-  // The delivery address is remembered per customer account, so the next person to sign in on this device never
-  // sees someone else's address. (The old per-shop copy, shared by everyone on the device, is removed.)
+  // A customer's home address is remembered per account. The active delivery address stays separate, so a one-time
+  // location cannot replace home unless the customer explicitly chooses to save it there.
   const [locationOwner, setLocationOwner] = useState<number | null>(null);
   const locationKey = (owner: number) => `shop-delivery:${business}:${owner}`;
+  const [homeLocation, setHomeLocation] = useState<DeliveryLocation>(emptyLocation);
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation>(emptyLocation);
+  const [deliveryIsTemporary, setDeliveryIsTemporary] = useState(false);
   const [pickingLocation, setPickingLocation] = useState(false);
-  const saveLocation = (location: DeliveryLocation) => {
-    setDeliveryLocation(location);
+  const [addressTarget, setAddressTarget] = useState<'home' | 'delivery'>('delivery');
+  const saveLocation = (location: DeliveryLocation, saveAsHome: boolean) => {
     setPickingLocation(false);
-    if (locationOwner) { try { localStorage.setItem(locationKey(locationOwner), JSON.stringify(location)); } catch { /* remembered for this visit only */ } }
+    if (addressTarget === 'home' || saveAsHome) {
+      setHomeLocation(location);
+      if (locationOwner) { try { localStorage.setItem(locationKey(locationOwner), JSON.stringify(location)); } catch { /* remembered for this visit only */ } }
+    }
+    if (addressTarget === 'home') {
+      if (!deliveryIsTemporary) setDeliveryLocation(location);
+    } else {
+      setDeliveryLocation(location);
+      setDeliveryIsTemporary(!saveAsHome);
+    }
   };
   const deliveryAddress = composeAddress(deliveryLocation);
+  const homeAddress = composeAddress(homeLocation);
   const deliveryPin = deliveryLocation.pin;
   const [trackingId, setTrackingId] = useState<number | null>(null);
   const toast = useToast();
@@ -97,6 +109,8 @@ export function ShopPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [activeSection, setActiveSection] = useState<'products' | 'categories' | 'favorites'>('products');
   const [sort, setSort] = useState<Sort>('featured');
   const [paging, setPaging] = useState({ key: '', count: PAGE });
   const savedKey = `shop-saved:${business}`;
@@ -121,12 +135,19 @@ export function ShopPage() {
     },
   });
   const accountId = account.data?.id ?? null;
+  const previousLocationOwner = useRef<number | null>(null);
   useEffect(() => {
     try { localStorage.removeItem(`shop-delivery:${business}`); } catch { /* nothing to clean */ }
+    const previousOwner = previousLocationOwner.current;
+    previousLocationOwner.current = accountId;
     setLocationOwner(accountId);
-    let saved = emptyLocation;
-    if (accountId) { try { saved = loadLocation(localStorage.getItem(locationKey(accountId))); } catch { /* start empty */ } }
-    setDeliveryLocation(saved);
+    let savedHome = emptyLocation;
+    if (accountId) { try { savedHome = loadLocation(localStorage.getItem(locationKey(accountId))); } catch { /* start empty */ } }
+    setHomeLocation(savedHome);
+    // Preserve a guest's in-progress delivery address when they sign in; otherwise start from this account's home.
+    const keepGuestDelivery = previousOwner === null && !!accountId;
+    setDeliveryIsTemporary(keepGuestDelivery && !!composeAddress(deliveryLocation));
+    setDeliveryLocation((current) => keepGuestDelivery && composeAddress(current) ? current : savedHome);
   }, [accountId, business]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when the customer changes
   // Poll faster while a rider is on the way so the map follows them.
   const orders = useQuery({
@@ -248,7 +269,7 @@ export function ShopPage() {
     <a href="#main-content" className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-900 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
     <AppDownloadBanner />
     <header className="relative z-30 border-b border-slate-200/80 bg-white">
-      <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
+      <div className="mx-auto flex max-w-[1720px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:gap-8 lg:px-8">
         <a href="#top" className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:shrink-0">
           <img src="/brand/minimart-logo.svg" className="size-10 shrink-0 rounded-xl bg-emerald-50 object-contain p-1 ring-1 ring-emerald-100 sm:size-11" alt="" />
           <div className="min-w-0">
@@ -283,8 +304,8 @@ export function ShopPage() {
       </div>
 
       {/* Categories: one row of pills; on smaller screens it slides sideways (fades and arrows show there are more). */}
-      {categories.length > 1 && <nav aria-label="Categories" className="border-t border-slate-100 bg-white">
-        <div className="mx-auto max-w-[1280px] py-2.5 lg:px-8">
+      {categories.length > 1 && <nav aria-label="Categories" className="border-t border-slate-100 bg-white xl:hidden">
+        <div className="mx-auto max-w-[1720px] py-2.5 lg:px-8">
           <CategoryRail>
             {categories.map((category, i) => {
               const Icon = category === ALL ? LayoutGrid : iconFor(category);
@@ -305,7 +326,7 @@ export function ShopPage() {
       </nav>}
     </header>
 
-    <div id="top" className="mx-auto max-w-[1280px] px-4 pt-5 sm:px-6 lg:px-8 lg:pt-6">
+    <div id="top" className="mx-auto max-w-[1720px] px-4 pt-4 sm:px-6 lg:px-8 lg:pt-5">
       {signedIn && (
         <div className="mb-4 flex items-center gap-3 sm:hidden">
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 font-display text-lg font-extrabold text-emerald-950 shadow-sm">{firstName.charAt(0).toUpperCase()}</span>
@@ -317,7 +338,37 @@ export function ShopPage() {
       )}
 
       {/* ───────── Shop + basket ───────── */}
-      <main id="main-content" className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <main id="main-content" className="grid grid-cols-[minmax(0,1fr)] gap-5 pb-12 xl:grid-cols-[220px_minmax(0,1fr)_340px] xl:gap-5">
+        <aside aria-label="Shop navigation" className="sp-soft-scroll hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm xl:sticky xl:top-24 xl:block xl:max-h-[calc(100vh-7rem)] xl:self-start xl:overflow-y-auto">
+          <nav aria-label="Shop sections" className="space-y-1.5">
+            <button type="button" onClick={() => { setActiveSection('products'); setSelectedCategory(ALL); setSearch(''); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }} aria-current={activeSection === 'products' ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${activeSection === 'products' ? 'bg-emerald-50 text-emerald-800' : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-800'}`}>
+              <ShoppingBag size={17} /> All Products
+            </button>
+            <button type="button" onClick={() => { setActiveSection('categories'); setCategoriesExpanded((value) => !value); }} aria-expanded={categoriesExpanded} aria-current={activeSection === 'categories' ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${activeSection === 'categories' ? 'bg-emerald-50 text-emerald-800' : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-800'}`}>
+              <Grid2X2 size={17} /> <span className="flex-1">Categories</span><ChevronDown size={15} className={`transition ${categoriesExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {categoriesExpanded && <div className="ml-7 space-y-1 border-l border-slate-200 pl-3">
+              {categories.slice(1).map((category) => <button key={category} type="button" onClick={() => { setActiveSection('categories'); setSelectedCategory(category); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }} className={`block w-full truncate rounded-lg px-2.5 py-2 text-left text-xs font-medium transition ${selectedCategory === category ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-white hover:text-slate-800'}`}>{category}<span className="ml-1 text-slate-400">{countFor(category)}</span></button>)}
+            </div>}
+            <button type="button" onClick={() => { setActiveSection('favorites'); setSelectedCategory(SAVED); }} aria-current={activeSection === 'favorites' ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${activeSection === 'favorites' ? 'bg-rose-50 text-rose-700' : 'text-slate-600 hover:bg-slate-50 hover:text-rose-700'}`}>
+              <Heart size={17} className={activeSection === 'favorites' ? 'fill-rose-500' : ''} /> <span className="flex-1">Favorites</span><span className="text-xs text-slate-400">{savedCount}</span>
+            </button>
+          </nav>
+          <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+            <button type="button" onClick={() => { setAddressTarget('home'); setPickingLocation(true); }} className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-slate-50/70 px-3 py-3 text-left transition hover:border-slate-200 hover:bg-white">
+              <Home size={17} className="shrink-0 text-slate-500" /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-slate-700">Home Address</span><span className="mt-0.5 block truncate text-[11px] text-slate-400">{homeAddress || 'Add your home address'}</span></span><ChevronDown size={14} className="shrink-0 text-slate-400" />
+            </button>
+            <div className="flex items-center gap-3 rounded-xl border border-transparent bg-slate-50/70 px-3 py-3 text-xs text-slate-500"><MapPin size={16} className="shrink-0" /><span className="truncate">{selectedBranch?.address || selectedBranch?.name || 'Choose a branch'}</span></div>
+          </div>
+          <div className="relative mt-2 overflow-hidden rounded-xl bg-gradient-to-br from-emerald-50 via-[#e8f6ec] to-emerald-100 p-4">
+            <span aria-hidden className="absolute -bottom-8 -left-6 size-24 rounded-full bg-emerald-300/40 blur-2xl" />
+            <span className="relative grid size-11 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm"><ShoppingBag size={22} /></span>
+            <h3 className="relative mt-3 font-display text-sm font-bold text-slate-900">Shop Local</h3>
+            <p className="relative mt-1 text-xs leading-5 text-slate-600">Support your neighborhood store with every order.</p>
+            <Heart size={14} className="absolute bottom-4 right-4 text-emerald-700" />
+          </div>
+        </aside>
+
         <section id="products" className="min-w-0 scroll-mt-4">
           <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
           <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -386,7 +437,23 @@ export function ShopPage() {
         </section>
 
         {/* ───────── Basket ───────── */}
-        <aside className="min-w-0 space-y-5 lg:sticky lg:top-4 lg:-m-1.5 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:p-1.5 [scrollbar-width:thin]">
+        <div className="min-w-0 space-y-3">
+          <aside aria-label="Shopping benefits" className="space-y-2">
+            {[
+              { icon: Bike, title: 'Delivery to your door', text: 'Cash on delivery. Track your rider on the map.', tone: 'bg-lime-100 text-emerald-700' },
+              { icon: Store, title: `Pickup at ${shop.branches.length} ${shop.branches.length === 1 ? 'branch' : 'branches'}`, text: 'Pick a branch and collect when it’s ready.', tone: 'bg-emerald-100 text-emerald-700' },
+              { icon: Wallet, title: 'Pay when you get it', text: 'No card needed and no online fees.', tone: 'bg-sky-100 text-sky-700' },
+            ].map(({ icon: Icon, title, text, tone }) => <article key={title} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3.5 py-3 shadow-sm">
+              <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${tone}`}><Icon size={19} /></span>
+              <span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-800">{title}</span><span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{text}</span></span>
+              <ChevronRight size={15} className="shrink-0 text-slate-400" />
+            </article>)}
+          </aside>
+        <div className="min-w-0 lg:sticky lg:top-4">
+        <div
+          className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100dvh-2rem)]"
+        >
+          <div className="sp-soft-scroll min-h-0 flex-1 space-y-3 overflow-y-auto scroll-smooth lg:-mr-2 lg:pr-2">
           <section id="basket" className="scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
@@ -429,7 +496,7 @@ export function ShopPage() {
               <fieldset className="mt-4">
                 <legend className="mb-2 text-xs font-bold uppercase tracking-[.14em] text-slate-500">How would you like your order?</legend>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['pickup', 'delivery'] as const).map((value) => <button key={value} type="button" aria-pressed={fulfilment === value} onClick={() => setFulfilment(value)} className={`rounded-xl border px-3 py-2.5 text-sm font-semibold capitalize ${fulfilment === value ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-600/10' : 'border-slate-200 text-slate-600'}`}>{value}</button>)}
+                  {(['pickup', 'delivery'] as const).map((value) => <button key={value} type="button" aria-pressed={fulfilment === value} onClick={() => { setFulfilment(value); if (value === 'delivery' && !deliveryAddress) { setDeliveryLocation(homeLocation); setDeliveryIsTemporary(false); } }} className={`rounded-xl border px-3 py-2.5 text-sm font-semibold capitalize ${fulfilment === value ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-600/10' : 'border-slate-200 text-slate-600'}`}>{value}</button>)}
                 </div>
               </fieldset>
               <fieldset className="mt-4">
@@ -437,14 +504,13 @@ export function ShopPage() {
                 <div className="space-y-2">
                   {shop.branches.map((branch) => {
                     const active = branchId === branch.id;
-                    return <label key={branch.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition ${active ? 'border-emerald-600 bg-emerald-50/70 ring-4 ring-emerald-600/10' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-                      <input type="radio" name="pickup-branch" className="sr-only" checked={active} onChange={() => setBranchId(branch.id)} />
+                    return <button key={branch.id} type="button" aria-pressed={active} onClick={() => setBranchId(active ? '' : branch.id)} className={`flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition ${active ? 'border-emerald-600 bg-emerald-50/70 ring-4 ring-emerald-600/10' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
                       <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 transition ${active ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300 bg-white'}`}>{active && <span className="size-1.5 rounded-full bg-white" />}</span>
                       <span className="min-w-0">
                         <span className="block text-sm font-semibold text-slate-900">{branch.name}</span>
                         {branch.address && <span className="mt-0.5 flex items-start gap-1 text-xs text-slate-500"><MapPin size={12} className="mt-0.5 shrink-0" />{branch.address}</span>}
                       </span>
-                    </label>;
+                    </button>;
                   })}
                 </div>
               </fieldset>
@@ -452,24 +518,25 @@ export function ShopPage() {
                 <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">Deliver to</p>
                 {deliveryAddress ? (
                   <div className="overflow-hidden rounded-2xl ring-1 ring-orange-200">
-                    {deliveryPin && <button type="button" onClick={() => setPickingLocation(true)} className="block w-full" aria-label="Change delivery location on the map"><DeliveryMap home={deliveryPin} height={150} bare preview /></button>}
+                    {deliveryPin && <button type="button" onClick={() => { setAddressTarget('delivery'); setPickingLocation(true); }} className="block w-full" aria-label="Change delivery location on the map"><DeliveryMap home={deliveryPin} height={150} bare preview /></button>}
                     <div className="flex items-start gap-3 bg-orange-50/60 p-3.5">
                       <MapPin size={18} className="mt-0.5 shrink-0 text-orange-600" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold leading-snug text-slate-900">{deliveryAddress}</p>
                         {deliveryLocation.note && <p className="mt-1 text-xs text-slate-500">Note: {deliveryLocation.note}</p>}
-                        {!deliveryPin && <p className="mt-1 text-xs font-medium text-amber-700">No map pin yet. Add one so the rider finds you.</p>}
+                    {!deliveryPin && <p className="mt-1 text-xs font-medium text-amber-700">No map pin yet. Add one so the rider finds you.</p>}
                       </div>
-                      <button type="button" onClick={() => setPickingLocation(true)} className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50">Change</button>
+                      <button type="button" onClick={() => { setAddressTarget('delivery'); setPickingLocation(true); }} className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50">Change</button>
                     </div>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setPickingLocation(true)} className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50">
+                  <button type="button" onClick={() => { setAddressTarget('delivery'); setDeliveryLocation(homeLocation); setPickingLocation(true); }} className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/50 p-4 text-left transition hover:border-orange-400 hover:bg-orange-50">
                     <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white"><MapPin size={20} /></span>
                     <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900">Set delivery address</span><span className="block text-xs text-slate-500">Search or pin your exact location on the map</span></span>
                     <ArrowRight size={18} className="shrink-0 text-orange-600" />
                   </button>
                 )}
+                {deliveryIsTemporary && homeAddress && <button type="button" onClick={() => { setDeliveryLocation(homeLocation); setDeliveryIsTemporary(false); }} className="text-xs font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-950">Use home address</button>}
                 <label className="block text-sm font-bold text-slate-800">Cash to pay rider with
                   <span className="mt-2 flex h-14 items-center overflow-hidden rounded-xl border-2 border-emerald-300 bg-emerald-50 shadow-sm transition focus-within:border-emerald-700 focus-within:ring-4 focus-within:ring-emerald-600/15">
                     <span aria-hidden="true" className="grid h-full min-w-14 place-items-center border-r border-emerald-200 bg-emerald-100 font-display text-2xl font-bold text-emerald-900">₱</span>
@@ -514,7 +581,10 @@ export function ShopPage() {
                   : <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No orders yet. Your pickups and deliveries will appear here.</p>}
             </div>
           </section>}
-        </aside>
+        </div>
+        </div>
+        </div>
+        </div>
       </main>
     </div>
 
@@ -560,9 +630,11 @@ export function ShopPage() {
     {accountOpen && account.data && <CustomerAccountDialog base={base} business={business} account={account.data} onClose={() => setAccountOpen(false)} onSignOut={() => { setAccountOpen(false); logoutMutation.mutate(); }} />}
     {pickingLocation && (
       <DeliveryLocationDialog
-        initial={deliveryLocation}
+        initial={addressTarget === 'home' ? homeLocation : deliveryLocation}
         store={toLatLng(selectedBranch?.latitude, selectedBranch?.longitude) ?? toLatLng(shop.branches.find((b) => b.latitude != null)?.latitude, shop.branches.find((b) => b.latitude != null)?.longitude)}
         storeName={selectedBranch?.name}
+        hasSavedHome={!!composeAddress(homeLocation)}
+        homeMode={addressTarget === 'home'}
         onClose={() => setPickingLocation(false)}
         onSave={saveLocation}
       />
