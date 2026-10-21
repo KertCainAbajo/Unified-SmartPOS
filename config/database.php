@@ -110,6 +110,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Supabase "transaction" pooler (port 6543) shares connections between requests, so server-side prepared
+            // statements cannot be kept: set DB_EMULATE_PREPARES=true there. (Session mode allows only ~15 clients.)
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOLEAN) ?: null,
+            ]) : [],
         ],
 
         'sqlsrv' => [

@@ -1,0 +1,201 @@
+sku,category,name,unit,price
+GRC-001,Grocery & Pantry,Sinandomeng Rice,kg,55.00
+GRC-002,Grocery & Pantry,Jasmine Rice,kg,65.00
+GRC-003,Grocery & Pantry,Brown Rice,kg,70.00
+GRC-004,Grocery & Pantry,White Sugar,kg,40.00
+GRC-005,Grocery & Pantry,Brown Sugar,kg,45.00
+GRC-006,Grocery & Pantry,All-Purpose Flour,kg,55.00
+GRC-007,Grocery & Pantry,Cornstarch,pack,25.00
+GRC-008,Grocery & Pantry,Cooking Oil 500 ml,bottle,35.00
+GRC-009,Grocery & Pantry,Soy Sauce 350 ml,bottle,18.00
+GRC-010,Grocery & Pantry,Vinegar 350 ml,bottle,18.00
+GRC-011,Grocery & Pantry,Fish Sauce 350 ml,bottle,25.00
+GRC-012,Grocery & Pantry,Salt,pack,15.00
+GRC-013,Grocery & Pantry,Black Pepper,sachet,5.00
+GRC-014,Grocery & Pantry,Lucky Me Pancit Canton,pack,15.00
+GRC-015,Grocery & Pantry,Instant Chicken Noodles,pack,15.00
+GRC-016,Grocery & Pantry,Century Tuna,can,35.00
+GRC-017,Grocery & Pantry,Sardines,can,25.00
+GRC-018,Grocery & Pantry,Corned Beef,can,38.00
+GRC-019,Grocery & Pantry,Tomato Sauce,pouch,25.00
+GRC-020,Grocery & Pantry,Peanut Butter,jar,85.00
+BEV-001,Beverages,Coca-Cola 1.5 L,bottle,85.00
+BEV-002,Beverages,Pepsi 1.5 L,bottle,80.00
+BEV-003,Beverages,Sprite 1.5 L,bottle,80.00
+BEV-004,Beverages,Royal Orange 1.5 L,bottle,80.00
+BEV-005,Beverages,Mountain Dew 1.5 L,bottle,80.00
+BEV-006,Beverages,Bottled Water 500 ml,bottle,15.00
+BEV-007,Beverages,Bottled Water 1 L,bottle,25.00
+BEV-008,Beverages,C2 Green Tea,bottle,25.00
+BEV-009,Beverages,Nestea Iced Tea,bottle,25.00
+BEV-010,Beverages,Zest-O Orange Juice,pack,10.00
+BEV-011,Beverages,Minute Maid Juice,bottle,25.00
+BEV-012,Beverages,Dutch Mill Yogurt Drink,bottle,15.00
+BEV-013,Beverages,Chuckie Chocolate Milk,pack,20.00
+BEV-014,Beverages,Bear Brand Sterilized Milk,pack,20.00
+BEV-015,Beverages,Alaska Evaporated Milk,can,35.00
+BEV-016,Beverages,Nescafé Original,sachet,7.00
+BEV-017,Beverages,Kopiko Brown Coffee,sachet,7.00
+BEV-018,Beverages,Milo Chocolate Drink,sachet,10.00
+BEV-019,Beverages,Sting Energy Drink,bottle,25.00
+BEV-020,Beverages,Gatorade,bottle,45.00
+SNK-001,Snacks & Confectionery,Piattos Cheese,pack,20.00
+SNK-002,Snacks & Confectionery,Chippy BBQ,pack,10.00
+SNK-003,Snacks & Confectionery,Nova Multigrain,pack,20.00
+SNK-004,Snacks & Confectionery,Clover Chips,pack,10.00
+SNK-005,Snacks & Confectionery,Roller Coaster,pack,10.00
+SNK-006,Snacks & Confectionery,Oishi Prawn Crackers,pack,10.00
+SNK-007,Snacks & Confectionery,Potato Chips,pack,35.00
+SNK-008,Snacks & Confectionery,Oreo Cookies,pack,12.00
+SNK-009,Snacks & Confectionery,Fita Crackers,pack,10.00
+SNK-010,Snacks & Confectionery,SkyFlakes,pack,10.00
+SNK-011,Snacks & Confectionery,Rebisco Crackers,pack,10.00
+SNK-012,Snacks & Confectionery,Cream-O Cookies,pack,10.00
+SNK-013,Snacks & Confectionery,Presto Peanut Butter,pack,10.00
+SNK-014,Snacks & Confectionery,Cloud 9 Chocolate,bar,15.00
+SNK-015,Snacks & Confectionery,Choco Mucho,bar,15.00
+SNK-016,Snacks & Confectionery,Snickers,bar,45.00
+SNK-017,Snacks & Confectionery,KitKat,bar,35.00
+SNK-018,Snacks & Confectionery,Chupa Chups Lollipop,piece,10.00
+SNK-019,Snacks & Confectionery,Mentos Candy,pack,20.00
+SNK-020,Snacks & Confectionery,Halls Candy,pack,20.00
+PC-001,Personal Care,Safeguard Soap,bar,25.00
+PC-002,Personal Care,Dove Beauty Bar,bar,45.00
+PC-003,Personal Care,Palmolive Shampoo,sachet,7.00
+PC-004,Personal Care,Sunsilk Shampoo,sachet,7.00
+PC-005,Personal Care,Head & Shoulders Shampoo,sachet,10.00
+PC-006,Personal Care,Cream Silk Conditioner,sachet,7.00
+PC-007,Personal Care,Colgate Toothpaste,tube,55.00
+PC-008,Personal Care,Closeup Toothpaste,tube,45.00
+PC-009,Personal Care,Toothbrush,piece,30.00
+PC-010,Personal Care,Dental Floss,pack,45.00
+PC-011,Personal Care,Rexona Deodorant,piece,75.00
+PC-012,Personal Care,Nivea Deodorant,piece,100.00
+PC-013,Personal Care,Facial Wash,tube,85.00
+PC-014,Personal Care,Facial Tissue,pack,25.00
+PC-015,Personal Care,Cotton Buds,pack,20.00
+PC-016,Personal Care,Sanitary Napkins,pack,35.00
+PC-017,Personal Care,Pantyliners,pack,30.00
+PC-018,Personal Care,Disposable Razor,piece,20.00
+PC-019,Personal Care,Body Lotion,bottle,100.00
+PC-020,Personal Care,Alcohol 250 ml,bottle,45.00
+HH-001,Household & Cleaning,Surf Detergent,sachet,12.00
+HH-002,Household & Cleaning,Ariel Detergent,sachet,15.00
+HH-003,Household & Cleaning,Tide Detergent,sachet,12.00
+HH-004,Household & Cleaning,Downy Fabric Conditioner,sachet,10.00
+HH-005,Household & Cleaning,Champion Detergent,sachet,10.00
+HH-006,Household & Cleaning,Joy Dishwashing Liquid,bottle,25.00
+HH-007,Household & Cleaning,Axion Dishwashing Paste,tub,25.00
+HH-008,Household & Cleaning,Zonrox Bleach,bottle,35.00
+HH-009,Household & Cleaning,Lysol Disinfectant,bottle,100.00
+HH-010,Household & Cleaning,Floor Cleaner,bottle,55.00
+HH-011,Household & Cleaning,Glass Cleaner,bottle,75.00
+HH-012,Household & Cleaning,Toilet Bowl Cleaner,bottle,65.00
+HH-013,Household & Cleaning,Toilet Brush,piece,45.00
+HH-014,Household & Cleaning,Sponge Scrubber,piece,15.00
+HH-015,Household & Cleaning,Garbage Bags,roll,35.00
+HH-016,Household & Cleaning,Tissue Roll,roll,20.00
+HH-017,Household & Cleaning,Paper Towels,roll,45.00
+HH-018,Household & Cleaning,Broom,piece,85.00
+HH-019,Household & Cleaning,Dustpan,piece,40.00
+HH-020,Household & Cleaning,Laundry Brush,piece,35.00
+FRS-001,Fresh Produce & Meat,Red Onion,kg,120.00
+FRS-002,Fresh Produce & Meat,Garlic,kg,180.00
+FRS-003,Fresh Produce & Meat,Potato,kg,100.00
+FRS-004,Fresh Produce & Meat,Tomato,kg,80.00
+FRS-005,Fresh Produce & Meat,Carrot,kg,100.00
+FRS-006,Fresh Produce & Meat,Cabbage,kg,80.00
+FRS-007,Fresh Produce & Meat,Eggplant,kg,80.00
+FRS-008,Fresh Produce & Meat,Sayote,kg,50.00
+FRS-009,Fresh Produce & Meat,Squash,kg,60.00
+FRS-010,Fresh Produce & Meat,Kangkong,bundle,20.00
+FRS-011,Fresh Produce & Meat,Pechay,bundle,25.00
+FRS-012,Fresh Produce & Meat,Lettuce,kg,150.00
+FRS-013,Fresh Produce & Meat,Banana,kg,70.00
+FRS-014,Fresh Produce & Meat,Apple,piece,25.00
+FRS-015,Fresh Produce & Meat,Orange,piece,25.00
+FRS-016,Fresh Produce & Meat,Mango,kg,120.00
+FRS-017,Fresh Produce & Meat,Chicken,kg,220.00
+FRS-018,Fresh Produce & Meat,Pork Belly,kg,380.00
+FRS-019,Fresh Produce & Meat,Ground Pork,kg,350.00
+FRS-020,Fresh Produce & Meat,Eggs,piece,9.00
+SCH-001,School & Office Supplies,Ballpen,piece,10.00
+SCH-002,School & Office Supplies,Pencil,piece,8.00
+SCH-003,School & Office Supplies,Eraser,piece,8.00
+SCH-004,School & Office Supplies,Sharpener,piece,10.00
+SCH-005,School & Office Supplies,Notebook,piece,25.00
+SCH-006,School & Office Supplies,Composition Notebook,piece,35.00
+SCH-007,School & Office Supplies,Bond Paper (ream),ream,250.00
+SCH-008,School & Office Supplies,Bond Paper (sheet),sheet,5.00
+SCH-009,School & Office Supplies,Manila Paper,sheet,10.00
+SCH-010,School & Office Supplies,Folder,piece,12.00
+SCH-011,School & Office Supplies,Envelope,piece,5.00
+SCH-012,School & Office Supplies,Yellow Pad,pad,45.00
+SCH-013,School & Office Supplies,Ruler,piece,15.00
+SCH-014,School & Office Supplies,Scissors,piece,35.00
+SCH-015,School & Office Supplies,Glue,bottle,20.00
+SCH-016,School & Office Supplies,Correction Tape,piece,35.00
+SCH-017,School & Office Supplies,Highlighter,piece,25.00
+SCH-018,School & Office Supplies,Permanent Marker,piece,25.00
+SCH-019,School & Office Supplies,Stapler,piece,85.00
+SCH-020,School & Office Supplies,Paper Clips,box,20.00
+ELC-001,Electronics & Accessories,USB-C Charging Cable,piece,99.00
+ELC-002,Electronics & Accessories,Micro USB Cable,piece,79.00
+ELC-003,Electronics & Accessories,Lightning Cable,piece,149.00
+ELC-004,Electronics & Accessories,USB-C Wall Charger,piece,199.00
+ELC-005,Electronics & Accessories,Dual USB Wall Charger,piece,149.00
+ELC-006,Electronics & Accessories,Wired Earphones,piece,149.00
+ELC-007,Electronics & Accessories,Wireless Earbuds,pair,499.00
+ELC-008,Electronics & Accessories,"Power Bank 10,000 mAh",piece,699.00
+ELC-009,Electronics & Accessories,AA Batteries,pack,35.00
+ELC-010,Electronics & Accessories,AAA Batteries,pack,35.00
+ELC-011,Electronics & Accessories,Phone Case,piece,120.00
+ELC-012,Electronics & Accessories,Tempered Glass,piece,80.00
+ELC-013,Electronics & Accessories,Phone Holder,piece,99.00
+ELC-014,Electronics & Accessories,USB Flash Drive 32 GB,piece,199.00
+ELC-015,Electronics & Accessories,USB Flash Drive 64 GB,piece,299.00
+ELC-016,Electronics & Accessories,Wireless Mouse,piece,299.00
+ELC-017,Electronics & Accessories,Wired Keyboard,piece,350.00
+ELC-018,Electronics & Accessories,HDMI Cable,piece,150.00
+ELC-019,Electronics & Accessories,Extension Cord,piece,250.00
+ELC-020,Electronics & Accessories,LED Bulb,piece,75.00
+CLO-001,Clothing & Accessories,Basic T-Shirt,piece,199.00
+CLO-002,Clothing & Accessories,Polo Shirt,piece,299.00
+CLO-003,Clothing & Accessories,Long-Sleeve Shirt,piece,349.00
+CLO-004,Clothing & Accessories,Jeans,pair,599.00
+CLO-005,Clothing & Accessories,Denim Shorts,pair,249.00
+CLO-006,Clothing & Accessories,Jogger Pants,pair,399.00
+CLO-007,Clothing & Accessories,Sports Shorts,pair,199.00
+CLO-008,Clothing & Accessories,Hoodie,piece,499.00
+CLO-009,Clothing & Accessories,Jacket,piece,699.00
+CLO-010,Clothing & Accessories,Underwear,piece,99.00
+CLO-011,Clothing & Accessories,Socks,pair,49.00
+CLO-012,Clothing & Accessories,Baseball Cap,piece,149.00
+CLO-013,Clothing & Accessories,Bucket Hat,piece,129.00
+CLO-014,Clothing & Accessories,Belt,piece,149.00
+CLO-015,Clothing & Accessories,Wallet,piece,199.00
+CLO-016,Clothing & Accessories,Tote Bag,piece,99.00
+CLO-017,Clothing & Accessories,Backpack,piece,499.00
+CLO-018,Clothing & Accessories,Slippers,pair,99.00
+CLO-019,Clothing & Accessories,Sandals,pair,249.00
+CLO-020,Clothing & Accessories,Sneakers,pair,899.00
+BKR-001,Bakery & Desserts,Pandesal,piece,3.00
+BKR-002,Bakery & Desserts,Spanish Bread,piece,8.00
+BKR-003,Bakery & Desserts,Monay,piece,10.00
+BKR-004,Bakery & Desserts,Ensaymada,piece,20.00
+BKR-005,Bakery & Desserts,Cheese Bread,piece,12.00
+BKR-006,Bakery & Desserts,Loaf Bread,loaf,75.00
+BKR-007,Bakery & Desserts,Whole Wheat Bread,loaf,95.00
+BKR-008,Bakery & Desserts,Croissant,piece,45.00
+BKR-009,Bakery & Desserts,Chocolate Donut,piece,25.00
+BKR-010,Bakery & Desserts,Glazed Donut,piece,20.00
+BKR-011,Bakery & Desserts,Cinnamon Roll,piece,40.00
+BKR-012,Bakery & Desserts,Blueberry Muffin,piece,35.00
+BKR-013,Bakery & Desserts,Chocolate Muffin,piece,35.00
+BKR-014,Bakery & Desserts,Brownie,piece,30.00
+BKR-015,Bakery & Desserts,Chocolate Chip Cookie,piece,20.00
+BKR-016,Bakery & Desserts,Butter Cookies,pack,45.00
+BKR-017,Bakery & Desserts,Cupcake,piece,25.00
+BKR-018,Bakery & Desserts,Cheesecake Slice,slice,100.00
+BKR-019,Bakery & Desserts,Chocolate Cake Slice,slice,85.00
+BKR-020,Bakery & Desserts,Ube Cake Slice,slice,85.00

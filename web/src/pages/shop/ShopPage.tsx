@@ -488,7 +488,7 @@ export function ShopPage() {
         {(shop.business.legal_name || shop.business.address || shop.business.phone || shop.business.email) && <span className="mt-2 block">{[shop.business.legal_name, shop.business.address, shop.business.phone, shop.business.email].filter(Boolean).join(' · ')}</span>}
         <span className="mt-1 block text-[10px]">For order or refund questions, contact this store using the details above.</span>
         <LegalLinks tone="dark" className="mt-3" />
-        {shop.data.some((p) => p.image_url) && <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0) and Wikimedia Commons.</span>}
+        {shop.data.some((p) => p.image_url) && <span className="mt-1 block text-[10px] text-emerald-50/35 sm:text-[11px]">Some product photos: Open Food Facts, Open Beauty Facts &amp; Open Products Facts contributors (CC BY-SA 3.0), Wikimedia Commons; illustrations: Google Noto Emoji (Apache 2.0).</span>}
       </div>
     </footer>
 
