@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ConfirmProvider } from '../../../components/Confirm';
@@ -66,7 +66,7 @@ it('places a pickup order for a signed-in customer and shows it in their orders'
   fireEvent.click(screen.getAllByRole('button', { name: 'Add one Bath Soap' })[0]); // product card and basket both have a stepper
   expect((await screen.findByRole('button', { name: 'Choose a branch' }) as HTMLButtonElement).disabled).toBe(true);
 
-  fireEvent.click(screen.getByRole('radio', { name: /Main Branch/ }));
+  fireEvent.click(within(document.getElementById('basket')!).getByRole('button', { name: /Main Branch/ }));
   fireEvent.click(await screen.findByRole('button', { name: /Place pickup order/ }));
 
   expect(await screen.findByText('Order ONL-0009 placed')).toBeTruthy();

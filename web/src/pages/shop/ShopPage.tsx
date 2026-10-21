@@ -77,6 +77,8 @@ export function ShopPage() {
   // location cannot replace home unless the customer explicitly chooses to save it there.
   const [locationOwner, setLocationOwner] = useState<number | null>(null);
   const locationKey = (owner: number) => `shop-delivery:${business}:${owner}`;
+  /** The address the next delivery goes to, when it differs from home (kept across page refreshes). */
+  const activeKey = (owner: number) => `shop-delivery-active:${business}:${owner}`;
   const [homeLocation, setHomeLocation] = useState<DeliveryLocation>(emptyLocation);
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation>(emptyLocation);
   const [deliveryIsTemporary, setDeliveryIsTemporary] = useState(false);
@@ -144,11 +146,22 @@ export function ShopPage() {
     let savedHome = emptyLocation;
     if (accountId) { try { savedHome = loadLocation(localStorage.getItem(locationKey(accountId))); } catch { /* start empty */ } }
     setHomeLocation(savedHome);
+    // A one-time delivery address chosen before a refresh comes back; otherwise start from home.
+    let savedActive: DeliveryLocation | null = null;
+    if (accountId) { try { const raw = localStorage.getItem(activeKey(accountId)); savedActive = raw ? loadLocation(raw) : null; } catch { /* none */ } }
     // Preserve a guest's in-progress delivery address when they sign in; otherwise start from this account's home.
-    const keepGuestDelivery = previousOwner === null && !!accountId;
-    setDeliveryIsTemporary(keepGuestDelivery && !!composeAddress(deliveryLocation));
-    setDeliveryLocation((current) => keepGuestDelivery && composeAddress(current) ? current : savedHome);
+    const keepGuestDelivery = previousOwner === null && !!accountId && !!composeAddress(deliveryLocation);
+    const useActive = !keepGuestDelivery && !!savedActive && !!composeAddress(savedActive);
+    setDeliveryIsTemporary(keepGuestDelivery || useActive);
+    setDeliveryLocation((current) => keepGuestDelivery ? current : useActive && savedActive ? savedActive : savedHome);
   }, [accountId, business]); // eslint-disable-line react-hooks/exhaustive-deps -- reload only when the customer changes
+  useEffect(() => {
+    if (!locationOwner) return;
+    try {
+      if (deliveryIsTemporary && composeAddress(deliveryLocation)) localStorage.setItem(activeKey(locationOwner), JSON.stringify(deliveryLocation));
+      else localStorage.removeItem(activeKey(locationOwner));
+    } catch { /* remembered for this visit only */ }
+  }, [deliveryLocation, deliveryIsTemporary, locationOwner]); // eslint-disable-line react-hooks/exhaustive-deps
   // Poll faster while a rider is on the way so the map follows them.
   const orders = useQuery({
     queryKey: ['shop-orders', business],
@@ -235,6 +248,7 @@ export function ShopPage() {
   const setShown = (count: number) => setPaging({ key: pageKey, count });
   const openCategory = (category: string) => {
     setSelectedCategory(category);
+    setActiveSection('categories');
     document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
   };
   const card = (product: ShopProduct) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />;
@@ -317,7 +331,7 @@ export function ShopPage() {
                 <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{countFor(category)}</span>
               </button>;
             })}
-            {(savedCount > 0 || selectedCategory === SAVED) && <button onClick={() => setSelectedCategory(SAVED)} aria-pressed={selectedCategory === SAVED} className={`inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 lg:ml-auto text-[13px] font-semibold transition ${selectedCategory === SAVED ? 'bg-rose-500 text-white shadow-md' : 'bg-white text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50'}`}>
+            {(savedCount > 0 || selectedCategory === SAVED) && <button onClick={() => { setSelectedCategory(SAVED); setActiveSection('favorites'); }} aria-pressed={selectedCategory === SAVED} className={`inline-flex shrink-0 snap-start items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 lg:ml-auto text-[13px] font-semibold transition ${selectedCategory === SAVED ? 'bg-rose-500 text-white shadow-md' : 'bg-white text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50'}`}>
               <span className={`grid size-7 place-items-center rounded-full ${selectedCategory === SAVED ? 'bg-white/20' : 'bg-rose-100'}`}><Heart size={14} className="fill-current" /></span> Saved
               <span className={`rounded-full px-1.5 text-[10px] font-bold ${selectedCategory === SAVED ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-600'}`}>{savedCount}</span>
             </button>}
@@ -374,7 +388,7 @@ export function ShopPage() {
           <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               {selectedCategory !== ALL && (
-                <button type="button" onClick={() => { setSelectedCategory(ALL); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                <button type="button" onClick={() => { setSelectedCategory(ALL); setActiveSection('products'); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
                   className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-white pl-2.5 pr-4 text-sm font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50">
                   <ChevronLeft size={16} /> All categories
                 </button>
@@ -395,7 +409,7 @@ export function ShopPage() {
           {shop.data.length === 0
             ? <EmptyAisle />
             : !visibleProducts.length
-              ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
+              ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); setActiveSection('products'); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
               : aisles
                 ? <div className="mt-5 space-y-8">
                   {[...categories.slice(1), OTHER].map((category) => {
@@ -635,6 +649,8 @@ export function ShopPage() {
         storeName={selectedBranch?.name}
         hasSavedHome={!!composeAddress(homeLocation)}
         homeMode={addressTarget === 'home'}
+        homeAddress={homeAddress || undefined}
+        onUseHome={() => { setDeliveryLocation(homeLocation); setDeliveryIsTemporary(false); setPickingLocation(false); }}
         onClose={() => setPickingLocation(false)}
         onSave={saveLocation}
       />

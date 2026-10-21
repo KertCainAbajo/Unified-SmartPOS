@@ -39,12 +39,15 @@ export function composeAddress(loc: DeliveryLocation): string {
  * Full-screen delivery address form. Shopee-style dropdowns pick the region, province, city and barangay; the map
  * (like Foodpanda) then puts the pin exactly on the door, so the rider can find it and the customer can track them.
  */
-export function DeliveryLocationDialog({ initial, store, storeName, hasSavedHome, homeMode, onClose, onSave }: {
+export function DeliveryLocationDialog({ initial, store, storeName, hasSavedHome, homeMode, homeAddress, onUseHome, onClose, onSave }: {
   initial: DeliveryLocation;
   store: LatLng | null;
   storeName?: string;
   hasSavedHome: boolean;
   homeMode: boolean;
+  /** The saved home address, offered as a one-tap choice when picking a delivery address. */
+  homeAddress?: string;
+  onUseHome?: () => void;
   onClose: () => void;
   onSave: (location: DeliveryLocation, saveAsHome: boolean) => void;
 }) {
@@ -238,6 +241,20 @@ export function DeliveryLocationDialog({ initial, store, storeName, hasSavedHome
             <h2 className="mt-1 font-display text-2xl font-bold text-slate-900">Where should we deliver?</h2>
             <p className="mt-1 text-sm text-slate-500">Choose your area, add your street and house no., then check the pin is on your door.</p>
           </div>
+
+          {!homeMode && homeAddress && onUseHome && (
+            <div className="space-y-2">
+              <button type="button" onClick={onUseHome} className="flex w-full items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-left transition hover:border-emerald-400 hover:bg-emerald-50">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white"><Home className="size-5" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-900">Use my home address</span>
+                  <span className="block truncate text-xs text-slate-600">{homeAddress}</span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-emerald-700">Use</span>
+              </button>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.14em] text-slate-400"><span className="h-px flex-1 bg-slate-200" />or deliver somewhere else<span className="h-px flex-1 bg-slate-200" /></p>
+            </div>
+          )}
 
           <div className="block">
             <span className="mb-1.5 block text-sm font-semibold text-slate-800">Region, Province, City, Barangay</span>
