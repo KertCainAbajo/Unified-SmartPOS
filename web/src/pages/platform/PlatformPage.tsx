@@ -374,6 +374,7 @@ function AccountsTab() {
   const q = useDebounced(search.trim());
   const [action, setAction] = useState<{ user: PlatformUser; kind: 'status' | 'admin' | 'reset' } | null>(null);
   const [addAccount, setAddAccount] = useState(false);
+  const [addAdmin, setAddAdmin] = useState(false);
   const { user: me } = useAuth();
   const list = useQuery({
     queryKey: ['platform-users', q, filter, page],
@@ -399,7 +400,10 @@ function AccountsTab() {
         <h1 className="font-display text-2xl font-bold text-brand-900 sm:text-3xl">Accounts & admins</h1>
         <p className="mt-1 text-sm text-slate-500">Manage sign-in accounts, business staff roles, and who can open this console.</p>
         </div>
-        <Button icon={<UserPlus className="size-4" />} onClick={() => setAddAccount(true)}>Add business account</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon={<Crown className="size-4" />} onClick={() => setAddAdmin(true)}>Add Super Admin</Button>
+          <Button icon={<UserPlus className="size-4" />} onClick={() => setAddAccount(true)}>Add business account</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -522,6 +526,7 @@ function AccountsTab() {
       </div>
       {action && <AccountDialog user={action.user} kind={action.kind} onClose={() => setAction(null)} />}
       {addAccount && <AddStaffAccountDialog onClose={() => setAddAccount(false)} />}
+      {addAdmin && <AddPlatformAdminDialog onClose={() => setAddAdmin(false)} />}
     </div>
   );
 }
@@ -757,6 +762,42 @@ function AccountDialog({ user, kind, onClose }: { user: PlatformUser; kind: 'sta
       </div>
     </Modal>
   );
+}
+
+function AddPlatformAdminDialog({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [email, setEmail] = useState('');
+  const [created, setCreated] = useState<{ email: string; name: string; source: 'existing_login' | 'shop_customer' | 'new_email'; temporary_password: string | null; expires_at: string | null; converted_to_personal: boolean } | null>(null);
+  const save = useMutation({
+    mutationFn: () => api<{ data: NonNullable<typeof created> }>('/platform/admins', {
+      method: 'POST', body: { email: email.trim() },
+    }),
+    onSuccess: (response) => {
+      setCreated(response.data);
+      for (const key of ['platform-users', 'platform-overview', 'platform-activity']) void queryClient.invalidateQueries({ queryKey: [key] });
+      toast.success('Super Admin added.');
+    },
+  });
+
+  return <Modal open onClose={onClose} title={created ? 'Super Admin account created' : 'Add Super Admin'} icon={Crown} size="md"
+    footer={created ? <Button onClick={onClose}>Done</Button> : <><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} disabled={!email.trim()} onClick={() => save.mutate()}>Add Super Admin</Button></>}>
+    <div className="space-y-4">
+      {created ? <div className="space-y-3 rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
+        <p className="text-sm font-semibold text-amber-950">{created.name} now has Super Admin access.</p>
+        <p className="text-sm text-slate-700">Management sign-in email: <code className="select-all font-bold">{created.email}</code></p>
+        {created.temporary_password ? <>
+          <p className="text-sm text-slate-700">The account name was set from the email address; they can update it after signing in.</p>
+          <div><p className="text-xs font-semibold text-amber-950">Temporary password (expires in 24 hours)</p><code className="mt-1 block select-all break-all rounded-lg bg-white p-3 font-bold text-slate-900 ring-1 ring-amber-200">{created.temporary_password}</code></div>
+          <p className="text-xs text-amber-900">Share it directly. They must change it at first sign-in and confirm a sign-in code sent to their email.</p>
+        </> : <p className="text-xs text-amber-900">They keep their existing password and should sign in through Management. {created.source === 'shop_customer' ? 'Their online-shop account has been moved to this login.' : created.converted_to_personal ? 'Their business login is now a personal Super Admin login; their business membership remains.' : ''}</p>}
+      </div> : <>
+        <p className="text-sm text-slate-600">Enter the person’s email. If they already have an account, it will be promoted and their password will stay the same. A new email gets a temporary password. Only add someone you trust to manage the platform.</p>
+        <label className="block text-sm font-medium text-slate-700">Email address<input type="email" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} autoFocus /></label>
+        {save.error instanceof ApiError && <ErrorBanner error={save.error} />}
+      </>}
+    </div>
+  </Modal>;
 }
 
 interface StaffSetupOptions {

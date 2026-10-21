@@ -209,6 +209,87 @@ class PlatformConsoleController extends Controller
         return response()->json(['data' => ['temporary_password' => $temporaryPassword, 'expires_at' => $expiresAt->toIso8601String()]]);
     }
 
+    /** Add platform administration by email: promote an existing login/customer, or create a new login. */
+    public function createAdminAccount(Request $request): JsonResponse
+    {
+        $request->merge(['email' => mb_strtolower(trim((string) $request->input('email')))]);
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+        $email = $data['email'];
+        if (mb_strtolower((string) $request->user()->email) === $email) {
+            throw new BusinessRuleException('This is already your Super Admin account. Enter another person’s email.', 'PLATFORM_SELF_CHANGE', status: 409);
+        }
+
+        $temporaryPassword = null;
+        $expiresAt = null;
+        [$admin, $source, $converted, $shopAccountsClosed] = DB::transaction(function () use ($request, $email, &$temporaryPassword, &$expiresAt) {
+            $admin = User::query()->where('email', $email)->lockForUpdate()->first();
+            $customer = CustomerAccount::query()->where('email', $email)
+                ->where('status', '!=', CustomerAccount::STATUS_MOVED_TO_ADMIN)->lockForUpdate()->first();
+
+            if ($admin?->is($request->user())) {
+                throw new BusinessRuleException('This is already your Super Admin account. Enter another person’s email.', 'PLATFORM_SELF_CHANGE', status: 409);
+            }
+            if ($admin && $admin->status !== UserStatus::Active->value) {
+                throw new BusinessRuleException('This email already has an inactive sign-in account. Enable it first.', 'PLATFORM_ADMIN_NOT_ELIGIBLE', status: 409);
+            }
+            if ($admin?->is_platform_admin) {
+                throw new BusinessRuleException('This email is already a Super Admin.', 'ALREADY_PLATFORM_ADMIN', status: 409);
+            }
+            if (! $admin && $customer && ! $customer->isActive()) {
+                throw new BusinessRuleException('This email has an unverified or inactive online-shop account. Ask the person to verify it before adding them.', 'CUSTOMER_ACCOUNT_NOT_ACTIVE', status: 409);
+            }
+
+            $converted = $admin !== null && $admin->managed_by_tenant_id !== null;
+            $created = $admin === null;
+            $source = $admin ? 'existing_login' : ($customer ? 'shop_customer' : 'new_email');
+            if ($created) {
+                $name = $customer?->name ?: Str::headline(Str::before($email, '@'));
+                $attributes = [
+                    'name' => $name, 'email' => $email, 'status' => UserStatus::Active->value,
+                    'is_platform_admin' => true, 'managed_by_tenant_id' => null,
+                ];
+                if ($customer) {
+                    // Preserve the verified shop customer's existing password.
+                    $attributes['password'] = $customer->getAttributes()['password'];
+                    $attributes['phone'] = $customer->phone;
+                    $attributes['must_change_password'] = false;
+                    $attributes['temporary_password_expires_at'] = null;
+                } else {
+                    $temporaryPassword = Str::password(20);
+                    $expiresAt = now()->addHours(24);
+                    $attributes['password'] = $temporaryPassword;
+                    $attributes['must_change_password'] = true;
+                    $attributes['temporary_password_expires_at'] = $expiresAt;
+                }
+                $admin = (new User)->forceFill($attributes);
+            } else {
+                $admin->forceFill(['is_platform_admin' => true, 'managed_by_tenant_id' => null]);
+            }
+            $admin->save();
+            if (! $created) {
+                $admin->tokens()->delete();
+            }
+            $shopAccountsClosed = CustomerAccount::closeForAdmin($email);
+            $this->audit->log('platform.admin_granted', $admin, null, null, array_filter([
+                'reason' => 'Added from Super Admin by email', 'source' => $source, 'email' => $email,
+                'login_created' => $created, 'converted_to_personal' => $converted ?: null,
+                'shop_accounts_closed' => $shopAccountsClosed,
+                'temporary_password_expires_at' => $expiresAt?->toIso8601String(),
+            ]), userId: $request->user()->id);
+
+            return [$admin, $source, $converted, $shopAccountsClosed];
+        });
+
+        return response()->json(['data' => [
+            'id' => $admin->id, 'name' => $admin->name, 'email' => $admin->email,
+            'source' => $source, 'temporary_password' => $temporaryPassword,
+            'expires_at' => $expiresAt?->toIso8601String(), 'converted_to_personal' => $converted,
+            'shop_accounts_closed' => $shopAccountsClosed,
+        ]], $temporaryPassword !== null ? 201 : 200);
+    }
+
     /** Disable or re-enable a sign-in account everywhere. A disabled account is signed out on its next request. */
     public function updateUserStatus(Request $request, User $user): JsonResponse
     {
