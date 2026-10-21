@@ -6,14 +6,21 @@ use App\Enums\UserStatus;
 use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Branch;
 use App\Models\CustomerAccount;
+use App\Models\Role;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Staff\AccessRevoker;
+use App\Services\Staff\EmployeeCodeGenerator;
+use App\Services\Staff\UsernameGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Platform Super Admin console: overview of the platform, one business's account details, sign-in accounts, platform
@@ -112,6 +119,94 @@ class PlatformConsoleController extends Controller
             'disabled' => User::query()->where('status', UserStatus::Disabled->value)->count(),
             'never' => User::query()->whereNull('last_login_at')->count(),
         ]]);
+    }
+
+    /** Available businesses, branches and safe system roles for provisioning a staff account. */
+    public function staffOptions(Tenant $tenant): JsonResponse
+    {
+        $roles = Role::query()->whereNull('tenant_id')->where('is_system', true)->with('permissions:id,key')->orderBy('name')->get()
+            ->reject(fn (Role $role) => $role->isAdministrative())
+            ->map(fn (Role $role) => ['id' => $role->id, 'key' => $role->key, 'name' => $role->name]);
+
+        return response()->json(['data' => [
+            'tenant' => ['id' => $tenant->id, 'name' => $tenant->name, 'status' => $tenant->status],
+            'branches' => $tenant->branches()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
+            'roles' => $roles->values(),
+        ]]);
+    }
+
+    /** Create an active company-managed account with a one-time password and a non-administrative system role. */
+    public function createStaffAccount(Request $request, Tenant $tenant, UsernameGenerator $usernames, EmployeeCodeGenerator $employeeCodes): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+        ]);
+        if (! $tenant->isActive()) {
+            throw new BusinessRuleException('Staff accounts can only be created for an active business.', 'TENANT_INACTIVE', status: 409);
+        }
+
+        $role = Role::query()->whereKey($data['role_id'])->whereNull('tenant_id')->where('is_system', true)->with('permissions:id,key')->first();
+        if (! $role || $role->isAdministrative()) {
+            throw new BusinessRuleException('Choose a non-administrative system role. Business owner and access roles must be granted by the business owner.', 'ROLE_NOT_ALLOWED', status: 422);
+        }
+        $branch = Branch::query()->whereKey($data['branch_id'])->where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        if (! $branch) {
+            throw new BusinessRuleException('Choose an active branch from the selected business.', 'BRANCH_NOT_ALLOWED', status: 422);
+        }
+
+        $username = $usernames->suggest($tenant->id, $role->key, $branch->code);
+        $temporaryPassword = Str::password(20);
+        $expiresAt = now()->addHours(24);
+        $membership = DB::transaction(function () use ($request, $tenant, $data, $role, $branch, $username, $temporaryPassword, $expiresAt, $employeeCodes) {
+            $user = User::query()->forceCreate([
+                'name' => trim($data['name']), 'email' => isset($data['email']) ? mb_strtolower(trim($data['email'])) : null,
+                'username' => $username, 'managed_by_tenant_id' => $tenant->id, 'password' => $temporaryPassword,
+                'status' => UserStatus::Active->value, 'must_change_password' => true, 'temporary_password_expires_at' => $expiresAt,
+            ]);
+            $membership = TenantMembership::query()->create([
+                'tenant_id' => $tenant->id, 'user_id' => $user->id, 'employee_code' => $employeeCodes->next($tenant->id),
+                'status' => 'active', 'all_branches' => false, 'joined_at' => now(), 'created_by' => $request->user()->id,
+            ]);
+            $membership->roles()->attach($role->id);
+            $membership->branches()->attach($branch->id);
+            $this->audit->log('platform.staff_account_created', $user, null, [
+                'tenant_id' => $tenant->id, 'role' => $role->key, 'branch_id' => $branch->id, 'username' => $username,
+                'temporary_password_expires_at' => $expiresAt->toIso8601String(),
+            ], tenantId: $tenant->id);
+
+            return $membership->load(['user', 'roles:id,name,key', 'branches:id,name']);
+        });
+
+        return response()->json(['data' => [
+            'id' => $membership->user->id, 'name' => $membership->user->name, 'email' => $membership->user->email,
+            'business_code' => $tenant->slug, 'username' => $username, 'employee_code' => $membership->employee_code, 'role' => $role->name,
+            'branch' => $branch->name, 'temporary_password' => $temporaryPassword, 'expires_at' => $expiresAt->toIso8601String(),
+        ]], 201);
+    }
+
+    /** Issue another user's one-time password; sessions and outstanding recovery credentials are revoked. */
+    public function resetUserPassword(Request $request, User $user, AccessRevoker $revoker): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+        if ($user->is($request->user())) {
+            throw new BusinessRuleException('You cannot reset your own password from this console. Use Forgot password instead.', 'PLATFORM_SELF_CHANGE', status: 409);
+        }
+        if ($user->status !== UserStatus::Active->value) {
+            throw new BusinessRuleException('Only active accounts can receive a temporary password.', 'ACCOUNT_NOT_ACTIVE', status: 409);
+        }
+
+        $temporaryPassword = Str::password(20);
+        $expiresAt = now()->addHours(24);
+        DB::transaction(function () use ($user, $temporaryPassword, $expiresAt, $revoker, $request, $data) {
+            $user->forceFill(['password' => $temporaryPassword, 'must_change_password' => true, 'temporary_password_expires_at' => $expiresAt])->save();
+            $revoker->revokeAll($user);
+            $this->audit->log('platform.user_password_reset', $user, null, ['temporary_password_expires_at' => $expiresAt->toIso8601String()], ['reason' => trim($data['reason'])]);
+        });
+
+        return response()->json(['data' => ['temporary_password' => $temporaryPassword, 'expires_at' => $expiresAt->toIso8601String()]]);
     }
 
     /** Disable or re-enable a sign-in account everywhere. A disabled account is signed out on its next request. */
@@ -238,7 +333,7 @@ class PlatformConsoleController extends Controller
     public function activity(Request $request): JsonResponse
     {
         $data = $request->validate(['type' => ['nullable', 'in:businesses,accounts,admins']]);
-        $actions = ['businesses' => ['platform.tenant_status_changed'], 'accounts' => ['platform.user_status_changed'], 'admins' => ['platform.admin_granted', 'platform.admin_revoked']];
+        $actions = ['businesses' => ['platform.tenant_status_changed'], 'accounts' => ['platform.user_status_changed', 'platform.user_password_reset', 'platform.staff_account_created'], 'admins' => ['platform.admin_granted', 'platform.admin_revoked']];
         $page = $this->platformLog()->when($data['type'] ?? null, fn ($q, $type) => $q->whereIn('action', $actions[$type]))
             ->paginate($this->perPage($request, 30));
         $counts = AuditLog::query()->where('action', 'like', 'platform.%')->selectRaw('action, count(*) as total')->groupBy('action')->pluck('total', 'action');

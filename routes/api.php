@@ -124,8 +124,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('overview', [PlatformConsoleController::class, 'overview'])->name('overview');
             Route::get('tenants/{tenant}', [PlatformConsoleController::class, 'showTenant'])->name('tenants.show');
             Route::get('users', [PlatformConsoleController::class, 'users'])->name('users.index');
+            Route::get('tenants/{tenant}/staff-options', [PlatformConsoleController::class, 'staffOptions'])->name('staff.options');
+            Route::post('tenants/{tenant}/staff', [PlatformConsoleController::class, 'createStaffAccount'])->name('staff.store');
             Route::patch('users/{user}/status', [PlatformConsoleController::class, 'updateUserStatus'])->name('users.status');
             Route::patch('users/{user}/admin', [PlatformConsoleController::class, 'updateAdmin'])->name('users.admin');
+            Route::post('users/{user}/password-reset', [PlatformConsoleController::class, 'resetUserPassword'])->name('users.password-reset');
             Route::get('activity', [PlatformConsoleController::class, 'activity'])->name('activity');
             Route::get('customer-lookup', [PlatformConsoleController::class, 'customerLookup'])->name('customers.lookup');
             Route::post('customer-accounts/{customerAccount}/make-admin', [PlatformConsoleController::class, 'promoteCustomer'])->name('customers.make-admin');

@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, AlertTriangle, ArrowRight, Building2, CheckCircle2, KeyRound, Pencil, XCircle, CalendarDays, ChevronRight, CircleCheck, CirclePause, Clock, Crown, Download, Globe, LayoutDashboard,
-  LogOut, Mail, MapPin, Phone, Search, ShieldCheck, ShieldOff, ShoppingBag, Store, UserCheck, UserCog, UserX, Users, type LucideIcon,
+  LogOut, Mail, MapPin, Phone, Search, ShieldCheck, ShieldOff, ShoppingBag, Store, UserCheck, UserCog, UserPlus, UserX, Users, type LucideIcon,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router';
@@ -372,7 +372,8 @@ function AccountsTab() {
   const [filter, setFilter] = useState<AccountFilter>('');
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
-  const [action, setAction] = useState<{ user: PlatformUser; kind: 'status' | 'admin' } | null>(null);
+  const [action, setAction] = useState<{ user: PlatformUser; kind: 'status' | 'admin' | 'reset' } | null>(null);
+  const [addAccount, setAddAccount] = useState(false);
   const { user: me } = useAuth();
   const list = useQuery({
     queryKey: ['platform-users', q, filter, page],
@@ -393,9 +394,12 @@ function AccountsTab() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
         <h1 className="font-display text-2xl font-bold text-brand-900 sm:text-3xl">Accounts & admins</h1>
-        <p className="mt-1 text-sm text-slate-500">Every sign-in account on the platform. Disable an account that is misused, and decide who can open this console.</p>
+        <p className="mt-1 text-sm text-slate-500">Manage sign-in accounts, business staff roles, and who can open this console.</p>
+        </div>
+        <Button icon={<UserPlus className="size-4" />} onClick={() => setAddAccount(true)}>Add business account</Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -481,6 +485,7 @@ function AccountsTab() {
                                 {u.status === 'disabled' ? <UserCheck className="size-4" /> : <UserX className="size-4" />}
                               </IconAction>
                             )}
+                            {!self && u.status === 'active' && <IconAction label="Reset password" tone="default" onClick={() => setAction({ user: u, kind: 'reset' })}><KeyRound className="size-4" /></IconAction>}
                             {self && <span className="text-[11px] text-slate-400">Your account</span>}
                           </div>
                         </td>
@@ -516,6 +521,7 @@ function AccountsTab() {
         </aside>
       </div>
       {action && <AccountDialog user={action.user} kind={action.kind} onClose={() => setAction(null)} />}
+      {addAccount && <AddStaffAccountDialog onClose={() => setAddAccount(false)} />}
     </div>
   );
 }
@@ -655,30 +661,35 @@ function CustomerAdminDialog({ customer, existingLogin, onClose, onDone }: { cus
   );
 }
 
-function AccountDialog({ user, kind, onClose }: { user: PlatformUser; kind: 'status' | 'admin'; onClose: () => void }) {
+function AccountDialog({ user, kind, onClose }: { user: PlatformUser; kind: 'status' | 'admin' | 'reset'; onClose: () => void }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user: me } = useAuth();
   const [reason, setReason] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const disabling = kind === 'status' && user.status !== 'disabled';
   const granting = kind === 'admin' && !user.is_platform_admin;
   const converting = granting && user.company_managed;
   const destructive = disabling || (kind === 'admin' && !granting);
   const save = useMutation({
-    mutationFn: () => kind === 'status'
+    mutationFn: () => kind === 'reset'
+      ? api<{ data: { temporary_password: string } }>(`/platform/users/${user.id}/password-reset`, { method: 'POST', body: { reason: reason.trim() } })
+      : kind === 'status'
       ? api(`/platform/users/${user.id}/status`, { method: 'PATCH', body: { status: disabling ? 'disabled' : 'active', reason: reason.trim() } })
       : api(`/platform/users/${user.id}/admin`, { method: 'PATCH', body: { is_platform_admin: granting, reason: reason.trim() } }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       for (const key of ['platform-users', 'platform-overview', 'platform-activity']) void queryClient.invalidateQueries({ queryKey: [key] });
-      toast.success(kind === 'status' ? `${user.name} ${disabling ? 'can no longer sign in' : 'can sign in again'}.` : `${user.name} ${granting ? 'is now a platform admin' : 'is no longer a platform admin'}.`);
-      onClose();
+      if (kind === 'reset') { setTemporaryPassword((result as { data: { temporary_password: string } }).data.temporary_password); toast.success('Temporary password created. Copy it now.'); }
+      else { toast.success(kind === 'status' ? `${user.name} ${disabling ? 'can no longer sign in' : 'can sign in again'}.` : `${user.name} ${granting ? 'is now a platform admin' : 'is no longer a platform admin'}.`); onClose(); }
     },
   });
 
-  const title = kind === 'status' ? `${disabling ? 'Disable' : 'Enable'} ${user.name}'s account?` : granting ? `Make ${user.name} a platform admin?` : `Remove ${user.name} as platform admin?`;
+  const title = kind === 'reset' ? `Reset ${user.name}'s password?` : kind === 'status' ? `${disabling ? 'Disable' : 'Enable'} ${user.name}'s account?` : granting ? `Make ${user.name} a platform admin?` : `Remove ${user.name} as platform admin?`;
   const from = kind === 'admin' ? (user.is_platform_admin ? 'Platform admin' : user.company_managed ? 'Business login' : 'Personal account') : user.status === 'disabled' ? 'Disabled' : 'Active';
   const to = kind === 'admin' ? (granting ? 'Platform admin' : user.company_managed ? 'Business login' : 'Personal account') : disabling ? 'Disabled' : 'Active';
-  const effects: { ok: boolean; text: string }[] = kind === 'admin'
+  const effects: { ok: boolean; text: string }[] = kind === 'reset'
+    ? [{ ok: true, text: 'Creates a one-time temporary password that expires in 24 hours' }, { ok: false, text: 'Signs them out everywhere; they must choose a new password at next sign-in' }]
+    : kind === 'admin'
     ? granting
       ? [
           { ok: true, text: 'Open this super admin console' },
@@ -690,18 +701,18 @@ function AccountDialog({ user, kind, onClose }: { user: PlatformUser; kind: 'sta
     : disabling
       ? [{ ok: false, text: 'Cannot sign in to any business, and is signed out everywhere now' }, { ok: true, text: 'Their records and history are kept' }]
       : [{ ok: true, text: 'Can sign in again with their usual password' }];
-  const suggestions = kind === 'admin'
+  const suggestions = kind === 'reset' ? ['User asked for sign-in help', 'Password may have been exposed', 'Account recovery requested'] : kind === 'admin'
     ? granting ? ['Runs the platform', 'New support lead', 'Verified owner of the system'] : ['Left the team', 'No longer needs console access', 'Role changed']
     : disabling ? ['Account reported as compromised', 'Lost or stolen phone', 'Misuse reported by the owner'] : ['Verified with the owner', 'Issue resolved', 'Phone recovered'];
   const quality = reasonQuality(reason);
 
   return (
-    <Modal open onClose={onClose} title={title} icon={kind === 'admin' ? Crown : disabling ? UserX : UserCheck} size="lg"
+    <Modal open onClose={onClose} title={title} icon={kind === 'admin' ? Crown : kind === 'reset' ? KeyRound : disabling ? UserX : UserCheck} size="lg"
       footer={<>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant={destructive ? 'danger' : 'primary'} loading={save.isPending} disabled={quality.level !== 'good'} onClick={() => save.mutate()}>
-          {kind === 'status' ? (disabling ? 'Disable account' : 'Enable account') : granting ? 'Make admin' : 'Remove admin'}
-        </Button>
+        {!temporaryPassword && <Button variant={destructive ? 'danger' : 'primary'} loading={save.isPending} disabled={quality.level !== 'good'} onClick={() => save.mutate()}>
+          {kind === 'reset' ? 'Generate temporary password' : kind === 'status' ? (disabling ? 'Disable account' : 'Enable account') : granting ? 'Make admin' : 'Remove admin'}
+        </Button>}
       </>}>
       <div className="space-y-5">
         {/* Who, and what changes */}
@@ -740,11 +751,85 @@ function AccountDialog({ user, kind, onClose }: { user: PlatformUser; kind: 'sta
           </div>
         )}
 
+        {temporaryPassword && <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200"><p className="text-sm font-semibold text-emerald-900">Temporary password — copy and give it directly to {user.name}</p><code className="mt-2 block select-all break-all rounded-lg bg-white p-3 text-base font-bold text-slate-900 ring-1 ring-emerald-200">{temporaryPassword}</code><p className="mt-2 text-xs text-emerald-800">Shown once. Expires in 24 hours and must be changed at next sign-in.</p></div>}
         {save.error instanceof ApiError && <ErrorBanner error={save.error} />}
-        <ReasonField value={reason} onChange={setReason} suggestions={suggestions} preview={`${me?.name ?? 'You'} · ${kind === 'admin' ? (granting ? `made ${user.name} a platform admin` : `removed ${user.name} as platform admin`) : `${disabling ? 'disabled' : 'enabled'} ${user.name}`}`} />
+        {!temporaryPassword && <ReasonField value={reason} onChange={setReason} suggestions={suggestions} preview={`${me?.name ?? 'You'} · ${kind === 'reset' ? `reset ${user.name}'s password` : kind === 'admin' ? (granting ? `made ${user.name} a platform admin` : `removed ${user.name} as platform admin`) : `${disabling ? 'disabled' : 'enabled'} ${user.name}`}`} />}
       </div>
     </Modal>
   );
+}
+
+interface StaffSetupOptions {
+  tenant: { id: number; name: string; status: string };
+  branches: { id: number; name: string; code: string }[];
+  roles: { id: number; key: string; name: string }[];
+}
+
+function AddStaffAccountDialog({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [tenantSearch, setTenantSearch] = useState('');
+  const tenantQuery = useDebounced(tenantSearch.trim());
+  const [tenantId, setTenantId] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [roleId, setRoleId] = useState('');
+  const [branchId, setBranchId] = useState('');
+  const [created, setCreated] = useState<{ business_code: string; username: string; employee_code: string; role: string; branch: string; temporary_password: string } | null>(null);
+  const businesses = useQuery({
+    queryKey: ['platform-staff-tenants', tenantQuery],
+    queryFn: () => api<PlatformList>('/platform/tenants', { query: { q: tenantQuery, status: 'active', per_page: 100 } }),
+  });
+  const options = useQuery({
+    queryKey: ['platform-staff-options', tenantId],
+    queryFn: () => api<{ data: StaffSetupOptions }>(`/platform/tenants/${tenantId}/staff-options`),
+    enabled: !!tenantId,
+  });
+  const save = useMutation({
+    mutationFn: () => api<{ data: NonNullable<typeof created> }>(`/platform/tenants/${tenantId}/staff`, {
+      method: 'POST', body: { name: name.trim(), email: email.trim() || null, role_id: Number(roleId), branch_id: Number(branchId) },
+    }),
+    onSuccess: (response) => {
+      setCreated(response.data);
+      for (const key of ['platform-users', 'platform-overview', 'platform-activity']) void queryClient.invalidateQueries({ queryKey: [key] });
+      toast.success('Business account created. Copy the temporary password now.');
+    },
+  });
+  const config = options.data?.data;
+  const canSubmit = !!tenantId && !!name.trim() && !!roleId && !!branchId && !!config?.branches.length && !!config.roles.length;
+
+  return <Modal open onClose={onClose} title={created ? 'Account created' : 'Add business account'} icon={created ? CheckCircle2 : UserPlus} size="md"
+    footer={created ? <Button onClick={onClose}>Done</Button> : <><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} disabled={!canSubmit} onClick={() => save.mutate()}>Create account</Button></>}>
+    <div className="space-y-4">
+      {created ? <div className="space-y-3 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
+        <p className="text-sm font-semibold text-emerald-900">Give these sign-in details directly to the employee. The password is shown once.</p>
+        <p className="text-sm text-slate-700">Business code: <code className="select-all font-bold">{created.business_code}</code><br />Username: <code className="select-all font-bold">{created.username}</code><br />Employee ID: <code className="select-all font-bold">{created.employee_code}</code><br />Role: {created.role}<br />Branch: {created.branch}</p>
+        <div><p className="text-xs font-semibold text-emerald-900">Temporary password (expires in 24 hours)</p><code className="mt-1 block select-all break-all rounded-lg bg-white p-3 font-bold text-slate-900 ring-1 ring-emerald-200">{created.temporary_password}</code></div>
+        <p className="text-xs text-emerald-800">They sign in from the Staff option using the business code and username, then choose a new password.</p>
+      </div> : <>
+        <p className="text-xs text-slate-500">Create a business staff login. Privileged roles such as owner, manager, or access manager remain controlled by the business owner.</p>
+        <label className="block text-sm font-medium text-slate-700">Find business
+          <input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={tenantSearch} onChange={(e) => { setTenantSearch(e.target.value); setTenantId(''); setRoleId(''); setBranchId(''); }} placeholder="Search business name" />
+        </label>
+        <label className="block text-sm font-medium text-slate-700">Business
+          <select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={tenantId} onChange={(e) => { setTenantId(e.target.value); setRoleId(''); setBranchId(''); }}>
+            <option value="">Select a business</option>{(businesses.data?.data ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        {businesses.error instanceof ApiError && <ErrorBanner error={businesses.error} />}
+        {tenantId && options.error instanceof ApiError && <ErrorBanner error={options.error} />}
+        {tenantId && !options.isPending && config && <>
+          {!config.branches.length || !config.roles.length ? <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">This business needs an active branch and seeded staff roles before an account can be created.</p> : <>
+            <label className="block text-sm font-medium text-slate-700">Employee name<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={name} onChange={(e) => setName(e.target.value)} maxLength={255} /></label>
+            <label className="block text-sm font-medium text-slate-700">Email (optional)<input type="email" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} /></label>
+            <label className="block text-sm font-medium text-slate-700">System role<select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="">Choose role</option>{config.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
+            <label className="block text-sm font-medium text-slate-700">Branch<select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={branchId} onChange={(e) => setBranchId(e.target.value)}><option value="">Choose branch</option>{config.branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}</select></label>
+          </>}
+        </>}
+        {save.error instanceof ApiError && <ErrorBanner error={save.error} />}
+      </>}
+    </div>
+  </Modal>;
 }
 
 const MAX_REASON = 255;
