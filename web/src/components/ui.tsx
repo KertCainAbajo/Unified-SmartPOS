@@ -482,11 +482,11 @@ export function Modal({
         e.preventDefault();
         onClose();
       }}
-      className={cx('m-auto w-[calc(100%-2rem)] rounded-2xl p-0 shadow-2xl shadow-brand-900/20 backdrop:bg-brand-900/40 backdrop:backdrop-blur-sm', widths[size])}
+      className={cx('m-auto max-h-[85vh] max-h-[85dvh] w-[calc(100%-2rem)] overflow-hidden rounded-2xl p-0 shadow-2xl shadow-brand-900/20 backdrop:bg-brand-900/40 backdrop:backdrop-blur-sm', widths[size])}
     >
       {open && (
-        <div className="flex max-h-[85vh] flex-col">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex max-h-[85vh] max-h-[85dvh] flex-col">
+          <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div className="flex min-w-0 items-center gap-3">
               {Icon && (
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-900/20">
@@ -502,8 +502,8 @@ export function Modal({
               <X className="size-5" />
             </button>
           </header>
-          <div className="overflow-y-auto px-5 py-5">{children}</div>
-          {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-5 py-3">{footer}</footer>}
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-5 [scrollbar-gutter:stable]">{children}</div>
+          {footer && <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-5 py-3">{footer}</footer>}
         </div>
       )}
     </dialog>
