@@ -816,7 +816,7 @@ function AddStaffAccountDialog({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [roleId, setRoleId] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [created, setCreated] = useState<{ business_code: string; username: string; employee_code: string; role: string; branch: string; temporary_password: string } | null>(null);
+  const [created, setCreated] = useState<{ business_code: string; email: string | null; username: string; employee_code: string; role: string; role_key: string; branch: string; temporary_password: string } | null>(null);
   const businesses = useQuery({
     queryKey: ['platform-staff-tenants', tenantQuery],
     queryFn: () => api<PlatformList>('/platform/tenants', { query: { q: tenantQuery, status: 'active', per_page: 100 } }),
@@ -837,18 +837,22 @@ function AddStaffAccountDialog({ onClose }: { onClose: () => void }) {
     },
   });
   const config = options.data?.data;
-  const canSubmit = !!tenantId && !!name.trim() && !!roleId && !!branchId && !!config?.branches.length && !!config.roles.length;
+  const selectedRole = config?.roles.find((role) => String(role.id) === roleId);
+  const ownerRole = selectedRole?.key === 'business_owner';
+  const emailSignInRole = selectedRole?.key === 'business_owner' || selectedRole?.key === 'branch_manager';
+  const canSubmit = !!tenantId && !!name.trim() && !!roleId && (!emailSignInRole || !!email.trim())
+    && (ownerRole || (!!branchId && !!config?.branches.length)) && !!config?.roles.length;
 
   return <Modal open onClose={onClose} title={created ? 'Account created' : 'Add business account'} icon={created ? CheckCircle2 : UserPlus} size="md"
     footer={created ? <Button onClick={onClose}>Done</Button> : <><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={save.isPending} disabled={!canSubmit} onClick={() => save.mutate()}>Create account</Button></>}>
     <div className="space-y-4">
       {created ? <div className="space-y-3 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
         <p className="text-sm font-semibold text-emerald-900">Give these sign-in details directly to the employee. The password is shown once.</p>
-        <p className="text-sm text-slate-700">Business code: <code className="select-all font-bold">{created.business_code}</code><br />Username: <code className="select-all font-bold">{created.username}</code><br />Employee ID: <code className="select-all font-bold">{created.employee_code}</code><br />Role: {created.role}<br />Branch: {created.branch}</p>
+        <p className="text-sm text-slate-700">{created.role_key === 'business_owner' || created.role_key === 'branch_manager' ? <>Management sign-in email: <code className="select-all font-bold">{created.email}</code></> : <>Business code: <code className="select-all font-bold">{created.business_code}</code><br />Username: <code className="select-all font-bold">{created.username}</code></>}<br />Employee ID: <code className="select-all font-bold">{created.employee_code}</code><br />Role: {created.role}<br />Branch: {created.branch}</p>
         <div><p className="text-xs font-semibold text-emerald-900">Temporary password (expires in 24 hours)</p><code className="mt-1 block select-all break-all rounded-lg bg-white p-3 font-bold text-slate-900 ring-1 ring-emerald-200">{created.temporary_password}</code></div>
-        <p className="text-xs text-emerald-800">They sign in from the Staff option using the business code and username, then choose a new password.</p>
+        <p className="text-xs text-emerald-800">{created.role_key === 'business_owner' || created.role_key === 'branch_manager' ? 'They use the Management sign-in with their email and change the temporary password. They will land on this business dashboard with their role access.' : 'They sign in from the Staff option using the business code and username, then choose a new password.'}</p>
       </div> : <>
-        <p className="text-xs text-slate-500">Create a business staff login. Privileged roles such as owner, manager, or access manager remain controlled by the business owner.</p>
+        <p className="text-xs text-slate-500">Business Owners get all-branch access. Managers are assigned to one branch. After sign-in, each lands in the business dashboard with access based on their role.</p>
         <label className="block text-sm font-medium text-slate-700">Find business
           <input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={tenantSearch} onChange={(e) => { setTenantSearch(e.target.value); setTenantId(''); setRoleId(''); setBranchId(''); }} placeholder="Search business name" />
         </label>
@@ -862,9 +866,9 @@ function AddStaffAccountDialog({ onClose }: { onClose: () => void }) {
         {tenantId && !options.isPending && config && <>
           {!config.branches.length || !config.roles.length ? <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">This business needs an active branch and seeded staff roles before an account can be created.</p> : <>
             <label className="block text-sm font-medium text-slate-700">Employee name<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={name} onChange={(e) => setName(e.target.value)} maxLength={255} /></label>
-            <label className="block text-sm font-medium text-slate-700">Email (optional)<input type="email" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} /></label>
+            <label className="block text-sm font-medium text-slate-700">Email {emailSignInRole ? '(required for sign-in)' : '(optional)'}<input type="email" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} required={emailSignInRole} /></label>
             <label className="block text-sm font-medium text-slate-700">System role<select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="">Choose role</option>{config.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
-            <label className="block text-sm font-medium text-slate-700">Branch<select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={branchId} onChange={(e) => setBranchId(e.target.value)}><option value="">Choose branch</option>{config.branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}</select></label>
+            {ownerRole ? <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Business Owner can access every branch and the full business dashboard.</p> : <label className="block text-sm font-medium text-slate-700">Branch<select className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm" value={branchId} onChange={(e) => setBranchId(e.target.value)}><option value="">Choose branch</option>{config.branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}</select></label>}
           </>}
         </>}
         {save.error instanceof ApiError && <ErrorBanner error={save.error} />}

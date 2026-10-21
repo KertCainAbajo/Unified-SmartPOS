@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Role;
+use App\Support\Permissions;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -33,6 +34,8 @@ class RoleResource extends JsonResource
             return null;
         }
 
-        return $context->tenant()->owner_user_id === auth()->id() || ! $this->isAdministrative();
+        $ownerRole = $context->membership()->roles()->whereNull('roles.tenant_id')->where('roles.key', Permissions::ROLE_OWNER)->exists();
+
+        return $context->tenant()->owner_user_id === auth()->id() || $ownerRole || ! $this->isAdministrative();
     }
 }

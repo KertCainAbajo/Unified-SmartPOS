@@ -16,6 +16,7 @@ use App\Services\AuditLogger;
 use App\Services\Staff\AccessRevoker;
 use App\Services\Staff\EmployeeCodeGenerator;
 use App\Services\Staff\UsernameGenerator;
+use App\Support\Permissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -125,7 +126,8 @@ class PlatformConsoleController extends Controller
     public function staffOptions(Tenant $tenant): JsonResponse
     {
         $roles = Role::query()->whereNull('tenant_id')->where('is_system', true)->with('permissions:id,key')->orderBy('name')->get()
-            ->reject(fn (Role $role) => $role->isAdministrative())
+            ->reject(fn (Role $role) => $role->isAdministrative()
+                && ! in_array($role->key, [Permissions::ROLE_OWNER, Permissions::ROLE_MANAGER], true))
             ->map(fn (Role $role) => ['id' => $role->id, 'key' => $role->key, 'name' => $role->name]);
 
         return response()->json(['data' => [
@@ -135,32 +137,36 @@ class PlatformConsoleController extends Controller
         ]]);
     }
 
-    /** Create an active company-managed account with a one-time password and a non-administrative system role. */
+    /** Create an active company-managed account with a one-time password and an allowed system role. */
     public function createStaffAccount(Request $request, Tenant $tenant, UsernameGenerator $usernames, EmployeeCodeGenerator $employeeCodes): JsonResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'role_id' => ['required', 'integer', 'exists:roles,id'],
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
         ]);
         if (! $tenant->isActive()) {
             throw new BusinessRuleException('Staff accounts can only be created for an active business.', 'TENANT_INACTIVE', status: 409);
         }
 
         $role = Role::query()->whereKey($data['role_id'])->whereNull('tenant_id')->where('is_system', true)->with('permissions:id,key')->first();
-        if (! $role || $role->isAdministrative()) {
-            throw new BusinessRuleException('Choose a non-administrative system role. Business owner and access roles must be granted by the business owner.', 'ROLE_NOT_ALLOWED', status: 422);
+        if (! $role || ($role->isAdministrative() && ! in_array($role->key, [Permissions::ROLE_OWNER, Permissions::ROLE_MANAGER], true))) {
+            throw new BusinessRuleException('Choose a supported system role. User & Access Manager remains controlled by the business owner.', 'ROLE_NOT_ALLOWED', status: 422);
         }
-        $branch = Branch::query()->whereKey($data['branch_id'])->where('tenant_id', $tenant->id)->where('is_active', true)->first();
-        if (! $branch) {
+        if ($role->requiresEmailSignIn() && empty($data['email'])) {
+            throw new BusinessRuleException('Business Owners and Managers must have an email address for sign-in.', 'EMAIL_REQUIRED', ['email' => ['Required for Business Owner and Manager roles.']]);
+        }
+        $isOwnerRole = $role->key === Permissions::ROLE_OWNER;
+        $branch = $isOwnerRole ? null : Branch::query()->whereKey($data['branch_id'] ?? null)->where('tenant_id', $tenant->id)->where('is_active', true)->first();
+        if (! $isOwnerRole && ! $branch) {
             throw new BusinessRuleException('Choose an active branch from the selected business.', 'BRANCH_NOT_ALLOWED', status: 422);
         }
 
-        $username = $usernames->suggest($tenant->id, $role->key, $branch->code);
+        $username = $usernames->suggest($tenant->id, $role->key, $branch?->code);
         $temporaryPassword = Str::password(20);
         $expiresAt = now()->addHours(24);
-        $membership = DB::transaction(function () use ($request, $tenant, $data, $role, $branch, $username, $temporaryPassword, $expiresAt, $employeeCodes) {
+        $membership = DB::transaction(function () use ($request, $tenant, $data, $role, $branch, $isOwnerRole, $username, $temporaryPassword, $expiresAt, $employeeCodes) {
             $user = User::query()->forceCreate([
                 'name' => trim($data['name']), 'email' => isset($data['email']) ? mb_strtolower(trim($data['email'])) : null,
                 'username' => $username, 'managed_by_tenant_id' => $tenant->id, 'password' => $temporaryPassword,
@@ -168,12 +174,14 @@ class PlatformConsoleController extends Controller
             ]);
             $membership = TenantMembership::query()->create([
                 'tenant_id' => $tenant->id, 'user_id' => $user->id, 'employee_code' => $employeeCodes->next($tenant->id),
-                'status' => 'active', 'all_branches' => false, 'joined_at' => now(), 'created_by' => $request->user()->id,
+                'status' => 'active', 'all_branches' => $isOwnerRole, 'joined_at' => now(), 'created_by' => $request->user()->id,
             ]);
             $membership->roles()->attach($role->id);
-            $membership->branches()->attach($branch->id);
+            if ($branch) {
+                $membership->branches()->attach($branch->id);
+            }
             $this->audit->log('platform.staff_account_created', $user, null, [
-                'tenant_id' => $tenant->id, 'role' => $role->key, 'branch_id' => $branch->id, 'username' => $username,
+                'tenant_id' => $tenant->id, 'role' => $role->key, 'branch_id' => $branch?->id, 'username' => $username,
                 'temporary_password_expires_at' => $expiresAt->toIso8601String(),
             ], tenantId: $tenant->id);
 
@@ -182,8 +190,9 @@ class PlatformConsoleController extends Controller
 
         return response()->json(['data' => [
             'id' => $membership->user->id, 'name' => $membership->user->name, 'email' => $membership->user->email,
-            'business_code' => $tenant->slug, 'username' => $username, 'employee_code' => $membership->employee_code, 'role' => $role->name,
-            'branch' => $branch->name, 'temporary_password' => $temporaryPassword, 'expires_at' => $expiresAt->toIso8601String(),
+            'business_code' => $tenant->slug, 'username' => $username, 'employee_code' => $membership->employee_code,
+            'role' => $role->name, 'role_key' => $role->key,
+            'branch' => $branch?->name ?? 'All branches', 'temporary_password' => $temporaryPassword, 'expires_at' => $expiresAt->toIso8601String(),
         ]], 201);
     }
 

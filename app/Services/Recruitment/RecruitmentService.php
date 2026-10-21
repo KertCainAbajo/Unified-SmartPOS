@@ -917,7 +917,8 @@ class RecruitmentService
 
     private function isOwner(): bool
     {
-        return $this->context->tenant()->owner_user_id === $this->actorUserId();
+        return $this->context->tenant()->owner_user_id === $this->actorUserId()
+            || $this->context->membership()->roles()->whereNull('roles.tenant_id')->where('roles.key', P::ROLE_OWNER)->exists();
     }
 
     private function actorUserId(): ?int

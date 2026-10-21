@@ -815,6 +815,7 @@ class StaffService
 
     private function actorIsOwner(): bool
     {
-        return $this->actorId() === $this->context->tenant()->owner_user_id;
+        return $this->actorId() === $this->context->tenant()->owner_user_id
+            || $this->context->membership()->roles()->whereNull('roles.tenant_id')->where('roles.key', Permissions::ROLE_OWNER)->exists();
     }
 }

@@ -62,7 +62,7 @@ by email.
 |---|---|---|
 | Business Owner (`business_owner`) | Everything in the business | Full |
 | User & Access Manager (`user_access_manager`) | Staff accounts and access only | `staff.*` (no sales/stock/finance) |
-| Branch Manager (`branch_manager`) | Branch operations | Adds branches (gets access to new ones) and runs own branches: staff with non-administrative roles, stock, sales, sales reports. **Not**: business settings, roles, profit/cost/expense reports, full audit log, other managers, final hiring approval. Owner-only to grant |
+| Branch Manager (`branch_manager`) | Branch operations | Adds branches (gets access to new ones) and runs own branches: staff with non-administrative roles, stock, sales, sales reports. **Not**: business settings, roles, profit/cost/expense reports, full audit log, other managers, final hiring approval. Owner-only in the business console; platform Super Admin may create one for a selected branch. |
 | Cashier (`cashier`) | Selling | None |
 | Inventory Staff (`inventory_staff`) | Stock operations | None |
 | Accountant / Finance (`accountant`) | Reports, expenses, financial review | None |
@@ -75,6 +75,8 @@ Staff permissions: `staff.view`, `staff.create`, `staff.update`, `staff.status` 
 `staff.offboard`, `staff.assign_roles`, `staff.assign_branches`, `staff.credentials` (invitations and
 recovery), `staff.audit` (account-related audit entries only). They replace the earlier
 `members.view` / `members.manage`.
+
+The platform Super Admin may create Business Owner and Branch Manager accounts for an active business. A Business Owner account has full access to every branch; a Branch Manager is limited to the branch chosen at creation. Both use email sign-in. Their business dashboard opens after sign-in and is scoped by role permissions.
 
 ## 5. Authorization rules for staff administration
 
