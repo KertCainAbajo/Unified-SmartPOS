@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   Barcode,
   Download,
+  Expand,
   ImagePlus,
   Layers,
   Package,
@@ -577,7 +578,7 @@ function ProductPhoto({ product }: { product: Product }) {
   return (
     <div className="flex flex-col gap-4 sm:col-span-2 sm:flex-row sm:items-center">
       <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200">
-        {imageUrl ? <img src={imageUrl} alt={product.name} className="size-full bg-white object-contain" /> : <ImagePlus className="size-8 text-slate-300" />}
+        {imageUrl ? <ProductPhotoCard product={product} imageUrl={imageUrl} /> : <ImagePlus className="size-8 text-slate-300" />}
       </div>
       <div className="min-w-0 flex-1">
         <label
@@ -596,6 +597,44 @@ function ProductPhoto({ product }: { product: Product }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Click the product thumbnail to see its photo and details in a larger card. */
+function ProductPhotoCard({ product, imageUrl }: { product: Product; imageUrl: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`View photo of ${product.name}`}
+        className="group relative size-full cursor-zoom-in bg-white focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      >
+        <img src={imageUrl} alt={product.name} className="size-full object-contain" />
+        <span className="absolute inset-0 grid place-items-center bg-slate-900/0 text-white opacity-0 transition group-hover:bg-slate-900/25 group-hover:opacity-100 group-focus-visible:bg-slate-900/25 group-focus-visible:opacity-100">
+          <span className="grid size-9 place-items-center rounded-full bg-white/95 text-slate-700 shadow"><Expand className="size-4" /></span>
+        </span>
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Product photo" size="sm" description={product.name}>
+        <article className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm">
+          <div className="grid aspect-square place-items-center bg-slate-50 p-5 sm:p-7">
+            <img src={imageUrl} alt={product.name} className="max-h-full max-w-full object-contain" />
+          </div>
+          <div className="space-y-3 p-4">
+            <div>
+              <h3 className="font-display text-lg font-bold text-slate-900">{product.name}</h3>
+              {product.category?.name && <p className="mt-1 text-sm text-slate-500">{product.category.name}</p>}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-600">SKU {product.sku}</span>
+              <span className="font-semibold text-brand-800">{formatMoney(product.price)}</span>
+            </div>
+          </div>
+        </article>
+      </Modal>
+    </>
   );
 }
 
