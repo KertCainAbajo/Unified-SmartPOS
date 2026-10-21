@@ -29,6 +29,11 @@ interface Account { id: number; name: string; email: string; phone: string }
 type Order = ShopOrder;
 interface CartLine { product: ShopProduct; quantity: number }
 type Sort = 'featured' | 'price-asc' | 'price-desc' | 'name';
+/** Cards per sideways category row on "All products", and per "Show more" step in a single category or search. */
+const AISLE_SIZE = 8;
+/** Row for products without a category on "All products". */
+const OTHER = 'Other products';
+const PAGE = 24;
 
 const peso = (value: string | number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(value));
 const statusNames: Record<string, string> = { pending: 'Waiting for store confirmation', confirmed: 'Being prepared', ready: 'Ready', out_for_delivery: 'On the way', completed: 'Completed', cancelled: 'Cancelled' };
@@ -93,6 +98,7 @@ export function ShopPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL);
   const [sort, setSort] = useState<Sort>('featured');
+  const [paging, setPaging] = useState({ key: '', count: PAGE });
   const savedKey = `shop-saved:${business}`;
   const [saved, setSaved] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem(savedKey) ?? '[]') as number[]; } catch { return []; } });
   const toggleSaved = (id: number) => setSaved((old) => {
@@ -200,6 +206,17 @@ export function ShopPage() {
       (selectedCategory === ALL || (selectedCategory === SAVED ? saved.includes(product.id) : product.category === selectedCategory)) &&
       `${product.name} ${product.description ?? ''} ${product.category ?? ''}`.toLowerCase().includes(term))
     .sort((a, b) => sort === 'price-asc' ? Number(a.price) - Number(b.price) : sort === 'price-desc' ? Number(b.price) - Number(a.price) : sort === 'name' ? a.name.localeCompare(b.name) : 0);
+  // All products, no search, store order: one short sideways row per category instead of a 200-card grid.
+  const aisles = selectedCategory === ALL && !term && sort === 'featured';
+  // "Show more" count, back to one page whenever the category, search or sort changes.
+  const pageKey = `${selectedCategory}|${term}|${sort}`;
+  const shown = paging.key === pageKey ? paging.count : PAGE;
+  const setShown = (count: number) => setPaging({ key: pageKey, count });
+  const openCategory = (category: string) => {
+    setSelectedCategory(category);
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  const card = (product: ShopProduct) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />;
   const setQuantity = (product: ShopProduct, quantity: number) => setCart((old) => {
     const next = { ...old };
     if (quantity <= 0) delete next[product.id]; else next[product.id] = { product, quantity };
@@ -305,6 +322,12 @@ export function ShopPage() {
           <ShopHero onStart={() => (signedIn ? document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }) : openAuth('login'))} photos={[...shop.data].sort((x, y) => totalStock(y) - totalStock(x))} branchCount={shop.branches.length} signedIn={signedIn} onCreateAccount={() => openAuth('register')} />
           <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
+              {selectedCategory !== ALL && (
+                <button type="button" onClick={() => { setSelectedCategory(ALL); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-white pl-2.5 pr-4 text-sm font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50">
+                  <ChevronLeft size={16} /> All categories
+                </button>
+              )}
               <p className="text-[11px] font-bold uppercase tracking-[.18em] text-emerald-700">{selectedCategory === ALL ? 'The store collection' : 'Category'}</p>
               <h2 className="mt-0.5 font-display text-xl font-bold tracking-tight sm:text-2xl">{selectedCategory}</h2>
               <p className="mt-1 text-sm text-slate-500">{visibleProducts.length} of {shop.data.length} items{term && <> matching “<span className="font-semibold text-slate-700">{search.trim()}</span>”</>}</p>
@@ -322,9 +345,44 @@ export function ShopPage() {
             ? <EmptyAisle />
             : !visibleProducts.length
               ? <EmptyState title="Nothing matches that search" text="Try a different word or browse another category." action={<button onClick={() => { setSearch(''); setSelectedCategory(ALL); }} className="mt-4 rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-900">Show all products</button>} />
-              : <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
-                {visibleProducts.map((product) => <ProductCard key={product.id} product={product} stock={productStock(product, branchId, shop.branches)} quantity={cart[product.id]?.quantity ?? 0} saved={saved.includes(product.id)} tone={toneFor(product.category)} Icon={iconFor(product.category)} onChange={(quantity) => setQuantity(product, quantity)} onToggleSaved={() => toggleSaved(product.id)} />)}
-              </div>}
+              : aisles
+                ? <div className="mt-5 space-y-8">
+                  {[...categories.slice(1), OTHER].map((category) => {
+                    const items = visibleProducts.filter((product) => category === OTHER ? !product.category : product.category === category);
+                    if (!items.length) return null;
+                    const Icon = iconFor(category);
+                    return <section key={category} aria-label={category}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h3 className="flex min-w-0 items-center gap-2 font-display text-lg font-bold text-slate-900">
+                          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Icon size={16} /></span>
+                          <span className="truncate">{category}</span>
+                          <span className="text-sm font-medium text-slate-400">{items.length}</span>
+                        </h3>
+                        {category !== OTHER && <button type="button" onClick={() => openCategory(category)} className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">See all <ChevronRight size={16} /></button>}
+                      </div>
+                      <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin] sm:gap-4">
+                        {(category === OTHER ? items : items.slice(0, AISLE_SIZE)).map((product) => <div key={product.id} className="w-[46%] shrink-0 snap-start sm:w-[31%] xl:w-[23.5%]">{card(product)}</div>)}
+                        {items.length > AISLE_SIZE && category !== OTHER && (
+                          <button type="button" onClick={() => openCategory(category)} className="flex w-[46%] shrink-0 snap-start flex-col items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-emerald-200 bg-emerald-50/40 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 sm:w-[31%] xl:w-[23.5%]">
+                            <span className="grid size-11 place-items-center rounded-full bg-white text-emerald-700 shadow-sm"><ChevronRight size={20} /></span>
+                            See all {items.length}
+                          </button>
+                        )}
+                      </div>
+                    </section>;
+                  })}
+                </div>
+                : <>
+                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+                    {visibleProducts.slice(0, shown).map(card)}
+                  </div>
+                  {visibleProducts.length > shown && (
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                      <button type="button" onClick={() => setShown(shown + PAGE)} className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50">Show more products</button>
+                      <p className="text-xs text-slate-500">Showing {shown} of {visibleProducts.length}</p>
+                    </div>
+                  )}
+                </>}
         </section>
 
         {/* ───────── Basket ───────── */}
