@@ -9,10 +9,14 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -42,6 +46,10 @@ class AppServiceProvider extends ServiceProvider
         // Generic permission gate for endpoints not tied to a single model (reports, audit logs…).
         Gate::define('tenant-permission', fn ($user, string $permission) => app(TenantContext::class)->hasTenant()
             && app(TenantContext::class)->can($permission));
+
+        // MAIL_MAILER=brevo sends through Brevo's HTTPS API (works where SMTP ports are blocked).
+        Mail::extend('brevo', fn () => (new BrevoTransportFactory(null, HttpClient::create()))
+            ->create(new Dsn('brevo+api', 'default', (string) config('services.brevo.key'))));
 
         $this->configureRateLimiting();
     }
