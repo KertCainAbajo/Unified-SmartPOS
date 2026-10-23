@@ -61,6 +61,7 @@ test.describe('signed out', () => {
     await expect(page).toHaveURL(/\/t\/1$/);
     await page.getByRole('button', { name: /Maria Santos/ }).click();
     await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog').filter({ hasText: 'Sign out?' }).getByRole('button', { name: 'OK' }).click();
     await expect(page).toHaveURL(/\/login/);
   });
 });

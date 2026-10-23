@@ -44,6 +44,7 @@ import type { AppNotification, Paginated } from '../lib/types';
 import { TenantProvider, useTenant, useTenantContextQuery } from '../tenant/TenantProvider';
 import { BranchSwitcher } from './BranchSwitcher';
 import { BrandLogo } from './BrandLogo';
+import { useConfirm } from './Confirm';
 import { NotificationsPanel } from './NotificationsPanel';
 import { ErrorBanner, Spinner, cx } from './ui';
 
@@ -246,7 +247,9 @@ function Shell() {
 
   const roleLabel = roles.map((r) => ROLE_LABELS[r] ?? r.replaceAll('_', ' ')).join(', ');
   const initials = (user?.name ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
+  const ask = useConfirm();
   const signOut = async () => {
+    if (!(await ask({ title: 'Sign out?', message: 'You will need to sign in again to use your account.', confirmLabel: 'OK', cancelLabel: 'Cancel', tone: 'default' }))) return;
     await logout();
     navigate('/login');
   };

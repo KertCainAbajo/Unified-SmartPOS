@@ -134,6 +134,7 @@ test.describe.serial('customer app, end to end', () => {
       // On a phone, signing out is in the account window (the header has no room for it).
       await expect(page.locator('header button[aria-label="Sign out"]')).toBeHidden();
       await account.getByRole('button', { name: 'Sign out' }).click();
+      await page.getByRole('dialog').filter({ hasText: 'Sign out?' }).getByRole('button', { name: 'OK' }).click();
       await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible();
     });
 

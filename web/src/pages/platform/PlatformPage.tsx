@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../../auth/AuthProvider';
 import { BrandLogo } from '../../components/BrandLogo';
+import { useConfirm } from '../../components/Confirm';
 import { useToast } from '../../components/Toast';
 import { Avatar, Button, ErrorBanner, Modal, Pagination, Spinner, cx } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
@@ -71,6 +72,7 @@ function ago(iso: string | null | undefined): string {
 export function PlatformPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const ask = useConfirm();
   const [tab, setTab] = useState<Tab>('overview');
   const [openTenant, setOpenTenant] = useState<number | null>(null);
 
@@ -96,7 +98,7 @@ export function PlatformPage() {
             </div>
             <button type="button" onClick={() => navigate('/')} title="Open a business you work at" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-brand-50 ring-1 ring-white/20 transition hover:bg-white/10 md:inline-flex"><Store className="size-4" /> My businesses</button>
             <span className="hidden items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm ring-1 ring-white/15 sm:inline-flex"><Avatar name={user.name} size="sm" />{user.name}</span>
-            <button type="button" onClick={async () => { await logout(); navigate('/login'); }}
+            <button type="button" onClick={async () => { if (!(await ask({ title: 'Sign out?', message: 'You will need to sign in again to use your account.', confirmLabel: 'OK', cancelLabel: 'Cancel', tone: 'default' }))) return; await logout(); navigate('/login'); }}
               className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-brand-50 ring-1 ring-white/20 transition hover:bg-white/10">
               <LogOut className="size-4" /> Sign out
             </button>
